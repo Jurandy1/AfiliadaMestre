@@ -578,7 +578,9 @@
     <!-- JAVASCRIPT APP ARCHITECTURE -->
     <script>
         // Backend local: npm start → http://localhost:3789
-        const API_BASE = window.location.port === "3789"
+        // Mesma origem quando servido por um servidor (local ou Vercel).
+        // Só usa localhost quando o arquivo é aberto direto (file://).
+        const API_BASE = (location.protocol === "http:" || location.protocol === "https:")
             ? ""
             : (localStorage.getItem("afiliado_mestre_api_base") || "http://localhost:3789");
         let apiLive = false;

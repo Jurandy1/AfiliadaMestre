@@ -259,6 +259,20 @@ app.post("/api/auto/run", async (_req, res) => {
   }
 });
 
+/**
+ * Endpoint para Cron (ex.: Vercel Cron chama via GET).
+ * Em ambientes serverless o setInterval não roda, então a alimentação
+ * automática acontece por aqui, agendada externamente.
+ */
+app.get("/api/cron/sync", async (_req, res) => {
+  try {
+    const result = await autosync.runOnce({ manual: true });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/shortlink", async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "").trim();
@@ -279,9 +293,15 @@ app.get("/", (_req, res) => {
   res.redirect("/uploads/painel_e_vitrine_afiliado_mestre.html");
 });
 
-app.listen(PORT, () => {
-  console.log(`Afiliado Mestre rodando em http://localhost:${PORT}`);
-  console.log(`Vitrine: http://localhost:${PORT}/uploads/painel_e_vitrine_afiliado_mestre.html`);
-  console.log(`Health:  http://localhost:${PORT}/api/health`);
-  autosync.start();
-});
+// Servidor contínuo (local, Render, Railway, VPS...). Em serverless (Vercel)
+// o arquivo é importado como handler e este bloco não executa.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Afiliado Mestre rodando em http://localhost:${PORT}`);
+    console.log(`Vitrine: http://localhost:${PORT}/uploads/painel_e_vitrine_afiliado_mestre.html`);
+    console.log(`Health:  http://localhost:${PORT}/api/health`);
+    autosync.start();
+  });
+}
+
+module.exports = app;
