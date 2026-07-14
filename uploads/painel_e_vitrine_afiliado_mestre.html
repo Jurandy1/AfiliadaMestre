@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afiliada Mestre — Ofertas selecionadas na Shopee</title>
+    <link rel="icon" type="image/png" href="/uploads/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        shopee: {
+                            orange: '#ee4d2d',
+                            orangeHover: '#d33b1c',
+                            orangeLight: '#ffebd7',
+                            yellow: '#f8d135',
+                            darkYellow: '#f5a623',
+                            grayBg: '#f5f5f5',
+                            textDark: '#222222',
+                            textMuted: '#757575',
+                            greenFree: '#26aa99',
+                            greenLight: '#e8f7f5'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Nunito', 'sans-serif'],
+                        shopee: ['Nunito', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Smooth Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d4d4d4;
+            border-radius: 6px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        /* Pulse Animation for VIP badges */
+        @keyframes subtle-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .animate-subtle-pulse {
+            animation: subtle-pulse 2s infinite;
+        }
+        /* Custom UI highlights */
+        .api-glow {
+            box-shadow: 0 0 15px rgba(238, 77, 45, 0.15);
+        }
+        .tab-active {
+            border-color: #ee4d2d;
+            color: #ee4d2d;
+            background-color: rgba(238, 77, 45, 0.04);
+        }
+    </style>
+</head>
+<body class="bg-shopee-grayBg text-shopee-textDark font-sans selection:bg-shopee-orange selection:text-white min-h-screen flex flex-col">
+
+    <!-- Admin bar: só aparece com ?admin=1 na URL -->
+    <header id="admin-top-bar" class="hidden bg-slate-900 text-white text-xs py-2 px-4 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p class="text-slate-300">Painel do afiliado — clientes não veem esta barra</p>
+            <div class="flex items-center bg-slate-800 rounded-full p-1 border border-slate-700">
+                <button 
+                    onclick="switchMainMode('storefront')" 
+                    id="btn-mode-storefront"
+                    class="px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white"
+                >
+                    <i class="fas fa-store mr-1.5"></i> Vitrine
+                </button>
+                <button 
+                    onclick="switchMainMode('console')" 
+                    id="btn-mode-console"
+                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
+                >
+                    <i class="fas fa-terminal mr-1.5"></i> Console Admin
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- SECTION 1: PUBLIC STOREFRONT MODE -->
+    <div id="main-storefront-section" class="flex-1 flex flex-col">
+        <!-- Shopee Style Header Block -->
+        <div class="bg-shopee-orange pb-6 pt-4 text-white">
+            <div class="max-w-7xl mx-auto px-4">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center gap-3 shrink-0">
+                        <div class="bg-white rounded-xl shadow-lg px-3 py-2 flex items-center justify-center">
+                            <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-12 md:h-14 w-auto">
+                        </div>
+                        <p class="hidden sm:block text-[11px] text-orange-100 font-semibold max-w-[160px] leading-tight">
+                            Ofertas selecionadas da Shopee com frete grátis
+                        </p>
+                    </div>
+
+                    <div class="w-full md:max-w-2xl">
+                        <div class="bg-white p-1 rounded-lg flex items-center shadow-md border-2 border-white focus-within:border-amber-300 transition-all">
+                            <i class="fas fa-search text-slate-400 ml-3 mr-2"></i>
+                            <input 
+                                type="text" 
+                                id="store-search-input"
+                                oninput="searchStoreProducts()"
+                                placeholder="O que você está procurando?" 
+                                class="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                            >
+                            <button 
+                                onclick="searchStoreProducts()"
+                                class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-6 py-2.5 rounded-md transition font-bold text-xs uppercase"
+                            >
+                                Buscar
+                            </button>
+                        </div>
+                        <div class="flex gap-4 mt-2 text-[11px] text-orange-100 px-1">
+                            <span class="font-semibold text-white">Populares:</span>
+                            <button onclick="applyStoreSearch('Mini Projetor')" class="hover:text-shopee-yellow underline">Mini Projetor</button>
+                            <button onclick="applyStoreSearch('Smartwatch')" class="hover:text-shopee-yellow underline">Smartwatch</button>
+                            <button onclick="applyStoreSearch('Umidificador')" class="hover:text-shopee-yellow underline">Umidificador</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CORE PUBLIC STOREFRONT CONTENT -->
+        <main class="max-w-7xl w-full mx-auto p-4 space-y-6 flex-1">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2 bg-shopee-orange rounded-xl overflow-hidden relative shadow-md h-48 md:h-64 p-7 md:p-10 text-white flex flex-col justify-between">
+                    <div class="absolute right-6 bottom-0 opacity-10 pointer-events-none">
+                        <i class="fas fa-shopping-bag text-[140px] text-white"></i>
+                    </div>
+                    <div class="space-y-2 max-w-lg z-10">
+                        <span class="bg-shopee-yellow text-shopee-orange text-[11px] font-black px-2.5 py-1 rounded uppercase">
+                            Ofertas do dia
+                        </span>
+                        <h2 class="text-2xl md:text-3xl font-extrabold leading-tight">Os melhores preços da Shopee em um só lugar</h2>
+                        <p class="text-sm text-orange-50 leading-relaxed">
+                            Clique no produto e compre direto na Shopee com desconto e frete grátis.
+                        </p>
+                    </div>
+                    <div class="z-10">
+                        <button onclick="scrollToStoreGrid()" class="bg-shopee-yellow hover:bg-yellow-400 text-shopee-orange font-extrabold text-xs px-5 py-2.5 rounded-lg shadow transition uppercase tracking-wide">
+                            Ver ofertas <i class="fas fa-arrow-down ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 lg:grid-cols-1 gap-3">
+                    <div class="bg-[#26aa99] text-white rounded-xl p-4 flex items-center gap-3 shadow-md relative overflow-hidden h-auto lg:h-[120px]">
+                        <div class="h-11 w-11 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl">
+                            <i class="fas fa-truck-fast"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold leading-tight">Frete grátis Shopee</h3>
+                            <p class="text-[11px] text-white/90 mt-0.5">Produtos elegíveis ao Frete Grátis do app.</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-600 text-white rounded-xl p-4 flex items-center gap-3 shadow-md relative overflow-hidden h-auto lg:h-[120px]">
+                        <div class="h-11 w-11 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl">
+                            <i class="fas fa-tags"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold leading-tight">Ofertas com desconto</h3>
+                            <p class="text-[11px] text-white/90 mt-0.5">Preços promocionais direto da Shopee.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Row -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60">
+                <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                    <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Navegar por Categorias
+                </h3>
+                <div class="grid grid-cols-4 sm:grid-cols-8 gap-2" id="store-categories-container">
+                    <!-- Dynamic categories generated inside script -->
+                </div>
+            </div>
+
+            <!-- FLASH SALE BOX -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200/60">
+                <div class="bg-gradient-to-r from-orange-500/10 to-red-500/10 p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center bg-shopee-orange text-white font-black px-3 py-1.5 rounded-lg text-xs italic tracking-wide animate-subtle-pulse">
+                            <i class="fas fa-bolt mr-1.5 text-shopee-yellow"></i> OFERTAS RELÂMPAGO
+                        </div>
+                        <!-- Countdown timer -->
+                        <div class="flex items-center space-x-1 font-bold text-sm text-slate-800">
+                            <span id="flash-hour" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">02</span>
+                            <span>:</span>
+                            <span id="flash-min" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">15</span>
+                            <span>:</span>
+                            <span id="flash-sec" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">30</span>
+                        </div>
+                    </div>
+                    <span class="text-xs text-shopee-orange font-bold flex items-center gap-1">
+                        Estoque limitado <i class="fas fa-chevron-right text-[9px]"></i>
+                    </span>
+                </div>
+                <!-- Flash Items Container (Horizontal scrollable) -->
+                <div class="p-4 overflow-x-auto flex space-x-4 pb-6" id="flash-products-container">
+                    <!-- Filled by Script -->
+                </div>
+            </div>
+
+            <!-- PRODUCTS SHOWCASE GRID -->
+            <div id="store-grid-section" class="space-y-4 pt-2">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fas fa-fire text-shopee-orange"></i> Ofertas em destaque
+                    </h3>
+                    <div id="store-results-info" class="text-xs text-slate-500">
+                        Carregando ofertas…
+                    </div>
+                </div>
+
+                <!-- Cards Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3.5" id="store-products-grid">
+                    <!-- Populated Dynamically -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SECTION 2: MASTER CONSOLE & API SIMULATOR MODE -->
+    <div id="main-console-section" class="hidden flex-1 max-w-7xl w-full mx-auto p-4 space-y-6">
+        
+        <!-- Header Console Summary -->
+        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-gauge-high text-shopee-orange"></i> Painel do Afiliado
+                </h2>
+                <p class="text-xs text-slate-400 mt-1">
+                    Gerencie as ofertas da vitrine. A alimentação roda sozinha em segundo plano.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="runAutoSyncNow()" id="btn-run-auto" class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">
+                    <i class="fas fa-bolt mr-1"></i> Rodar sincronização agora
+                </button>
+                <button onclick="loadOffersFromSupabase({silent:false, reset:true})" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                    <i class="fas fa-rotate mr-1"></i> Recarregar cache
+                </button>
+                <button onclick="openNewProductForm()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                    <i class="fas fa-plus mr-1"></i> Produto manual
+                </button>
+            </div>
+        </div>
+
+        <!-- STATS REAIS -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div class="space-y-1">
+                    <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Produtos no banco</span>
+                    <h3 class="text-2xl font-black text-slate-800" id="stat-db-products">—</h3>
+                    <p class="text-[10px] text-slate-400">Cache no Supabase</p>
+                </div>
+                <div class="h-12 w-12 rounded-xl bg-orange-50 text-shopee-orange flex items-center justify-center text-xl">
+                    <i class="fas fa-box"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div class="space-y-1">
+                    <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Categorias ativas</span>
+                    <h3 class="text-2xl font-black text-slate-800" id="stat-db-categories">—</h3>
+                    <p class="text-[10px] text-slate-400">Com pelo menos 1 item</p>
+                </div>
+                <div class="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div class="space-y-1">
+                    <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Auto-sync</span>
+                    <h3 class="text-lg font-black text-slate-800" id="stat-auto-state">—</h3>
+                    <p class="text-[10px] text-slate-400" id="stat-auto-next">próxima: —</p>
+                </div>
+                <div class="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                    <i class="fas fa-robot"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div class="space-y-1">
+                    <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Última sincronização</span>
+                    <h3 class="text-sm font-black text-slate-800" id="stat-auto-last">—</h3>
+                    <p class="text-[10px] text-slate-400" id="stat-auto-upserts">itens salvos: —</p>
+                </div>
+                <div class="h-12 w-12 rounded-xl bg-yellow-50 text-shopee-orange flex items-center justify-center text-xl">
+                    <i class="fas fa-clock-rotate-left"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOUBLE PANEL GRID -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- LEFT COLUMN: Busca e sincronização (7 cols) -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Busca manual na Shopee -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-magnifying-glass text-slate-500"></i> Buscar ofertas e salvar no banco
+                        </h4>
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-slate-600 font-bold mb-1">Palavra-chave</label>
+                                <input type="text" id="admin-keyword" value="fone bluetooth" placeholder="ex: smartwatch, air fryer..." class="w-full p-2 border rounded-lg focus:outline-shopee-orange">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Qtd. de itens</label>
+                                <select id="admin-limit" class="w-full p-2 border rounded-lg focus:outline-shopee-orange">
+                                    <option value="10">10</option>
+                                    <option value="20" selected>20</option>
+                                    <option value="30">30</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="fetchLiveOffers(true)" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover flex items-center gap-1.5">
+                                <i class="fas fa-cloud-arrow-down"></i> Buscar na Shopee e salvar
+                            </button>
+                            <button onclick="syncAllCategories({silent:false}).then(()=>{loadOffersFromSupabase({silent:true,reset:true}); loadCategoriesFromApi({silent:true}); loadAdminStats();})" class="px-3 py-2 rounded-lg border border-shopee-orange text-shopee-orange text-[11px] font-bold hover:bg-orange-50 flex items-center gap-1.5">
+                                <i class="fas fa-tower-broadcast"></i> Sincronizar todas as categorias
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync por categoria -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-layer-group text-slate-500"></i> Sincronizar uma categoria
+                        </h4>
+                    </div>
+                    <div class="p-4 flex flex-wrap items-end gap-3 text-xs">
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="block text-slate-600 font-bold mb-1">Categoria</label>
+                            <select id="admin-cat-sync" class="w-full p-2 border rounded-lg focus:outline-shopee-orange"></select>
+                        </div>
+                        <button onclick="adminSyncCategory()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700 flex items-center gap-1.5">
+                            <i class="fas fa-rotate"></i> Sincronizar categoria
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status do auto-sync -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-robot text-slate-500"></i> Alimentação automática
+                        </h4>
+                        <button onclick="loadAutoStatus()" class="text-[10px] text-shopee-orange font-bold hover:underline">Atualizar</button>
+                    </div>
+                    <div class="p-4">
+                        <div id="auto-status-box" class="text-[11px] text-slate-600 space-y-1 font-mono bg-slate-50 border border-slate-100 rounded-lg p-3">
+                            Carregando status…
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-2">
+                            O servidor sincroniza um pequeno lote por vez, de tempos em tempos, para manter tudo no plano gratuito do Supabase.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Active Database Manager (5 cols) -->
+            <div class="lg:col-span-5 space-y-6">
+                <!-- Add Custom Product Inline Form (collapsible/visible) -->
+                <div id="new-product-form-card" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-plus-circle text-shopee-orange"></i> Adicionar Achadinho Customizado
+                        </h4>
+                        <button onclick="closeNewProductForm()" class="text-slate-400 hover:text-slate-600">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 gap-2">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Título do Produto</label>
+                                <input type="text" id="add-title" placeholder="Ex: Fone de Ouvido Profissional Gamer" class="w-full p-2 border rounded outline-shopee-orange">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-slate-600 font-bold mb-1">Preço Original (R$)</label>
+                                    <input type="number" step="0.01" id="add-old-price" placeholder="120.00" class="w-full p-2 border rounded outline-shopee-orange">
+                                </div>
+                                <div>
+                                    <label class="block text-slate-600 font-bold mb-1">Preço c/ Desconto (R$)</label>
+                                    <input type="number" step="0.01" id="add-new-price" placeholder="59.90" class="w-full p-2 border rounded outline-shopee-orange">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-slate-600 font-bold mb-1">Categoria</label>
+                                    <select id="add-category" class="w-full p-2 border rounded outline-shopee-orange">
+                                        <option value="eletronicos">Eletrônicos</option>
+                                        <option value="casa">Casa & Cozinha</option>
+                                        <option value="moda">Moda</option>
+                                        <option value="beleza">Beleza</option>
+                                        <option value="utilidades">Utilidades</option>
+                                        <option value="acessorios">Acessórios</option>
+                                        <option value="automotivo">Automotivo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-slate-600 font-bold mb-1">Estoque Flash % (Se relâmpago)</label>
+                                    <input type="number" id="add-stock" placeholder="Deixe 0 para oferta normal" class="w-full p-2 border rounded outline-shopee-orange">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Link de Afiliado Customizado</label>
+                                <input type="text" id="add-aff-link" value="https://shope.ee/mestre-exemplo" class="w-full p-2 border rounded outline-shopee-orange font-mono bg-amber-50">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">URL da Imagem</label>
+                                <input type="text" id="add-img-url" placeholder="Deixe em branco para usar placeholder dinâmico" class="w-full p-2 border rounded outline-shopee-orange font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Por que é um bom achadinho? (Descrição)</label>
+                                <textarea id="add-desc" rows="3" placeholder="Insira os principais detalhes do produto..." class="w-full p-2 border rounded outline-shopee-orange"></textarea>
+                            </div>
+                            <button onclick="saveNewProduct()" class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white font-bold py-2.5 rounded-lg shadow-md transition text-xs uppercase tracking-wider mt-1">
+                                Salvar e Publicar na Vitrine
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products Database Grid Manager -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                                <i class="fas fa-list-check text-slate-500"></i> Produtos ativos (<span id="count-db-items">0</span>)
+                            </h4>
+                        </div>
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="admin-search" oninput="onAdminSearch()" placeholder="Filtrar por nome ou categoria..." class="w-full pl-8 p-2 border rounded-lg text-xs focus:outline-shopee-orange">
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2.5" id="console-products-list">
+                        <!-- Populated inside scripts -->
+                    </div>
+                    <div class="p-3 border-t border-slate-100 flex items-center justify-between gap-2" id="console-pagination">
+                        <button onclick="adminPrevPage()" id="admin-prev" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fas fa-chevron-left"></i> Anterior
+                        </button>
+                        <span class="text-[11px] text-slate-500" id="admin-page-info">Página 1</span>
+                        <button onclick="adminNextPage()" id="admin-next" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+                            Próxima <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- POPUP DE DETALHES DO PRODUTO (cliente) -->
+    <div id="product-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeProductModal()">
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full max-h-[92vh] overflow-y-auto transform scale-95 transition-transform duration-200" id="modal-card">
+            <div class="relative">
+                <button onclick="closeProductModal()" class="absolute top-3 right-3 z-10 h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="grid grid-cols-1 md:grid-cols-2">
+                    <div class="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                        <img id="modal-img" src="" alt="" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/500x500/ffebd7/ee4d2d?text=Shopee'">
+                        <span id="modal-discount" class="absolute top-3 left-3 bg-shopee-orange text-white font-black text-xs px-2.5 py-1 rounded-lg shadow"></span>
+                    </div>
+
+                    <div class="p-5 flex flex-col">
+                        <span id="modal-category" class="self-start bg-slate-100 text-slate-600 text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wide mb-2"></span>
+                        <h3 id="modal-title" class="text-base font-bold text-slate-800 leading-snug"></h3>
+
+                        <div class="flex items-center gap-2 mt-2">
+                            <div id="modal-stars" class="text-amber-400 text-xs flex"></div>
+                            <span id="modal-sales" class="text-[11px] text-slate-500"></span>
+                        </div>
+
+                        <div class="mt-3">
+                            <p id="modal-old-price" class="text-xs text-slate-400 line-through"></p>
+                            <p id="modal-new-price" class="text-shopee-orange text-3xl font-black leading-none"></p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <span class="bg-shopee-greenLight text-shopee-greenFree text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
+                                <i class="fas fa-truck"></i> Frete grátis
+                            </span>
+                            <span class="bg-orange-50 text-shopee-orange text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
+                                <i class="fas fa-shield-halved"></i> Compra protegida
+                            </span>
+                            <span id="modal-shop" class="hidden bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded items-center gap-1">
+                                <i class="fas fa-store"></i> <span id="modal-shop-name"></span>
+                            </span>
+                        </div>
+
+                        <p id="modal-desc" class="text-xs text-slate-500 leading-relaxed mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100"></p>
+
+                        <a id="modal-buy-btn" href="#" target="_blank" rel="noopener noreferrer sponsored"
+                           class="mt-auto pt-4 block">
+                            <span class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white py-3 px-4 rounded-xl font-bold text-sm shadow flex items-center justify-center gap-2 transition uppercase tracking-wide">
+                                <i class="fas fa-bag-shopping"></i> Comprar na Shopee <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+                            </span>
+                        </a>
+                        <p class="text-[10px] text-slate-400 text-center mt-2">Você será direcionado para a página oficial na Shopee.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST INJECTOR BOX -->
+    <div id="toast-container" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 space-y-2 z-50 pointer-events-none">
+        <!-- Managed dynamically in scripts -->
+    </div>
+
+    <footer class="bg-white border-t border-slate-200 mt-12 py-8">
+        <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="space-y-3">
+                <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-14 w-auto">
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Seleção diária de ofertas da Shopee. Ao clicar, você é direcionado para a página oficial do produto.
+                </p>
+            </div>
+            <div>
+                <h4 class="font-extrabold text-xs uppercase text-slate-700 tracking-wider mb-3">Como comprar</h4>
+                <ul class="text-xs text-slate-500 space-y-2">
+                    <li>1. Escolha um produto na vitrine</li>
+                    <li>2. Você abre a página na Shopee</li>
+                    <li>3. Finalize a compra com segurança</li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-extrabold text-xs uppercase text-slate-700 tracking-wider mb-3">Aviso</h4>
+                <p class="text-[10px] text-slate-400 leading-relaxed">
+                    Site independente de divulgação de ofertas. Não somos a Shopee. Marcas e produtos pertencem aos respectivos donos. Preços e estoque podem mudar na Shopee.
+                </p>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto mt-8 pt-6 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center text-xs text-slate-400 gap-4 px-4">
+            <p>© 2026 Afiliada Mestre</p>
+            <span id="api-status-badge" class="hidden text-shopee-orange font-bold">API Status: verificando…</span>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT APP ARCHITECTURE -->
+    <script>
+        // Backend local: npm start → http://localhost:3789
+        const API_BASE = window.location.port === "3789"
+            ? ""
+            : (localStorage.getItem("afiliado_mestre_api_base") || "http://localhost:3789");
+        let apiLive = false;
+        let lastApiSource = "mock";
+        let currentPage = 0;
+        const PAGE_SIZE = 60;
+        let hasMore = false;
+        let loadingMore = false;
+
+        // Core Products Mock database (fallback se o backend/Shopee estiver offline)
+        const defaultProducts = [
+            {
+                id: 1,
+                title: "Mini Projetor Portátil Smart HY300 Android 11",
+                category: "eletronicos",
+                oldPrice: 599.00,
+                newPrice: 289.90,
+                discount: "51%",
+                stars: 4.9,
+                reviews: 243,
+                sales: "1.4k vendidos",
+                image: "https://images.unsplash.com/photo-1535016120720-40c646be5580?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-hy300",
+                isFlashSale: true,
+                flashStock: 82,
+                commissionRate: "8.5%",
+                sellerCommission: "R$ 14,50",
+                shopeeCommission: "R$ 10,14",
+                totalCommission: "R$ 24,64",
+                desc: "Assista a séries e filmes favoritos em qualquer parede de casa! Qualidade nativa 720p, conexão Wi-Fi, Bluetooth e sistema Android integrado para baixar apps de streaming diretamente no projetor."
+            },
+            {
+                id: 2,
+                title: "Fone de Ouvido Sem Fio Bluetooth In-Ear 5.3 Premium",
+                category: "eletronicos",
+                oldPrice: 129.90,
+                newPrice: 47.90,
+                discount: "63%",
+                stars: 4.8,
+                reviews: 1420,
+                sales: "4.9k vendidos",
+                image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-fone-tws",
+                isFlashSale: true,
+                flashStock: 65,
+                commissionRate: "12.0%",
+                sellerCommission: "R$ 3,20",
+                shopeeCommission: "R$ 2,54",
+                totalCommission: "R$ 5,74",
+                desc: "Diga adeus aos cabos que embolam. Conexão super estável Bluetooth 5.3, som cristalino estéreo com graves envolventes e bateria que dura até 6 horas de uso contínuo + estojo de carregamento com display LED digital."
+            },
+            {
+                id: 3,
+                title: "Umidificador Difusor de Aromas Portátil USB Madeira Nobre",
+                category: "casa",
+                oldPrice: 89.90,
+                newPrice: 29.99,
+                discount: "66%",
+                stars: 4.7,
+                reviews: 875,
+                sales: "2.3k vendidos",
+                image: "https://images.unsplash.com/photo-1602928321679-560bb453f190?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-difusor",
+                isFlashSale: true,
+                flashStock: 91,
+                commissionRate: "15.0%",
+                sellerCommission: "R$ 2,80",
+                shopeeCommission: "R$ 1,69",
+                totalCommission: "R$ 4,49",
+                desc: "Deixe seu quarto com cheirinho de hotel 5 estrelas. Design elegante imitando madeira nobre, possui luzes de LED decorativas de cores suaves que mudam sozinhas e funciona via USB silenciosamente."
+            },
+            {
+                id: 4,
+                title: "Mini Processador Picador de Alimentos Recarregável Sem Fio",
+                category: "casa",
+                oldPrice: 69.90,
+                newPrice: 24.50,
+                discount: "64%",
+                stars: 4.5,
+                reviews: 312,
+                sales: "1.1k vendidos",
+                image: "https://images.unsplash.com/photo-1574269661126-7e45799919b2?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-processador",
+                isFlashSale: true,
+                flashStock: 35,
+                commissionRate: "10.0%",
+                sellerCommission: "R$ 1,45",
+                shopeeCommission: "R$ 1,00",
+                totalCommission: "R$ 2,45",
+                desc: "Pique alho, cebola, vegetais e temperos com apenas 1 clique! Três lâminas super afiadas de aço inoxidável e bateria recarregável via USB. Praticidade absoluta no preparo das refeições."
+            },
+            {
+                id: 5,
+                title: "Suporte Organizador de Acrílico Giratório 360 Graus para Cosméticos",
+                category: "beleza",
+                oldPrice: 159.00,
+                newPrice: 54.90,
+                discount: "65%",
+                stars: 4.9,
+                reviews: 184,
+                sales: "650 vendidos",
+                image: "https://images.unsplash.com/photo-1616763355548-1b606f439f86?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-suporte",
+                isFlashSale: false,
+                commissionRate: "8.0%",
+                sellerCommission: "R$ 2,90",
+                shopeeCommission: "R$ 1,49",
+                totalCommission: "R$ 4,39",
+                desc: "A melhor solução para arrumar suas makes e skincare. Gira 360 graus suavemente, permitindo acesso rápido a todos os cosméticos. Alturas ajustáveis para caber frascos de todos os tamanhos."
+            },
+            {
+                id: 6,
+                title: "Garrafa Térmica Inteligente Inox com Sensor de Temperatura Digital",
+                category: "utilidades",
+                oldPrice: 119.00,
+                newPrice: 39.90,
+                discount: "66%",
+                stars: 4.6,
+                reviews: 934,
+                sales: "2.1k vendidos",
+                image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-garrafa-led",
+                isFlashSale: false,
+                commissionRate: "9.5%",
+                sellerCommission: "R$ 2,50",
+                shopeeCommission: "R$ 1,29",
+                totalCommission: "R$ 3,79",
+                desc: "Saiba a temperatura exata do seu café ou água gelada com um leve toque na tampa. Tela touch de LED embutida, isolamento a vácuo duradouro para manter a bebida na temperatura ideal por até 12 horas."
+            },
+            {
+                id: 7,
+                title: "Kit 12 Pincéis de Maquiagem Profissional Super Macios + Estojo Luxo",
+                category: "beleza",
+                oldPrice: 99.00,
+                newPrice: 35.90,
+                discount: "63%",
+                stars: 4.8,
+                reviews: 410,
+                sales: "950 vendidos",
+                image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-pinceis",
+                isFlashSale: false,
+                commissionRate: "12.0%",
+                sellerCommission: "R$ 2,80",
+                shopeeCommission: "R$ 1,50",
+                totalCommission: "R$ 4,30",
+                desc: "Aplicação perfeita e esfumado profissional garantido com cerdas macias sintéticas hipoalergênicas. O conjunto inclui todos os pincéis fundamentais para preparação de pele e maquiagem dos olhos com precisão."
+            },
+            {
+                id: 8,
+                title: "Mini Aspirador Portátil Recarregável de Alta Potência 120W",
+                category: "automotivo",
+                oldPrice: 149.90,
+                newPrice: 48.90,
+                discount: "67%",
+                stars: 4.4,
+                reviews: 580,
+                sales: "1.2k vendidos",
+                image: "https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&q=80&w=400",
+                affiliateLink: "https://shope.ee/mestre-aspirador",
+                isFlashSale: false,
+                commissionRate: "11.0%",
+                sellerCommission: "R$ 3,10",
+                shopeeCommission: "R$ 2,27",
+                totalCommission: "R$ 5,37",
+                desc: "Mantenha o estofado do carro, o teclado do notebook ou os cantos do sofá sempre limpos. Leve, compacto e sem fios. Acompanha bicos adaptadores para alcançar qualquer fresta difícil de limpar."
+            }
+        ];
+
+        // App Core State
+        let productsDatabase = [];
+        let currentStoreCategory = 'todos';
+
+        // Categories Map — carregado dinâmicamente de /api/categorias (com fallback)
+        let categories = [
+            { id: 'todos', label: 'Tudo', icon: 'fa-border-all', color: 'orange', count: 0 },
+            { id: 'eletronicos', label: 'Eletrônicos', icon: 'fa-laptop', color: 'blue', count: 0 },
+            { id: 'celular', label: 'Celular', icon: 'fa-mobile-alt', color: 'cyan', count: 0 },
+            { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0 },
+            { id: 'moda', label: 'Moda', icon: 'fa-tshirt', color: 'pink', count: 0 },
+            { id: 'beleza', label: 'Beleza', icon: 'fa-spa', color: 'purple', count: 0 },
+            { id: 'utilidades', label: 'Utilidades', icon: 'fa-tools', color: 'teal', count: 0 },
+            { id: 'acessorios', label: 'Acessórios', icon: 'fa-clock', color: 'yellow', count: 0 },
+            { id: 'automotivo', label: 'Automotivo', icon: 'fa-car', color: 'slate', count: 0 },
+            { id: 'fitness', label: 'Fitness', icon: 'fa-dumbbell', color: 'emerald', count: 0 },
+            { id: 'infantil', label: 'Infantil', icon: 'fa-child', color: 'rose', count: 0 }
+        ];
+
+        function isAdminMode() {
+            return new URLSearchParams(window.location.search).has("admin");
+        }
+
+        function initAdminUi() {
+            const bar = document.getElementById("admin-top-bar");
+            if (!bar) return;
+            if (isAdminMode()) {
+                bar.classList.remove("hidden");
+                const badge = document.getElementById("api-status-badge");
+                if (badge) badge.classList.remove("hidden");
+                if (window.location.hash === "#console") switchMainMode("console");
+            }
+        }
+
+        // Ícones inválidos / Pro-only → equivalentes Free
+        const ICON_FIXES = {
+            "fa-sparkles": "fa-spa",
+            "fa-check-shield": "fa-shield-halved",
+            "fa-chart-line-up": "fa-chart-line",
+            "fa-arrow-pointer": "fa-mouse-pointer",
+            "fa-external-link": "fa-arrow-up-right-from-square",
+        };
+
+        function normalizeCategoryIcon(icon) {
+            const raw = String(icon || "fa-tag").replace(/^fas\s+/, "");
+            return ICON_FIXES[raw] || raw;
+        }
+
+        window.onload = async function() {
+            initAdminUi();
+            initDatabase();
+            initCountdown();
+            renderCategories();
+            renderStoreProducts();
+            renderConsoleProducts();
+            if (isAdminMode()) {
+                populateAdminCategorySelect();
+                loadAdminStats();
+                loadAutoStatus();
+            }
+            const health = await checkApiHealth();
+
+            if (health && health.supabaseConfigured) {
+                await loadCategoriesFromApi({ silent: true });
+                const fromDb = await loadOffersFromSupabase({ silent: true, reset: true });
+                if (!fromDb && health.shopeeConfigured) {
+                    if (isAdminMode()) showToast("Populando vitrine com a Shopee…", "success");
+                    syncAllCategories({ silent: !isAdminMode() }).then(() => {
+                        loadOffersFromSupabase({ silent: true, reset: true });
+                        loadCategoriesFromApi({ silent: true });
+                    });
+                }
+            } else if (isAdminMode()) {
+                showToast("Backend offline — rode: npm start", "error");
+            }
+        };
+
+        function setApiStatus(text, live) {
+            apiLive = !!live;
+            const el = document.getElementById("api-status-badge");
+            if (el) el.textContent = text;
+        }
+
+        async function checkApiHealth() {
+            try {
+                const res = await fetch(`${API_BASE}/api/health`);
+                const data = await res.json();
+                if (!res.ok) throw new Error("health fail");
+                const ok = data.shopeeConfigured && data.supabaseConfigured;
+                setApiStatus(
+                    ok ? "API Status: Shopee + Supabase OK" : "API Status: backend up (verifique .env)",
+                    true
+                );
+                return data;
+            } catch (e) {
+                setApiStatus("API Status: Simulação / backend offline", false);
+                return null;
+            }
+        }
+
+        function applyProducts(list, source, { append = false } = {}) {
+            if (!Array.isArray(list)) return false;
+            if (append) {
+                // Merge por id para não duplicar
+                const map = new Map(productsDatabase.map(p => [String(p.id), p]));
+                for (const p of list) map.set(String(p.id), p);
+                productsDatabase = [...map.values()];
+            } else {
+                if (!list.length) return false;
+                productsDatabase = list;
+            }
+            lastApiSource = source || "api";
+            try {
+                localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
+            } catch (_) {}
+            renderStoreProducts();
+            renderConsoleProducts();
+            if (isAdminMode()) loadAdminStats();
+            return productsDatabase.length > 0;
+        }
+
+        async function loadCategoriesFromApi({ silent = true } = {}) {
+            try {
+                const res = await fetch(`${API_BASE}/api/categorias`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                if (Array.isArray(data.categories) && data.categories.length) {
+                    categories = (data.categories || []).map((c) => ({
+                        ...c,
+                        icon: normalizeCategoryIcon(c.icon),
+                    }));
+                    renderCategories();
+                }
+                return true;
+            } catch (err) {
+                if (!silent) showToast(`Categorias falharam: ${err.message}`, "error");
+                return false;
+            }
+        }
+
+        async function syncAllCategories({ silent = false } = {}) {
+            try {
+                const res = await fetch(`${API_BASE}/api/sync`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ limit: 20 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                if (!silent) showToast(`Sync: ${data.count} produtos únicos (${data.keywordsRun} keywords)`, "success");
+                return data;
+            } catch (err) {
+                if (!silent) showToast(`Sync falhou: ${err.message}`, "error");
+                return null;
+            }
+        }
+
+        async function syncCategory(catId, { silent = false } = {}) {
+            if (!catId || catId === "todos") return syncAllCategories({ silent });
+            try {
+                showToast(`Buscando ofertas de "${catId}" na Shopee…`, "success");
+                const res = await fetch(`${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                if (!silent) showToast(`✓ ${data.count} produtos em "${catId}"`, "success");
+                return data;
+            } catch (err) {
+                if (!silent) showToast(`Sync ${catId} falhou: ${err.message}`, "error");
+                return null;
+            }
+        }
+
+        async function fetchLiveOffers(syncToSupabase = false, opts = {}) {
+            const keyword = opts.keyword
+                || document.getElementById("admin-keyword")?.value
+                || document.getElementById("store-search-input")?.value
+                || "oferta";
+            const limit = document.getElementById("admin-limit")?.value || 20;
+            const sync = syncToSupabase ? "&sync=1" : "";
+            try {
+                const res = await fetch(`${API_BASE}/api/ofertas?keyword=${encodeURIComponent(keyword)}&limit=${limit}${sync}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const ok = applyProducts(data.products, "shopee");
+                if (isAdminMode()) loadAdminStats();
+                if (!opts.silent) {
+                    showToast(ok
+                        ? `Shopee: ${data.count} ofertas${data.saved ? ` · ${data.saved} no Supabase` : ""}`
+                        : "Shopee respondeu sem produtos",
+                        ok ? "success" : "error");
+                }
+                setApiStatus("API Status: Shopee ao vivo", true);
+                return ok;
+            } catch (err) {
+                if (!opts.silent) showToast(`Erro Shopee: ${err.message}`, "error");
+                return false;
+            }
+        }
+
+        async function loadOffersFromSupabase(opts = {}) {
+            const keyword = opts.keyword ?? (document.getElementById("store-search-input")?.value || "");
+            const category = opts.category ?? (currentStoreCategory !== "todos" ? currentStoreCategory : "");
+            const reset = opts.reset !== false;
+            if (reset) currentPage = 0;
+            const limit = PAGE_SIZE;
+            const offset = currentPage * PAGE_SIZE;
+            const url = `${API_BASE}/api/ofertas/db?limit=${limit}&offset=${offset}`
+                + `&keyword=${encodeURIComponent(keyword)}`
+                + `&category=${encodeURIComponent(category)}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const ok = applyProducts(data.products, "supabase", { append: !reset });
+                hasMore = (data.products || []).length >= limit;
+                renderLoadMoreBtn();
+                if (!opts.silent) {
+                    showToast(ok ? `Supabase: ${data.count} ofertas` : "Banco vazio para esse filtro — rode um Sync", ok ? "success" : "error");
+                }
+                if (ok) setApiStatus("API Status: cache Supabase", true);
+                return ok;
+            } catch (err) {
+                if (!opts.silent) showToast(`Erro Supabase: ${err.message}`, "error");
+                return false;
+            }
+        }
+
+        async function loadMoreProducts() {
+            if (loadingMore || !hasMore) return;
+            loadingMore = true;
+            currentPage += 1;
+            await loadOffersFromSupabase({ silent: true, reset: false });
+            loadingMore = false;
+        }
+
+        function renderLoadMoreBtn() {
+            const info = document.getElementById('store-results-info');
+            if (!info) return;
+            const existing = document.getElementById('load-more-btn');
+            if (existing) existing.remove();
+            if (!hasMore) return;
+            const btn = document.createElement('button');
+            btn.id = 'load-more-btn';
+            btn.className = 'ml-3 px-3 py-1 text-[11px] font-bold rounded-lg bg-shopee-orange text-white hover:bg-shopee-orangeHover';
+            btn.textContent = 'Carregar mais 60';
+            btn.onclick = loadMoreProducts;
+            info.appendChild(btn);
+        }
+
+        async function syncDefaultKeywords() {
+            showToast("Sincronizando keywords na Shopee…", "success");
+            try {
+                const res = await fetch(`${API_BASE}/api/sync`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ limit: 12 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                applyProducts(data.products, "sync");
+                showToast(`Sync OK: ${data.count} produtos únicos no Supabase`, "success");
+            } catch (err) {
+                showToast(`Sync falhou: ${err.message}`, "error");
+            }
+        }
+
+        // Inicializa o estado. Só usa cache do localStorage OU mock enquanto a API não responde;
+        // window.onload em seguida vai sobrescrever com dados reais do Supabase.
+        function initDatabase() {
+            try {
+                const cache = localStorage.getItem('afiliado_mestre_db_v1');
+                if (cache) {
+                    const parsed = JSON.parse(cache);
+                    if (Array.isArray(parsed) && parsed.length) {
+                        productsDatabase = parsed;
+                    } else {
+                        productsDatabase = [...defaultProducts];
+                    }
+                } else {
+                    productsDatabase = [...defaultProducts];
+                }
+            } catch (_) {
+                productsDatabase = [...defaultProducts];
+            }
+        }
+
+        // Restore default mocked data
+        function restoreDefaultDatabase() {
+            if (confirm("Deseja apagar os produtos adicionados e redefinir o banco de dados padrão?")) {
+                localStorage.removeItem('afiliado_mestre_db_v1');
+                initDatabase();
+                renderStoreProducts();
+                renderConsoleProducts();
+                if (isAdminMode()) loadAdminStats();
+                showToast("Banco de dados restaurado!", "success");
+            }
+        }
+
+        // Switch screen layout modes
+        function switchMainMode(mode) {
+            const storefront = document.getElementById('main-storefront-section');
+            const consoleSection = document.getElementById('main-console-section');
+            const btnStore = document.getElementById('btn-mode-storefront');
+            const btnConsole = document.getElementById('btn-mode-console');
+
+            if (mode === 'storefront') {
+                storefront.classList.remove('hidden');
+                consoleSection.classList.add('hidden');
+                btnStore.className = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
+                btnConsole.className = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
+                renderStoreProducts();
+            } else {
+                storefront.classList.add('hidden');
+                consoleSection.classList.remove('hidden');
+                btnStore.className = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
+                btnConsole.className = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
+                adminPage = 1;
+                renderConsoleProducts();
+                populateAdminCategorySelect();
+                loadAdminStats();
+                loadAutoStatus();
+            }
+        }
+
+        // Active Countdown Timer for Relampago Section
+        function initCountdown() {
+            let totalSeconds = (2 * 3600) + (15 * 60) + 30; // 2h 15m 30s
+            setInterval(() => {
+                totalSeconds--;
+                if (totalSeconds <= 0) {
+                    totalSeconds = 3 * 3600; // loop reset
+                }
+                const hrs = Math.floor(totalSeconds / 3600);
+                const mins = Math.floor((totalSeconds % 3600) / 60);
+                const secs = totalSeconds % 60;
+
+                document.getElementById('flash-hour').innerText = String(hrs).padStart(2, '0');
+                document.getElementById('flash-min').innerText = String(mins).padStart(2, '0');
+                document.getElementById('flash-sec').innerText = String(secs).padStart(2, '0');
+            }, 1000);
+        }
+
+        // Render Categories list
+        function renderCategories() {
+            const container = document.getElementById('store-categories-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            categories.forEach(cat => {
+                const isActive = cat.id === currentStoreCategory;
+                const borderClass = isActive ? 'border-shopee-orange shadow-sm bg-orange-50/40' : 'border-transparent';
+                const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
+                const textClass = isActive ? 'text-shopee-orange font-bold' : 'text-slate-600 font-medium';
+                const count = Number(cat.count || 0);
+                const badge = count > 0
+                    ? `<span class="text-[9px] text-slate-400 font-semibold">${count}</span>`
+                    : '';
+
+                container.innerHTML += `
+                    <button
+                        onclick="setStoreCategory('${cat.id}')"
+                        class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group"
+                    >
+                        <div class="h-11 w-11 rounded-full ${bgIconClass} flex items-center justify-center text-base mb-1.5 transition transform group-hover:scale-105">
+                            <i class="fas ${normalizeCategoryIcon(cat.icon)}"></i>
+                        </div>
+                        <span class="text-[11px] text-center leading-tight ${textClass}">${cat.label}</span>
+                        ${badge}
+                    </button>
+                `;
+            });
+        }
+
+        // Filter by category — busca do Supabase e, se vazio, dispara sync daquela categoria.
+        async function setStoreCategory(catId) {
+            currentStoreCategory = catId;
+            currentPage = 0;
+            renderCategories();
+            renderStoreProducts();
+            if (!apiLive) return;
+            const gotSomething = await loadOffersFromSupabase({ silent: true, reset: true, category: catId === 'todos' ? '' : catId });
+            const inThisCat = productsDatabase.filter(p => catId === 'todos' || p.category === catId).length;
+            if (catId !== 'todos' && inThisCat < 8) {
+                // Poucos produtos no cache → dispara sync focado
+                syncCategory(catId, { silent: false }).then((data) => {
+                    if (data) {
+                        loadOffersFromSupabase({ silent: true, reset: true, category: catId });
+                        loadCategoriesFromApi({ silent: true });
+                    }
+                });
+            }
+        }
+
+        // Render Products in the Public Storefront Grid
+        function renderStoreProducts() {
+            const grid = document.getElementById('store-products-grid');
+            const flashContainer = document.getElementById('flash-products-container');
+            const searchVal = document.getElementById('store-search-input').value.toLowerCase().trim();
+
+            grid.innerHTML = '';
+            flashContainer.innerHTML = '';
+
+            // Filter logic
+            const filtered = productsDatabase.filter(p => {
+                const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
+                const matchesSearch = p.title.toLowerCase().includes(searchVal) || p.desc.toLowerCase().includes(searchVal);
+                return matchesCategory && matchesSearch;
+            });
+
+            // Populate Flash sales
+            const flashSales = filtered.filter(p => p.isFlashSale);
+            if (flashSales.length === 0) {
+                flashContainer.innerHTML = `
+                    <div class="py-4 text-center text-slate-400 text-xs w-full">
+                        Nenhuma oferta relâmpago correspondente nesta categoria.
+                    </div>
+                `;
+            } else {
+                flashSales.forEach(p => {
+                    const priceFormatted = p.newPrice.toFixed(2).replace('.', ',');
+                    flashContainer.innerHTML += `
+                        <div 
+                            onclick="openProductModal(${p.id})"
+                            class="bg-white rounded-xl overflow-hidden border border-orange-100 hover:border-shopee-orange shadow-sm cursor-pointer transition shrink-0 w-36 md:w-44 flex flex-col group relative"
+                        >
+                            <span class="absolute top-0 right-0 bg-shopee-yellow text-shopee-orange text-[9px] font-black px-1.5 py-0.5 rounded-bl-lg z-10">
+                                -${p.discount}
+                            </span>
+                            <div class="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                                <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                            </div>
+                            <div class="p-2 space-y-2 flex flex-col justify-between flex-1 bg-white">
+                                <h4 class="text-[11px] text-slate-800 font-semibold truncate">${escapeHtml(p.title)}</h4>
+                                <div class="text-center">
+                                    <p class="text-[9px] text-slate-400 line-through leading-none">R$ ${p.oldPrice.toFixed(2).replace('.', ',')}</p>
+                                    <p class="text-shopee-orange text-sm font-black mt-0.5">R$ ${priceFormatted}</p>
+                                </div>
+                                <div class="relative bg-red-100 h-3.5 rounded-full overflow-hidden flex items-center justify-center">
+                                    <div class="absolute left-0 top-0 bg-gradient-to-r from-orange-500 to-red-500 h-full" style="width: ${p.flashStock}%"></div>
+                                    <span class="relative text-[8px] font-black text-white uppercase z-10">Restam ${p.flashStock}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            // Populate Main discoveries grid — mostra TODOS os filtrados (flash entra no carrossel + no grid)
+            const normalOffers = filtered;
+            if (normalOffers.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-2">
+                        <i class="far fa-folder-open text-3xl"></i>
+                        <p class="font-bold text-sm">Nenhum produto correspondente encontrado.</p>
+                        <p class="text-xs">Tente mudar sua busca ou categoria!</p>
+                    </div>
+                `;
+            } else {
+                normalOffers.forEach(p => {
+                    const priceFormatted = p.newPrice.toFixed(2).replace('.', ',');
+                    const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars)) + (p.stars % 1 >= 0.5 ? '<i class="fas fa-star-half-alt"></i>' : '');
+
+                    grid.innerHTML += `
+                        <div 
+                            onclick="openProductModal(${p.id})"
+                            class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group"
+                        >
+                            <div class="absolute top-0 right-0 bg-[#ffe97a] text-shopee-orange text-[9px] font-black px-1.5 py-1 text-center rounded-bl-lg z-10 leading-none">
+                                <span class="block">${p.discount}</span>
+                                <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
+                            </div>
+
+                            <div class="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                                <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                                <div class="absolute bottom-1.5 left-1.5 bg-shopee-greenFree text-white text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 leading-none shadow-sm">
+                                    <i class="fas fa-truck text-[7px]"></i> FRETE GRÁTIS
+                                </div>
+                            </div>
+
+                            <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
+                                <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 h-8 leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                                <div>
+                                    <p class="text-[9px] text-slate-400 line-through leading-none min-h-[9px]">R$ ${p.oldPrice.toFixed(2).replace('.', ',')}</p>
+                                    <p class="text-shopee-orange text-sm font-black mt-0.5">R$ ${priceFormatted}</p>
+                                </div>
+                                <div class="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-50">
+                                    <div class="text-amber-400 flex gap-0.5">${starsHtml}</div>
+                                    <span>${escapeHtml(String(p.sales || ''))}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            const info = document.getElementById('store-results-info');
+            const catLabel = (categories.find(c => c.id === currentStoreCategory) || {}).label || 'Tudo';
+            info.textContent = filtered.length
+                ? `${filtered.length} ofertas · ${catLabel}`
+                : 'Nenhuma oferta nesta categoria';
+            renderLoadMoreBtn();
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function escapeAttr(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;');
+        }
+
+        // Quick search set
+        function applyStoreSearch(term) {
+            document.getElementById('store-search-input').value = term;
+            searchStoreProducts();
+            scrollToStoreGrid();
+        }
+
+        let searchDebounce = null;
+        async function searchStoreProducts() {
+            const term = (document.getElementById('store-search-input')?.value || "").trim();
+            // Filtra o que já está carregado imediatamente (sem custo)
+            renderStoreProducts();
+            if (!apiLive || term.length < 2) return;
+            // Busca no cache do Supabase (não grava nada) com debounce
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                loadOffersFromSupabase({ silent: true, reset: true, keyword: term });
+            }, 400);
+        }
+
+        function scrollToStoreGrid() {
+            document.getElementById('store-grid-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Abre o popup com as informações do produto para o cliente
+        function openProductModal(id) {
+            const p = productsDatabase.find(prod => prod.id === id);
+            if (!p) return;
+
+            const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || 'Oferta';
+
+            document.getElementById('modal-img').src = p.image || '';
+            document.getElementById('modal-discount').innerText = (p.discount && p.discount !== '0%') ? `-${p.discount} OFF` : 'OFERTA';
+            document.getElementById('modal-category').innerText = catLabel;
+            document.getElementById('modal-title').innerText = p.title || 'Produto';
+            document.getElementById('modal-sales').innerText = p.sales && p.sales !== '—' ? p.sales : '';
+            document.getElementById('modal-old-price').innerText = (p.oldPrice && p.oldPrice > p.newPrice)
+                ? `De: R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}` : '';
+            document.getElementById('modal-new-price').innerText = `R$ ${Number(p.newPrice).toFixed(2).replace('.', ',')}`;
+
+            const starsBox = document.getElementById('modal-stars');
+            starsBox.innerHTML = '<i class="fas fa-star mr-0.5"></i>'.repeat(Math.max(1, Math.floor(p.stars || 4)));
+
+            const shopWrap = document.getElementById('modal-shop');
+            if (p.shopName) {
+                document.getElementById('modal-shop-name').innerText = p.shopName;
+                shopWrap.classList.remove('hidden');
+                shopWrap.classList.add('flex');
+            } else {
+                shopWrap.classList.add('hidden');
+                shopWrap.classList.remove('flex');
+            }
+
+            document.getElementById('modal-desc').innerText = p.desc
+                || 'Oferta disponível na Shopee com frete grátis para itens elegíveis. Clique para ver o preço final e finalizar a compra com segurança.';
+
+            document.getElementById('modal-buy-btn').href = p.affiliateLink || '#';
+
+            const modal = document.getElementById('product-modal');
+            const card = document.getElementById('modal-card');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                card.classList.remove('scale-95');
+            });
+        }
+
+        function closeProductModal() {
+            const modal = document.getElementById('product-modal');
+            const card = document.getElementById('modal-card');
+            modal.classList.add('opacity-0');
+            card.classList.add('scale-95');
+            document.body.style.overflow = '';
+            setTimeout(() => {
+                modal.classList.remove('flex');
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeProductModal();
+        });
+
+        // ---- Gerenciador de produtos (paginado + busca) ----
+        let adminPage = 1;
+        const ADMIN_PAGE_SIZE = 8;
+        let adminSearchTerm = '';
+
+        function getAdminFiltered() {
+            const term = adminSearchTerm.toLowerCase().trim();
+            if (!term) return productsDatabase;
+            return productsDatabase.filter(p =>
+                (p.title || '').toLowerCase().includes(term) ||
+                (p.category || '').toLowerCase().includes(term)
+            );
+        }
+
+        function onAdminSearch() {
+            adminSearchTerm = document.getElementById('admin-search')?.value || '';
+            adminPage = 1;
+            renderConsoleProducts();
+        }
+
+        function adminPrevPage() {
+            if (adminPage > 1) { adminPage--; renderConsoleProducts(); }
+        }
+
+        function adminNextPage() {
+            const total = getAdminFiltered().length;
+            const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+            if (adminPage < maxPage) { adminPage++; renderConsoleProducts(); }
+        }
+
+        function renderConsoleProducts() {
+            const container = document.getElementById('console-products-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const countEl = document.getElementById('count-db-items');
+            if (countEl) countEl.innerText = productsDatabase.length;
+
+            const filtered = getAdminFiltered();
+            const total = filtered.length;
+            const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+            if (adminPage > maxPage) adminPage = maxPage;
+            const start = (adminPage - 1) * ADMIN_PAGE_SIZE;
+            const pageItems = filtered.slice(start, start + ADMIN_PAGE_SIZE);
+
+            if (!pageItems.length) {
+                container.innerHTML = `<div class="py-8 text-center text-slate-400 text-xs">Nenhum produto encontrado.</div>`;
+            } else {
+                pageItems.forEach(p => {
+                    const labelFlash = p.isFlashSale ? `<span class="bg-red-500 text-white font-bold text-[8px] px-1.5 py-0.5 rounded">RELÂMPAGO</span>` : ``;
+                    const rate = p.commissionRate && p.commissionRate !== '0.0%' ? p.commissionRate : '—';
+                    container.innerHTML += `
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center gap-3">
+                            <img src="${p.image}" class="w-11 h-11 object-cover rounded-lg border bg-white shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/100x100/ffebd7/ee4d2d?text=Icon'">
+                            <div class="min-w-0 flex-1">
+                                <h5 class="font-bold text-slate-800 truncate">${escapeHtml(p.title)}</h5>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                    <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-600">${escapeHtml(String(p.category || ''))}</span>
+                                    ${labelFlash}
+                                    <span class="text-shopee-orange font-bold text-[10px]">R$ ${Number(p.newPrice).toFixed(2)}</span>
+                                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <a href="${escapeAttr(p.affiliateLink || '#')}" target="_blank" rel="noopener" class="text-slate-400 hover:text-shopee-orange" title="Abrir link">
+                                    <i class="fas fa-arrow-up-right-from-square"></i>
+                                </a>
+                                <button onclick="removeProductFromDatabase(${p.id})" class="text-red-400 hover:text-red-600" title="Excluir">
+                                    <i class="fas fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            const info = document.getElementById('admin-page-info');
+            if (info) info.textContent = `Página ${adminPage} de ${maxPage} · ${total} itens`;
+            const prev = document.getElementById('admin-prev');
+            const next = document.getElementById('admin-next');
+            if (prev) prev.disabled = adminPage <= 1;
+            if (next) next.disabled = adminPage >= maxPage;
+        }
+
+        // Remove product
+        function removeProductFromDatabase(id) {
+            productsDatabase = productsDatabase.filter(p => p.id !== id);
+            localStorage.setItem('afiliado_mestre_db_v1', JSON.stringify(productsDatabase));
+            renderConsoleProducts();
+            renderStoreProducts();
+            if (isAdminMode()) loadAdminStats();
+            showToast("Produto removido do banco!", "success");
+        }
+
+        // Update single inline affiliate links
+        function updateSingleAffiliateLink(id, newLink) {
+            const idx = productsDatabase.findIndex(p => p.id === id);
+            if (idx !== -1) {
+                productsDatabase[idx].affiliateLink = newLink;
+                localStorage.setItem('afiliado_mestre_db_v1', JSON.stringify(productsDatabase));
+                showToast("Link de redirecionamento atualizado com sucesso!", "success");
+            }
+        }
+
+        // Open Form
+        function openNewProductForm() {
+            document.getElementById('new-product-form-card').classList.remove('hidden');
+        }
+
+        function closeNewProductForm() {
+            document.getElementById('new-product-form-card').classList.add('hidden');
+        }
+
+        // Save custom product
+        function saveNewProduct() {
+            const title = document.getElementById('add-title').value.trim();
+            const oldPrice = parseFloat(document.getElementById('add-old-price').value);
+            const newPrice = parseFloat(document.getElementById('add-new-price').value);
+            const category = document.getElementById('add-category').value;
+            const stock = parseInt(document.getElementById('add-stock').value) || 0;
+            const affLink = document.getElementById('add-aff-link').value.trim();
+            const imgUrl = document.getElementById('add-img-url').value.trim();
+            const desc = document.getElementById('add-desc').value.trim();
+
+            if (!title || isNaN(newPrice)) {
+                showToast("Preencha ao menos o Título e o Preço com Desconto!", "error");
+                return;
+            }
+
+            // Calculations
+            const finalOldPrice = isNaN(oldPrice) ? newPrice * 1.5 : oldPrice;
+            const discountPct = Math.round(((finalOldPrice - newPrice) / finalOldPrice) * 100);
+            const generatedId = Date.now();
+
+            // Default mock commissions
+            const estShopeeRate = 0.045; // 4.5% standard platform
+            const estSellerRate = 0.055; // 5.5% average extra shop offer
+            const totalRateStr = `${((estShopeeRate + estSellerRate) * 100).toFixed(1)}%`;
+            
+            const shopeeCommVal = newPrice * estShopeeRate;
+            const sellerCommVal = newPrice * estSellerRate;
+            const totalCommVal = shopeeCommVal + sellerCommVal;
+
+            const placeholderImgs = [
+                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=400",
+                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=400"
+            ];
+            const finalImage = imgUrl || placeholderImgs[Math.floor(Math.random() * placeholderImgs.length)];
+
+            const newProdObj = {
+                id: generatedId,
+                title: title,
+                category: category,
+                oldPrice: finalOldPrice,
+                newPrice: newPrice,
+                discount: `${discountPct}%`,
+                stars: 4.5,
+                reviews: Math.floor(Math.random() * 50 + 10),
+                sales: `${Math.floor(Math.random() * 120 + 15)} vendidos`,
+                image: finalImage,
+                affiliateLink: affLink || "https://shope.ee/mestre-custom",
+                isFlashSale: stock > 0,
+                flashStock: stock,
+                commissionRate: totalRateStr,
+                sellerCommission: `R$ ${sellerCommVal.toFixed(2)}`,
+                shopeeCommission: `R$ ${shopeeCommVal.toFixed(2)}`,
+                totalCommission: `R$ ${totalCommVal.toFixed(2)}`,
+                desc: desc || "Lindo achado adicionado diretamente pelo painel master. Pronto para ser promovido nas suas redes com ótimas taxas de lucro."
+            };
+
+            productsDatabase.unshift(newProdObj);
+            localStorage.setItem('afiliado_mestre_db_v1', JSON.stringify(productsDatabase));
+
+            // Reload UI
+            renderConsoleProducts();
+            renderStoreProducts();
+            if (isAdminMode()) loadAdminStats();
+            closeNewProductForm();
+
+            // Clear inputs
+            document.getElementById('add-title').value = '';
+            document.getElementById('add-old-price').value = '';
+            document.getElementById('add-new-price').value = '';
+            document.getElementById('add-stock').value = '';
+            document.getElementById('add-desc').value = '';
+            document.getElementById('add-img-url').value = '';
+
+            showToast("✨ Novo produto integrado e publicado com sucesso!", "success");
+        }
+
+        // ---- Painel admin: estatísticas reais + auto-sync ----
+        function fmtDateTime(iso) {
+            if (!iso) return '—';
+            try {
+                return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            } catch { return iso; }
+        }
+
+        function populateAdminCategorySelect() {
+            const sel = document.getElementById('admin-cat-sync');
+            if (!sel) return;
+            const current = sel.value;
+            sel.innerHTML = categories
+                .filter(c => c.id !== 'todos')
+                .map(c => `<option value="${c.id}">${escapeHtml(c.label)}${c.count ? ` (${c.count})` : ''}</option>`)
+                .join('');
+            if (current) sel.value = current;
+        }
+
+        async function loadAdminStats() {
+            const prodEl = document.getElementById('stat-db-products');
+            const catEl = document.getElementById('stat-db-categories');
+            try {
+                const res = await fetch(`${API_BASE}/api/categorias`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const cats = data.categories || [];
+                const total = (cats.find(c => c.id === 'todos') || {}).count || 0;
+                const active = cats.filter(c => c.id !== 'todos' && Number(c.count) > 0).length;
+                if (prodEl) prodEl.innerText = total.toLocaleString('pt-BR');
+                if (catEl) catEl.innerText = active;
+            } catch (err) {
+                if (prodEl) prodEl.innerText = productsDatabase.length;
+                if (catEl) catEl.innerText = new Set(productsDatabase.map(p => p.category)).size;
+            }
+        }
+
+        async function loadAutoStatus() {
+            const box = document.getElementById('auto-status-box');
+            try {
+                const res = await fetch(`${API_BASE}/api/auto/status`);
+                const s = await res.json();
+                if (!res.ok) throw new Error(s.error || `HTTP ${res.status}`);
+
+                const stateEl = document.getElementById('stat-auto-state');
+                const nextEl = document.getElementById('stat-auto-next');
+                const lastEl = document.getElementById('stat-auto-last');
+                const upsEl = document.getElementById('stat-auto-upserts');
+                if (stateEl) stateEl.innerText = s.enabled ? (s.running ? 'Rodando…' : 'Ativo') : 'Desligado';
+                if (nextEl) nextEl.innerText = `próxima: ${fmtDateTime(s.nextRunAt)}`;
+                if (lastEl) lastEl.innerText = fmtDateTime(s.lastRunAt);
+                if (upsEl) upsEl.innerText = `itens salvos: ${s.totalUpserts ?? 0}`;
+
+                if (box) {
+                    box.innerHTML = [
+                        `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado'}`,
+                        `lote..........: ${s.batch} keyword(s) / execução`,
+                        `intervalo.....: ${s.intervalMin} min`,
+                        `itens/keyword.: ${s.limit}`,
+                        `keywords total: ${s.keywordsTotal} (posição ${s.cursor})`,
+                        `execuções.....: ${s.runs}`,
+                        `última........: ${fmtDateTime(s.lastRunAt)}`,
+                        `próxima.......: ${fmtDateTime(s.nextRunAt)}`,
+                        `limpeza.......: ${s.pruneDays ? s.pruneDays + ' dias' : 'desligada'}`,
+                        s.lastError ? `último erro...: ${escapeHtml(s.lastError)}` : ``,
+                    ].filter(Boolean).map(l => `<div>${l}</div>`).join('');
+                }
+            } catch (err) {
+                if (box) box.innerHTML = `<div class="text-red-500">Não foi possível ler o status (${escapeHtml(err.message)}).</div>`;
+            }
+        }
+
+        async function runAutoSyncNow() {
+            const btn = document.getElementById('btn-run-auto');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Sincronizando…`; }
+            showToast('Rodando um lote de sincronização…', 'success');
+            try {
+                const res = await fetch(`${API_BASE}/api/auto/run`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const ups = data.result?.upserts ?? 0;
+                showToast(`Lote concluído: ${ups} itens atualizados.`, 'success');
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                await loadCategoriesFromApi({ silent: true });
+                populateAdminCategorySelect();
+                loadAdminStats();
+                loadAutoStatus();
+            } catch (err) {
+                showToast(`Falha ao sincronizar: ${err.message}`, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = original; }
+            }
+        }
+
+        async function adminSyncCategory() {
+            const sel = document.getElementById('admin-cat-sync');
+            const catId = sel?.value;
+            if (!catId) return;
+            const data = await syncCategory(catId, { silent: false });
+            if (data) {
+                await loadOffersFromSupabase({ silent: true, reset: true, category: catId });
+                await loadCategoriesFromApi({ silent: true });
+                populateAdminCategorySelect();
+                loadAdminStats();
+            }
+        }
+
+        // Unified compatibility clipboard copier helper
+        function copyTextToClipboard(text, successMsg) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(successMsg, "success");
+        }
+
+        // Custom interactive visual toast notification
+        function showToast(message, type = "success") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const isSuccess = type === "success";
+            const bgClass = isSuccess ? "bg-slate-900 border-shopee-orange" : "bg-red-600 border-red-500";
+            const icon = isSuccess ? '<i class="fas fa-check-circle text-shopee-orange mr-2"></i>' : '<i class="fas fa-exclamation-triangle text-white mr-2"></i>';
+
+            toast.className = `${bgClass} text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between border transition-all duration-300 transform translate-y-3 opacity-0 select-none pointer-events-auto`;
+            toast.innerHTML = `
+                <div class="flex items-center font-semibold">
+                    ${icon}
+                    <span>${message}</span>
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            // Pop animation trigger
+            setTimeout(() => {
+                toast.classList.remove('translate-y-3', 'opacity-0');
+            }, 10);
+
+            // Close timer
+            setTimeout(() => {
+                toast.classList.add('translate-y-3', 'opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
