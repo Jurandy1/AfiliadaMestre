@@ -46,6 +46,24 @@ app.use(express.json({ limit: "1mb" }));
 let campaignsCache = { at: 0, data: null };
 const CAMPAIGNS_TTL_MS = 30 * 60 * 1000;
 
+// Cache em memória para categorias (contagens Supabase) — reduz drasticamente
+// o tempo de resposta ao abrir o app e ao trocar categoria no mobile.
+let categoriasCache = { at: 0, data: null };
+const CATEGORIAS_TTL_MS = 5 * 60 * 1000;
+
+// Cache pequeno para /api/ofertas/db, indexado pela query string.
+// Alivia Supabase quando o usuário toca a mesma categoria repetidas vezes.
+const ofertasCache = new Map();
+const OFERTAS_TTL_MS = 60 * 1000;
+const OFERTAS_CACHE_MAX = 40;
+
+function setCacheHeaders(res, { maxAge = 60, sMaxAge = 300, swr = 600 } = {}) {
+  res.set(
+    "Cache-Control",
+    `public, max-age=${maxAge}, s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`
+  );
+}
+
 app.get("/api/health", (_req, res) => {
   const hasShopee = !!(process.env.SHOPEE_APP_ID && process.env.SHOPEE_SECRET);
   let supabaseOk = false;
@@ -119,16 +137,33 @@ app.get("/api/ofertas/db", async (req, res) => {
     const limit = Number(req.query.limit) || 60;
     const offset = Number(req.query.offset) || 0;
     const sort = String(req.query.sort || "recent").trim();
+
+    const cacheKey = `${keyword}|${category}|${subcategory}|${limit}|${offset}|${sort}`;
+    const cached = ofertasCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < OFERTAS_TTL_MS) {
+      setCacheHeaders(res, { maxAge: 30, sMaxAge: 60, swr: 300 });
+      return res.json({ ...cached.data, cached: true });
+    }
+
     const rows = await listOfertas({ keyword, category, subcategory, limit, offset, sort });
     const list = Array.isArray(rows) ? rows : [];
-    res.json({
+    const payload = {
       source: "supabase",
       count: list.length,
       offset,
       limit,
       sort,
       products: list.map(rowToProduct),
-    });
+    };
+
+    ofertasCache.set(cacheKey, { at: Date.now(), data: payload });
+    if (ofertasCache.size > OFERTAS_CACHE_MAX) {
+      const oldestKey = ofertasCache.keys().next().value;
+      ofertasCache.delete(oldestKey);
+    }
+
+    setCacheHeaders(res, { maxAge: 30, sMaxAge: 60, swr: 300 });
+    res.json(payload);
   } catch (err) {
     console.error("[/api/ofertas/db]", err.message);
     res.status(err.status || 500).json({
@@ -146,6 +181,7 @@ app.get("/api/campanhas", async (req, res) => {
   try {
     const force = req.query.refresh === "1";
     if (!force && campaignsCache.data && Date.now() - campaignsCache.at < CAMPAIGNS_TTL_MS) {
+      setCacheHeaders(res, { maxAge: 300, sMaxAge: 900, swr: 1800 });
       return res.json({ ...campaignsCache.data, cached: true });
     }
     const limit = Math.min(Number(req.query.limit) || 8, 20);
@@ -160,6 +196,7 @@ app.get("/api/campanhas", async (req, res) => {
       campaigns,
     };
     campaignsCache = { at: Date.now(), data: payload };
+    setCacheHeaders(res, { maxAge: 300, sMaxAge: 900, swr: 1800 });
     res.json({ ...payload, cached: false });
   } catch (err) {
     console.error("[/api/campanhas]", err.message);
@@ -171,38 +208,37 @@ app.get("/api/campanhas", async (req, res) => {
   }
 });
 
-app.get("/api/categorias", async (_req, res) => {
+app.get("/api/categorias", async (req, res) => {
   try {
+    const force = req.query.refresh === "1";
+    if (!force && categoriasCache.data && Date.now() - categoriasCache.at < CATEGORIAS_TTL_MS) {
+      setCacheHeaders(res, { maxAge: 120, sMaxAge: 300, swr: 900 });
+      return res.json({ ...categoriasCache.data, cached: true });
+    }
+
     let counts = {};
     try {
       counts = await countByCategory();
     } catch (e) {
       console.warn("[/api/categorias] Supabase indisponível:", e.message);
     }
-    const categories = await Promise.all(
-      metaOnly().map(async (c) => {
-        let subCounts = {};
-        try {
-          const rows = await listOfertas({ category: c.id, limit: 200, offset: 0 });
-          const products = (Array.isArray(rows) ? rows : []).map(rowToProduct);
-          for (const sub of c.subcategories || []) {
-            subCounts[sub.id] = products.filter((p) => productMatchesSubcategory(p, c.id, sub.id)).length;
-          }
-        } catch (_) {
-          try {
-            subCounts = await countBySubcategory(c.id);
-          } catch (__) {}
-        }
-        return {
-          ...c,
-          count: counts[c.id] || 0,
-          subcategories: (c.subcategories || []).map((sub) => ({
-            ...sub,
-            count: subCounts[sub.id] || 0,
-          })),
-        };
-      })
+
+    // Contagem por subcategoria usa só HEAD queries (leves) em paralelo.
+    // Evita baixar 200 rows por categoria só para contar — economiza ~90% do tempo.
+    const metas = metaOnly();
+    const subCountsList = await Promise.all(
+      metas.map((c) => countBySubcategory(c.id).catch(() => ({})))
     );
+
+    const categories = metas.map((c, idx) => ({
+      ...c,
+      count: counts[c.id] || 0,
+      subcategories: (c.subcategories || []).map((sub) => ({
+        ...sub,
+        count: subCountsList[idx][sub.id] || 0,
+      })),
+    }));
+
     categories.unshift({
       id: "todos",
       label: "Tudo",
@@ -211,8 +247,15 @@ app.get("/api/categorias", async (_req, res) => {
       count: counts.total || 0,
       subcategories: [],
     });
-    res.json({ categories, updatedAt: new Date().toISOString() });
+
+    const payload = { categories, updatedAt: new Date().toISOString() };
+    categoriasCache = { at: Date.now(), data: payload };
+    setCacheHeaders(res, { maxAge: 120, sMaxAge: 300, swr: 900 });
+    res.json({ ...payload, cached: false });
   } catch (err) {
+    if (categoriasCache.data) {
+      return res.json({ ...categoriasCache.data, cached: true, stale: true, error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -252,6 +295,8 @@ app.post("/api/sync", async (req, res) => {
         if (rows.length) await upsertOfertas(rows);
         const products = nodes.map((n) => mapOfferToProduct(n, keyword, listType));
         allProducts.push(...products);
+        categoriasCache = { at: 0, data: null };
+        ofertasCache.clear();
         report.push({ keyword, category, ok: true, count: nodes.length, listType, sortType });
         await new Promise((r) => setTimeout(r, 350));
       } catch (e) {

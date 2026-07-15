@@ -1086,12 +1086,18 @@
                 productsDatabase = list;
             }
             lastApiSource = source || "api";
+            // Limita cache local para não estourar quota do localStorage (mobile).
+            if (productsDatabase.length > 400) {
+                productsDatabase = productsDatabase.slice(-400);
+            }
             try {
                 localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
             } catch (_) {}
             renderStoreProducts();
-            renderConsoleProducts();
-            if (isAdminMode()) loadAdminStats();
+            if (isAdminMode()) {
+                renderConsoleProducts();
+                loadAdminStats();
+            }
             return allowEmpty || productsDatabase.length > 0;
         }
 
@@ -1547,13 +1553,12 @@
             return sub?.label || '';
         }
 
-        // Render Categories list
+        // Render Categories list — build once, single innerHTML write.
         function renderCategories() {
             const container = document.getElementById('store-categories-container');
             if (!container) return;
-            container.innerHTML = '';
 
-            categories.forEach(cat => {
+            const html = categories.map(cat => {
                 const isActive = cat.id === currentStoreCategory;
                 const borderClass = isActive ? 'border-shopee-orange shadow-sm bg-orange-50/40' : 'border-transparent';
                 const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
@@ -1562,8 +1567,7 @@
                 const badge = count > 0
                     ? `<span class="text-[9px] text-slate-400 font-semibold">${count}</span>`
                     : '';
-
-                container.innerHTML += `
+                return `
                     <button
                         onclick="setStoreCategory('${cat.id}')"
                         class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group w-full"
@@ -1573,40 +1577,50 @@
                         </div>
                         <span class="text-[11px] text-center leading-tight ${textClass}">${cat.label}</span>
                         ${badge}
-                    </button>
-                `;
-            });
+                    </button>`;
+            }).join('');
+            container.innerHTML = html;
         }
 
-        // Filter by category — carrega todos os produtos da categoria para filtrar subcategorias localmente.
+        // Filter by category — usa cache local imediatamente; só busca no servidor
+        // se a categoria tiver poucos itens no cache atual (evita ida ao Supabase
+        // a cada toque, que era o principal gargalo no mobile).
         async function setStoreCategory(catId) {
             currentStoreCategory = catId;
             currentStoreSubcategory = '';
             currentPage = 0;
             renderCategories();
             renderSubcategories();
-            if (!apiLive) {
-                renderStoreProducts();
+            // Render imediato do que já temos — feedback instantâneo no mobile
+            renderStoreProducts();
+            if (!apiLive) return;
+
+            const MIN_LOCAL = 12;
+            const localCount = catId === 'todos'
+                ? productsDatabase.length
+                : productsDatabase.filter(p => p.category === catId).length;
+            if (localCount >= MIN_LOCAL) {
+                // Já temos suficiente em cache; carrega mais em background sem bloquear
+                if (localCount < 60) {
+                    loadCategoryProducts(catId).catch(() => {});
+                }
                 return;
             }
-            if (catId === 'todos') {
-                await loadOffersFromSupabase({ silent: true, reset: true, category: '' });
-            } else {
-                await loadCategoryProducts(catId);
-            }
+            await loadCategoryProducts(catId);
         }
 
         async function loadCategoryProducts(catId) {
             try {
-                const url = `${API_BASE}/api/ofertas/db?limit=200&offset=0`
-                    + `&category=${encodeURIComponent(catId)}`
+                const url = `${API_BASE}/api/ofertas/db?limit=60&offset=0`
+                    + (catId === 'todos' ? '' : `&category=${encodeURIComponent(catId)}`)
                     + `&sort=${encodeURIComponent(currentStoreSort)}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 categoryProductsCache = data.products || [];
-                applyProducts(categoryProductsCache, 'supabase', { append: false, allowEmpty: true });
-                hasMore = categoryProductsCache.length >= 200;
+                // append=true preserva o cache das outras categorias
+                applyProducts(categoryProductsCache, 'supabase', { append: true, allowEmpty: true });
+                hasMore = categoryProductsCache.length >= 60;
                 renderLoadMoreBtn();
                 return categoryProductsCache.length > 0;
             } catch (err) {
@@ -1685,10 +1699,20 @@
         }
 
         function selectMobileSubcategory(catId, subId) {
-            setStoreCategory(catId).then(() => {
-                setStoreSubcategory(subId);
-                closeMobileCategorySheet();
-            });
+            // Fecha o painel imediatamente para dar sensação de resposta.
+            closeMobileCategorySheet();
+            // Aplica categoria + subcategoria juntas, sem dois renders sequenciais.
+            currentStoreCategory = catId;
+            currentStoreSubcategory = subId || '';
+            currentPage = 0;
+            renderCategories();
+            renderSubcategories();
+            renderStoreProducts();
+            scrollToStoreGrid();
+            // Carrega dados frescos em background se o cache estiver curto.
+            if (!apiLive) return;
+            const localCount = productsDatabase.filter(p => p.category === catId).length;
+            if (localCount < 12) loadCategoryProducts(catId).catch(() => {});
         }
 
         function updateMobileCategoryUI() {
@@ -1785,16 +1809,15 @@
             const searchVal = (document.getElementById('store-search-input')?.value || '').toLowerCase().trim();
             if (!grid || !flashContainer) return;
 
-            grid.innerHTML = '';
-            flashContainer.innerHTML = '';
-
             let filtered = productsDatabase.filter(p => {
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
-                const title = (p.title || '').toLowerCase();
-                const desc = (p.desc || '').toLowerCase();
-                const matchesSearch = !searchVal || title.includes(searchVal) || desc.includes(searchVal);
-                const matchesSub = productMatchesSubcategory(p, currentStoreCategory, currentStoreSubcategory);
-                return matchesCategory && matchesSearch && matchesSub;
+                if (!matchesCategory) return false;
+                if (searchVal) {
+                    const title = (p.title || '').toLowerCase();
+                    const desc = (p.desc || '').toLowerCase();
+                    if (!title.includes(searchVal) && !desc.includes(searchVal)) return false;
+                }
+                return productMatchesSubcategory(p, currentStoreCategory, currentStoreSubcategory);
             });
             filtered = sortProductsLocal(filtered);
             if (currentStoreCategory === 'todos' && !searchVal) {
@@ -1815,16 +1838,16 @@
                         Nenhuma oferta com prazo de término próximo nesta categoria.
                     </div>`;
             } else {
-                flashSales.slice(0, 16).forEach(p => {
+                flashContainer.innerHTML = flashSales.slice(0, 16).map(p => {
                     const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
-                    flashContainer.innerHTML += `
+                    return `
                         <div onclick="openProductModal(${p.id})"
                             class="bg-white rounded-xl overflow-hidden border border-orange-100 hover:border-shopee-orange shadow-sm cursor-pointer transition shrink-0 w-36 md:w-44 flex flex-col group relative">
                             <span class="absolute top-0 right-0 bg-shopee-yellow text-shopee-orange text-[9px] font-black px-1.5 py-0.5 rounded-bl-lg z-10">
                                 -${p.discount}
                             </span>
                             <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                                <img src="${p.image}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
                             </div>
                             <div class="p-2 space-y-1.5 flex flex-col justify-between flex-1">
                                 <h4 class="text-[11px] text-slate-800 font-semibold truncate">${escapeHtml(p.title)}</h4>
@@ -1834,7 +1857,7 @@
                                 </div>
                             </div>
                         </div>`;
-                });
+                }).join('');
             }
 
             if (filtered.length === 0) {
@@ -1845,7 +1868,7 @@
                         <p class="text-xs">Tente mudar sua busca ou categoria!</p>
                     </div>`;
             } else {
-                filtered.forEach(p => {
+                grid.innerHTML = filtered.map(p => {
                     const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
                     const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars || 4)) + ((p.stars % 1 >= 0.5) ? '<i class="fas fa-star-half-alt"></i>' : '');
                     const showOff = p.discount && p.discount !== '0%';
@@ -1854,8 +1877,7 @@
                     const subBadge = subLabel
                         ? `<span class="self-start bg-orange-50 text-shopee-orange text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">${escapeHtml(subLabel)}</span>`
                         : '';
-
-                    grid.innerHTML += `
+                    return `
                         <div onclick="openProductModal(${p.id})"
                             class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group">
                             ${showOff ? `
@@ -1864,7 +1886,7 @@
                                 <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
                             </div>` : ''}
                             <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                                <img src="${p.image}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
                             </div>
                             <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
                                 ${subBadge}
@@ -1881,7 +1903,7 @@
                                 </div>
                             </div>
                         </div>`;
-                });
+                }).join('');
             }
 
             const info = document.getElementById('store-results-info');
