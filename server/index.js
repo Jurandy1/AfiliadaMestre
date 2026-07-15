@@ -9,12 +9,15 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const {
   fetchProductOffers,
+  fetchShopeeOffers,
   generateShortLink,
   mapOfferToProduct,
   mapOfferToRow,
+  mapCampaignNode,
 } = require("./shopee");
 const {
   upsertOfertas,
+  updateShortLink,
   listOfertas,
   countByCategory,
   rowToProduct,
@@ -29,6 +32,10 @@ const ROOT = path.join(__dirname, "..");
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+// Cache leve em memória para campanhas (reduz hits Shopee/Vercel)
+let campaignsCache = { at: 0, data: null };
+const CAMPAIGNS_TTL_MS = 30 * 60 * 1000;
 
 app.get("/api/health", (_req, res) => {
   const hasShopee = !!(process.env.SHOPEE_APP_ID && process.env.SHOPEE_SECRET);
@@ -49,22 +56,24 @@ app.get("/api/health", (_req, res) => {
 
 /**
  * Busca ao vivo na Shopee (productOfferV2).
- * Query: keyword, limit, page, sync=1 (grava no Supabase)
+ * Query: keyword, limit, page, listType, sortType, sync=1
  */
 app.get("/api/ofertas", async (req, res) => {
   try {
     const keyword = String(req.query.keyword || "oferta").trim();
     const limit = Number(req.query.limit) || 20;
     const page = Number(req.query.page) || 1;
+    const listType = req.query.listType != null ? Number(req.query.listType) : 0;
+    const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
     const sync = req.query.sync === "1" || req.query.sync === "true";
 
-    const offer = await fetchProductOffers({ keyword, limit, page });
+    const offer = await fetchProductOffers({ keyword, limit, page, listType, sortType });
     const nodes = offer.nodes || [];
-    const products = nodes.map((n) => mapOfferToProduct(n, keyword));
+    const products = nodes.map((n) => mapOfferToProduct(n, keyword, listType));
 
     let saved = 0;
     if (sync && nodes.length) {
-      const rows = nodes.map((n) => mapOfferToRow(n, keyword)).filter((r) => r.item_id);
+      const rows = nodes.map((n) => mapOfferToRow(n, keyword, listType)).filter((r) => r.item_id && r.offer_link);
       const result = await upsertOfertas(rows);
       saved = Array.isArray(result) ? result.length : rows.length;
     }
@@ -72,6 +81,8 @@ app.get("/api/ofertas", async (req, res) => {
     res.json({
       source: "shopee",
       keyword,
+      listType,
+      sortType,
       count: products.length,
       saved,
       pageInfo: offer.pageInfo || {},
@@ -88,8 +99,8 @@ app.get("/api/ofertas", async (req, res) => {
 });
 
 /**
- * Lê ofertas já salvas no Supabase (cache da vitrine).
- * Query: keyword, category, limit, offset
+ * Lê ofertas do Supabase.
+ * Query: keyword, category, limit, offset, sort=recent|sales|discount|rating|ending
  */
 app.get("/api/ofertas/db", async (req, res) => {
   try {
@@ -97,13 +108,15 @@ app.get("/api/ofertas/db", async (req, res) => {
     const category = String(req.query.category || "").trim();
     const limit = Number(req.query.limit) || 60;
     const offset = Number(req.query.offset) || 0;
-    const rows = await listOfertas({ keyword, category, limit, offset });
+    const sort = String(req.query.sort || "recent").trim();
+    const rows = await listOfertas({ keyword, category, limit, offset, sort });
     const list = Array.isArray(rows) ? rows : [];
     res.json({
       source: "supabase",
       count: list.length,
       offset,
       limit,
+      sort,
       products: list.map(rowToProduct),
     });
   } catch (err) {
@@ -117,8 +130,37 @@ app.get("/api/ofertas/db", async (req, res) => {
 });
 
 /**
- * Devolve as categorias configuradas + contagem de itens no Supabase.
+ * Campanhas oficiais Shopee (shopeeOfferV2) com cache em memória.
  */
+app.get("/api/campanhas", async (req, res) => {
+  try {
+    const force = req.query.refresh === "1";
+    if (!force && campaignsCache.data && Date.now() - campaignsCache.at < CAMPAIGNS_TTL_MS) {
+      return res.json({ ...campaignsCache.data, cached: true });
+    }
+    const limit = Math.min(Number(req.query.limit) || 8, 20);
+    const offer = await fetchShopeeOffers({ sortType: 1, page: 1, limit });
+    const campaigns = (offer.nodes || [])
+      .map(mapCampaignNode)
+      .filter((c) => c.affiliateLink && c.affiliateLink !== "#" && c.isActive);
+    const payload = {
+      source: "shopee",
+      count: campaigns.length,
+      updatedAt: new Date().toISOString(),
+      campaigns,
+    };
+    campaignsCache = { at: Date.now(), data: payload };
+    res.json({ ...payload, cached: false });
+  } catch (err) {
+    console.error("[/api/campanhas]", err.message);
+    // fallback cache antigo se existir
+    if (campaignsCache.data) {
+      return res.json({ ...campaignsCache.data, cached: true, stale: true, error: err.message });
+    }
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
 app.get("/api/categorias", async (_req, res) => {
   try {
     let counts = {};
@@ -144,16 +186,11 @@ app.get("/api/categorias", async (_req, res) => {
   }
 });
 
-/**
- * Sincroniza keywords → Shopee → Supabase.
- * Body: { keywords?: string[], category?: string, limit?: number }
- *  - Sem body: usa TODAS as keywords do dicionário CATEGORIAS (varredura completa).
- *  - Com category: só as keywords daquela categoria.
- *  - Com keywords: usa a lista fornecida (categoria inferida).
- */
 app.post("/api/sync", async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 5), 50);
+    const listType = req.body?.listType != null ? Number(req.body.listType) : 0;
+    const sortType = req.body?.sortType != null ? Number(req.body.sortType) : 2;
     let plano;
 
     if (Array.isArray(req.body?.keywords) && req.body.keywords.length) {
@@ -175,13 +212,13 @@ app.post("/api/sync", async (req, res) => {
 
     for (const { keyword, category } of plano) {
       try {
-        const offer = await fetchProductOffers({ keyword, limit, page: 1 });
+        const offer = await fetchProductOffers({ keyword, limit, page: 1, listType, sortType });
         const nodes = offer.nodes || [];
-        const rows = nodes.map((n) => mapOfferToRow(n, keyword)).filter((r) => r.item_id);
+        const rows = nodes.map((n) => mapOfferToRow(n, keyword, listType)).filter((r) => r.item_id && r.offer_link);
         if (rows.length) await upsertOfertas(rows);
-        const products = nodes.map((n) => mapOfferToProduct(n, keyword));
+        const products = nodes.map((n) => mapOfferToProduct(n, keyword, listType));
         allProducts.push(...products);
-        report.push({ keyword, category, ok: true, count: nodes.length });
+        report.push({ keyword, category, ok: true, count: nodes.length, listType, sortType });
         await new Promise((r) => setTimeout(r, 350));
       } catch (e) {
         report.push({ keyword, category, ok: false, error: e.message });
@@ -194,6 +231,8 @@ app.post("/api/sync", async (req, res) => {
     res.json({
       ok: true,
       keywordsRun: plano.length,
+      listType,
+      sortType,
       report,
       count: map.size,
       products: [...map.values()],
@@ -204,25 +243,23 @@ app.post("/api/sync", async (req, res) => {
   }
 });
 
-/**
- * Atalho GET para sincronizar todas as keywords de uma categoria.
- * Ex.: GET /api/sync/categoria/eletronicos?limit=25
- */
 app.get("/api/sync/categoria/:id", async (req, res) => {
   try {
     const catId = String(req.params.id || "").trim();
     const cat = CATEGORIAS.find((c) => c.id === catId);
     if (!cat) return res.status(404).json({ error: `Categoria desconhecida: ${catId}` });
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 5), 50);
+    const listType = req.query.listType != null ? Number(req.query.listType) : 0;
+    const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
     const all = [];
     const report = [];
     for (const kw of cat.keywords) {
       try {
-        const offer = await fetchProductOffers({ keyword: kw, limit, page: 1 });
+        const offer = await fetchProductOffers({ keyword: kw, limit, page: 1, listType, sortType });
         const nodes = offer.nodes || [];
-        const rows = nodes.map((n) => mapOfferToRow(n, kw)).filter((r) => r.item_id);
+        const rows = nodes.map((n) => mapOfferToRow(n, kw, listType)).filter((r) => r.item_id && r.offer_link);
         if (rows.length) await upsertOfertas(rows);
-        all.push(...nodes.map((n) => mapOfferToProduct(n, kw)));
+        all.push(...nodes.map((n) => mapOfferToProduct(n, kw, listType)));
         report.push({ keyword: kw, ok: true, count: nodes.length });
         await new Promise((r) => setTimeout(r, 300));
       } catch (e) {
@@ -235,6 +272,8 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
       ok: true,
       category: cat.id,
       keywordsRun: cat.keywords.length,
+      listType,
+      sortType,
       count: map.size,
       report,
       products: [...map.values()],
@@ -244,12 +283,10 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
   }
 });
 
-/** Status do alimentador automático (para o painel admin). */
 app.get("/api/auto/status", (_req, res) => {
   res.json(autosync.status());
 });
 
-/** Dispara manualmente um lote do auto-sync (admin). */
 app.post("/api/auto/run", async (_req, res) => {
   try {
     const result = await autosync.runOnce({ manual: true });
@@ -259,11 +296,16 @@ app.post("/api/auto/run", async (_req, res) => {
   }
 });
 
-/**
- * Endpoint para Cron (ex.: Vercel Cron chama via GET).
- * Em ambientes serverless o setInterval não roda, então a alimentação
- * automática acontece por aqui, agendada externamente.
- */
+/** Popular destaques (Top Performance). */
+app.post("/api/auto/top-performance", async (_req, res) => {
+  try {
+    const result = await autosync.runTopPerformance({ manual: true });
+    res.json({ ok: true, result, status: autosync.status() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/cron/sync", async (_req, res) => {
   try {
     const result = await autosync.runOnce({ manual: true });
@@ -273,19 +315,32 @@ app.get("/api/cron/sync", async (_req, res) => {
   }
 });
 
+/**
+ * Gera short link (com subIds) e opcionalmente cacheia no Supabase.
+ * Body: { originUrl, subIds?, itemId? }
+ */
 app.post("/api/shortlink", async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "").trim();
     if (!originUrl) return res.status(400).json({ error: "originUrl obrigatório" });
-    const subIds = Array.isArray(req.body?.subIds) ? req.body.subIds.map(String) : ["vitrine", "afiliado_mestre"];
+    const subIds = Array.isArray(req.body?.subIds)
+      ? req.body.subIds.map(String)
+      : ["vitrine", "web"];
+    const itemId = req.body?.itemId != null ? Number(req.body.itemId) : null;
     const shortLink = await generateShortLink(originUrl, subIds);
-    res.json({ shortLink });
+    if (shortLink && itemId) {
+      try {
+        await updateShortLink(itemId, shortLink);
+      } catch (e) {
+        console.warn("[/api/shortlink] cache falhou:", e.message);
+      }
+    }
+    res.json({ shortLink, originUrl, subIds });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
   }
 });
 
-// Arquivos estáticos do projeto
 app.use(express.static(ROOT));
 app.use("/uploads", express.static(path.join(ROOT, "uploads")));
 
@@ -293,8 +348,6 @@ app.get("/", (_req, res) => {
   res.redirect("/uploads/painel_e_vitrine_afiliado_mestre.html");
 });
 
-// Servidor contínuo (local, Render, Railway, VPS...). Em serverless (Vercel)
-// o arquivo é importado como handler e este bloco não executa.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Afiliado Mestre rodando em http://localhost:${PORT}`);

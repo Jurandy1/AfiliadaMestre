@@ -1,15 +1,13 @@
 "use strict";
 
-// Alimentação automática da vitrine — leve e "free-tier friendly".
-// Em vez de varrer TODAS as keywords de uma vez (pico de escrita no Supabase e
-// muitas chamadas à Shopee), processamos um pequeno lote por vez (round-robin).
-// Assim o banco se mantém atualizado aos poucos, sem estourar cotas gratuitas.
+// Alimentação automática leve (free-tier).
+// Rotaciona listType/sortType: recomendados+vendidos → top performance → maior comissão.
 
-const { fetchProductOffers, mapOfferToRow, mapOfferToProduct } = require("./shopee");
+const { fetchProductOffers, mapOfferToRow, SYNC_ROTATION } = require("./shopee");
 const { upsertOfertas, pruneOlderThan } = require("./supabase");
 const { allKeywords } = require("./categorias");
 
-const KEYWORDS = allKeywords(); // [{ keyword, category }]
+const KEYWORDS = allKeywords();
 
 const config = {
   enabled: /^(1|true|on|yes)$/i.test(String(process.env.AUTO_SYNC ?? "1")),
@@ -26,6 +24,7 @@ const state = {
   nextRunAt: null,
   lastPruneAt: null,
   cursor: 0,
+  rotationCursor: 0,
   runs: 0,
   totalUpserts: 0,
   lastResult: null,
@@ -48,8 +47,13 @@ function credsReady() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Processa um lote de keywords a partir do cursor atual. */
-async function runOnce({ manual = false } = {}) {
+function nextMode() {
+  const mode = SYNC_ROTATION[state.rotationCursor % SYNC_ROTATION.length];
+  state.rotationCursor = (state.rotationCursor + 1) % SYNC_ROTATION.length;
+  return mode;
+}
+
+async function runOnce({ manual = false, forceMode = null } = {}) {
   if (state.running) return { skipped: "already-running" };
   if (!credsReady()) {
     state.lastError = "Credenciais Shopee/Supabase ausentes";
@@ -61,6 +65,7 @@ async function runOnce({ manual = false } = {}) {
   const startedAt = new Date();
   const processed = [];
   let upserts = 0;
+  const mode = forceMode || nextMode();
 
   try {
     for (let i = 0; i < config.batch; i++) {
@@ -68,22 +73,37 @@ async function runOnce({ manual = false } = {}) {
       const { keyword, category } = KEYWORDS[idx];
       state.cursor = (state.cursor + 1) % KEYWORDS.length;
       try {
-        const offer = await fetchProductOffers({ keyword, limit: config.limit, page: 1 });
+        const offer = await fetchProductOffers({
+          keyword,
+          limit: config.limit,
+          page: 1,
+          listType: mode.listType,
+          sortType: mode.sortType,
+        });
         const nodes = offer.nodes || [];
-        const rows = nodes.map((n) => mapOfferToRow(n, keyword)).filter((r) => r.item_id);
+        const rows = nodes
+          .map((n) => mapOfferToRow(n, keyword, mode.listType))
+          .filter((r) => r.item_id && r.offer_link);
         if (rows.length) {
           await upsertOfertas(rows);
           upserts += rows.length;
         }
-        processed.push({ keyword, category, ok: true, count: rows.length });
+        processed.push({
+          keyword,
+          category,
+          ok: true,
+          count: rows.length,
+          mode: mode.label,
+          listType: mode.listType,
+          sortType: mode.sortType,
+        });
       } catch (e) {
-        processed.push({ keyword, category, ok: false, error: e.message });
+        processed.push({ keyword, category, ok: false, error: e.message, mode: mode.label });
         state.lastError = e.message;
       }
       if (i < config.batch - 1) await sleep(config.requestGapMs);
     }
 
-    // Prune ocasional (no máximo 1x/dia) para manter o Supabase enxuto.
     if (config.pruneDays > 0) {
       const dayMs = 24 * 60 * 60 * 1000;
       const canPrune = !state.lastPruneAt || Date.now() - new Date(state.lastPruneAt).getTime() > dayMs;
@@ -101,13 +121,21 @@ async function runOnce({ manual = false } = {}) {
     state.runs += 1;
     state.totalUpserts += upserts;
     state.lastRunAt = startedAt.toISOString();
-    state.lastResult = { manual, upserts, processed };
-    console.log(`[autosync] run #${state.runs}: ${upserts} upserts (${processed.length} keywords)`);
+    state.lastResult = { manual, upserts, mode: mode.label, processed };
+    console.log(`[autosync] run #${state.runs} [${mode.label}]: ${upserts} upserts (${processed.length} keywords)`);
     return state.lastResult;
   } finally {
     state.running = false;
     scheduleNext();
   }
+}
+
+/** Força um lote Top Performance (listType 2). */
+async function runTopPerformance({ manual = true } = {}) {
+  return runOnce({
+    manual,
+    forceMode: { listType: 2, sortType: 2, label: "top_performance" },
+  });
 }
 
 function scheduleNext() {
@@ -129,9 +157,8 @@ function start() {
   }
   console.log(
     `[autosync] ativo: lote=${config.batch} keyword(s) a cada ${config.intervalMin}min ` +
-    `(limit=${config.limit}, keywords=${KEYWORDS.length})`
+    `(limit=${config.limit}, keywords=${KEYWORDS.length}, modos=${SYNC_ROTATION.map((m) => m.label).join("|")})`
   );
-  // Primeira execução ~20s após o boot, sem travar o start do servidor.
   setTimeout(() => runOnce().catch((e) => console.error("[autosync]", e.message)), 20000);
   scheduleNext();
 }
@@ -146,6 +173,8 @@ function status() {
     pruneDays: config.pruneDays,
     keywordsTotal: KEYWORDS.length,
     cursor: state.cursor,
+    rotationCursor: state.rotationCursor,
+    modes: SYNC_ROTATION,
     runs: state.runs,
     totalUpserts: state.totalUpserts,
     lastRunAt: state.lastRunAt,
@@ -156,4 +185,4 @@ function status() {
   };
 }
 
-module.exports = { start, runOnce, status, config };
+module.exports = { start, runOnce, runTopPerformance, status, config };

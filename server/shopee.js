@@ -5,6 +5,16 @@ const { categoryForKeyword } = require("./categorias");
 
 const SHOPEE_API_URL = "https://open-api.affiliate.shopee.com.br/graphql";
 
+/** listType: 0=Recomendados, 1=Maior comissão, 2=Top performance */
+/** sortType: 1=Relevância, 2=Vendidos, 3=Maior preço, 4=Menor preço, 5=Comissão */
+const SYNC_ROTATION = [
+  { listType: 0, sortType: 2, label: "recomendados_vendidos" },
+  { listType: 2, sortType: 2, label: "top_performance" },
+  { listType: 1, sortType: 5, label: "maior_comissao" },
+];
+
+const MIN_RATING = Number(process.env.SYNC_MIN_RATING) || 4.0;
+
 function getCreds() {
   const appId = (process.env.SHOPEE_APP_ID || "").trim();
   const secret = (process.env.SHOPEE_SECRET || "").trim();
@@ -52,17 +62,68 @@ async function shopeeGraphql(query, variables) {
   return json.data;
 }
 
+function parseDiscountPct(discountRaw, priceMin, priceMax) {
+  if (discountRaw != null && discountRaw !== "") {
+    const n = Number(String(discountRaw).replace("%", ""));
+    if (Number.isFinite(n)) return Math.round(n > 1 ? n : n * 100);
+  }
+  if (priceMax > priceMin && priceMax > 0) {
+    return Math.round(((priceMax - priceMin) / priceMax) * 100);
+  }
+  return 0;
+}
+
+function parseCommissionPct(rate) {
+  const n = Number(String(rate || "0").replace("%", ""));
+  if (!Number.isFinite(n)) return 0;
+  return n <= 1 ? n * 100 : n;
+}
+
+function toUnixSec(val) {
+  if (val == null || val === "") return null;
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
+}
+
+function isFlashActive(periodEnd) {
+  const end = toUnixSec(periodEnd);
+  if (!end) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return end > now && end - now < 72 * 3600;
+}
+
+function isQualityOffer(node) {
+  if (!node || !node.offerLink) return false;
+  if (!node.itemId) return false;
+  const rating = Number(node.ratingStar);
+  if (Number.isFinite(rating) && rating > 0 && rating < MIN_RATING) return false;
+  return true;
+}
+
+function filterQualityNodes(nodes) {
+  return (nodes || []).filter((n) => isQualityOffer(n));
+}
+
 /**
- * Busca ofertas de produto (productOfferV2).
+ * productOfferV2 — listType 0 é válido (não usar || 1).
  */
-async function fetchProductOffers({ keyword = "", limit = 20, page = 1, sortType = 5, listType = 1 } = {}) {
+async function fetchProductOffers({
+  keyword = "",
+  limit = 20,
+  page = 1,
+  sortType = 2,
+  listType = 0,
+} = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
+  const safeList = [0, 1, 2].includes(Number(listType)) ? Number(listType) : 0;
+  const safeSort = [1, 2, 3, 4, 5].includes(Number(sortType)) ? Number(sortType) : 2;
   const kw = String(keyword || "").trim();
 
   const args = [
-    `listType: ${Number(listType) || 1}`,
-    `sortType: ${Number(sortType) || 5}`,
+    `listType: ${safeList}`,
+    `sortType: ${safeSort}`,
     `page: ${safePage}`,
     `limit: ${safeLimit}`,
   ];
@@ -96,13 +157,75 @@ async function fetchProductOffers({ keyword = "", limit = 20, page = 1, sortType
   }`;
 
   const data = await shopeeGraphql(query);
-  return data?.productOfferV2 || { nodes: [], pageInfo: {} };
+  const result = data?.productOfferV2 || { nodes: [], pageInfo: {} };
+  return {
+    ...result,
+    nodes: filterQualityNodes(result.nodes),
+    listType: safeList,
+    sortType: safeSort,
+  };
 }
 
-/**
- * Gera link curto afiliado.
- */
-async function generateShortLink(originUrl, subIds = ["vitrine", "afiliado_mestre"]) {
+/** Campanhas / coleções oficiais (shopeeOfferV2). */
+async function fetchShopeeOffers({ keyword = "", sortType = 1, page = 1, limit = 12 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 12, 1), 50);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const safeSort = [1, 2].includes(Number(sortType)) ? Number(sortType) : 1;
+  const kw = String(keyword || "").trim();
+
+  const args = [
+    `sortType: ${safeSort}`,
+    `page: ${safePage}`,
+    `limit: ${safeLimit}`,
+  ];
+  if (kw) args.unshift(`keyword: ${JSON.stringify(kw)}`);
+
+  const query = `{
+    shopeeOfferV2(${args.join(", ")}) {
+      nodes {
+        commissionRate
+        imageUrl
+        offerLink
+        originalLink
+        offerName
+        offerType
+        categoryId
+        collectionId
+        periodStartTime
+        periodEndTime
+      }
+      pageInfo { page limit hasNextPage }
+    }
+  }`;
+
+  const data = await shopeeGraphql(query);
+  return data?.shopeeOfferV2 || { nodes: [], pageInfo: {} };
+}
+
+function mapCampaignNode(node) {
+  const rate = parseCommissionPct(node.commissionRate);
+  const end = toUnixSec(node.periodEndTime);
+  const start = toUnixSec(node.periodStartTime);
+  return {
+    id: String(node.collectionId || node.categoryId || node.offerName || Math.random()),
+    title: node.offerName || "Campanha Shopee",
+    image: node.imageUrl || "",
+    affiliateLink: node.offerLink || node.originalLink || "#",
+    offerType: node.offerType,
+    categoryId: node.categoryId,
+    collectionId: node.collectionId,
+    commissionRate: rate ? `${rate.toFixed(1)}%` : "—",
+    periodStart: start,
+    periodEnd: end,
+    isActive: !end || end > Math.floor(Date.now() / 1000),
+  };
+}
+
+async function generateShortLink(originUrl, subIds = ["vitrine", "afiliada_mestre"]) {
+  const clean = (Array.isArray(subIds) ? subIds : ["vitrine"])
+    .map((s) => String(s).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40))
+    .filter(Boolean)
+    .slice(0, 5);
   const query = `
     mutation GenerateShortLink($originUrl: String!, $subIds: [String!]) {
       generateShortLink(input: { originUrl: $originUrl, subIds: $subIds }) {
@@ -110,26 +233,18 @@ async function generateShortLink(originUrl, subIds = ["vitrine", "afiliado_mestr
       }
     }
   `;
-  const data = await shopeeGraphql(query, { originUrl, subIds });
+  const data = await shopeeGraphql(query, { originUrl, subIds: clean.length ? clean : ["vitrine"] });
   return data?.generateShortLink?.shortLink || null;
 }
 
-function mapOfferToProduct(node, keyword = "") {
+function mapOfferToProduct(node, keyword = "", listType = null) {
   const priceMin = Number(node.priceMin) || 0;
   const priceMax = Number(node.priceMax) || priceMin;
-  const discountRaw = node.priceDiscountRate;
-  let discountPct = 0;
-  if (discountRaw != null && discountRaw !== "") {
-    const n = Number(String(discountRaw).replace("%", ""));
-    discountPct = Number.isFinite(n) ? Math.round(n > 1 ? n : n * 100) : 0;
-  } else if (priceMax > priceMin && priceMax > 0) {
-    discountPct = Math.round(((priceMax - priceMin) / priceMax) * 100);
-  }
-
-  const commissionRateNum = Number(String(node.commissionRate || "0").replace("%", ""));
-  const ratePct = Number.isFinite(commissionRateNum)
-    ? (commissionRateNum <= 1 ? commissionRateNum * 100 : commissionRateNum)
-    : 0;
+  const discountPct = parseDiscountPct(node.priceDiscountRate, priceMin, priceMax);
+  const ratePct = parseCommissionPct(node.commissionRate);
+  const periodStart = toUnixSec(node.periodStartTime);
+  const periodEnd = toUnixSec(node.periodEndTime);
+  const flash = isFlashActive(periodEnd);
 
   const sales = node.sales != null ? String(node.sales) : "";
   const salesLabel = sales && !/vendid/i.test(sales) ? `${sales} vendidos` : sales;
@@ -138,9 +253,11 @@ function mapOfferToProduct(node, keyword = "") {
   const descParts = [];
   descParts.push(discountPct > 0 ? `Oferta com ${discountPct}% de desconto` : "Oferta selecionada");
   if (salesLabel && salesLabel !== "—") descParts.push(salesLabel);
-  descParts.push("frete grátis para itens elegíveis");
-  if (shop) descParts.push(`vendido por ${shop} na Shopee`);
+  descParts.push("confira frete e prazo na Shopee");
+  if (shop) descParts.push(`vendido por ${shop}`);
   const desc = descParts.join(" · ") + ".";
+
+  const secondsLeft = flash && periodEnd ? Math.max(0, periodEnd - Math.floor(Date.now() / 1000)) : 0;
 
   return {
     id: Number(node.itemId) || Date.now(),
@@ -150,14 +267,20 @@ function mapOfferToProduct(node, keyword = "") {
     oldPrice: priceMax || priceMin,
     newPrice: priceMin,
     discount: discountPct ? `${discountPct}%` : "0%",
+    discountPct,
     stars: Number(node.ratingStar) || 4.5,
     reviews: 0,
     sales: salesLabel || "—",
+    salesRaw: sales,
     image: node.imageUrl || "",
     affiliateLink: node.offerLink || node.productLink || "#",
     productLink: node.productLink || "",
-    isFlashSale: discountPct >= 40,
-    flashStock: discountPct >= 40 ? Math.min(99, 20 + discountPct) : 0,
+    shortLink: node.shortLink || node.short_link || null,
+    isFlashSale: flash,
+    flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (72 * 3600)) * 100))) : 0,
+    periodStart,
+    periodEnd,
+    listType: listType != null ? listType : (node.listType != null ? Number(node.listType) : null),
     commissionRate: `${ratePct.toFixed(1)}%`,
     sellerCommission: node.sellerCommissionRate || "—",
     shopeeCommission: node.shopeeCommissionRate || "—",
@@ -169,7 +292,7 @@ function mapOfferToProduct(node, keyword = "") {
   };
 }
 
-function mapOfferToRow(node, keyword = "") {
+function mapOfferToRow(node, keyword = "", listType = null) {
   return {
     item_id: Number(node.itemId),
     product_name: node.productName || "",
@@ -190,14 +313,25 @@ function mapOfferToRow(node, keyword = "") {
     shop_type: node.shopType != null ? Number(node.shopType) : null,
     keyword: keyword || null,
     category: categoryForKeyword(keyword),
+    period_start: toUnixSec(node.periodStartTime),
+    period_end: toUnixSec(node.periodEndTime),
+    list_type: listType != null ? Number(listType) : null,
     updated_at: new Date().toISOString(),
   };
 }
 
 module.exports = {
   fetchProductOffers,
+  fetchShopeeOffers,
   generateShortLink,
   mapOfferToProduct,
   mapOfferToRow,
+  mapCampaignNode,
+  filterQualityNodes,
+  isQualityOffer,
+  isFlashActive,
+  toUnixSec,
   getCreds,
+  SYNC_ROTATION,
+  MIN_RATING,
 };

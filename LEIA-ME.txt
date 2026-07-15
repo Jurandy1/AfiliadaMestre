@@ -11,13 +11,17 @@ Afiliado Mestre — setup rápido
 3) Abra no navegador:
    http://localhost:3789
 
-4) No painel (API & Console Admin) use:
-   - "Buscar na Shopee" / sync para puxar productOfferV2
+4) No painel (URL com ?admin=1) use:
+   - "Rodar sincronização" / "Popular destaques"
    - Ofertas vão para a tabela public.ofertas no Supabase
-   - Vitrine lê o cache do banco (ou busca ao vivo)
+   - Vitrine lê o cache do banco
+
+5) Se a tabela já existia, rode no Supabase SQL Editor:
+   sql/migration_conversion.sql
+   (cria period_start, period_end, list_type, short_link)
 
 IMPORTANTE
 - SHOPEE_APP_ID / SHOPEE_SECRET ficam só no .env (nunca no HTML)
 - SUPABASE_SERVICE_KEY também só no servidor
-- Você colou as keys no chat: se esta conversa for compartilhada, rotate as keys no Supabase
-- Botão "Comprar" abre offerLink da Shopee (não entra direto no carrinho — limitação da API)
+- Botão "Comprar" abre offerLink/shortLink da Shopee
+- A vitrine pública NÃO mostra comissão (só o painel admin)

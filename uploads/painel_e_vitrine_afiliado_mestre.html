@@ -106,7 +106,7 @@
                             <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-12 md:h-14 w-auto">
                         </div>
                         <p class="hidden sm:block text-[11px] text-orange-100 font-semibold max-w-[160px] leading-tight">
-                            Ofertas selecionadas da Shopee com frete grátis
+                            Achadinhos e ofertas selecionadas da Shopee
                         </p>
                     </div>
 
@@ -140,54 +140,28 @@
 
         <!-- CORE PUBLIC STOREFRONT CONTENT -->
         <main class="max-w-7xl w-full mx-auto p-4 space-y-6 flex-1">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="lg:col-span-2 bg-shopee-orange rounded-xl overflow-hidden relative shadow-md h-48 md:h-64 p-7 md:p-10 text-white flex flex-col justify-between">
-                    <div class="absolute right-6 bottom-0 opacity-10 pointer-events-none">
-                        <i class="fas fa-shopping-bag text-[140px] text-white"></i>
+            <!-- Hero: campanhas oficiais da Shopee -->
+            <section id="campaigns-hero" class="space-y-3">
+                <div class="flex items-end justify-between gap-2">
+                    <div>
+                        <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider">Campanhas Shopee</p>
+                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas oficiais para você aproveitar</h2>
                     </div>
-                    <div class="space-y-2 max-w-lg z-10">
-                        <span class="bg-shopee-yellow text-shopee-orange text-[11px] font-black px-2.5 py-1 rounded uppercase">
-                            Ofertas do dia
-                        </span>
-                        <h2 class="text-2xl md:text-3xl font-extrabold leading-tight">Os melhores preços da Shopee em um só lugar</h2>
-                        <p class="text-sm text-orange-50 leading-relaxed">
-                            Clique no produto e compre direto na Shopee com desconto e frete grátis.
-                        </p>
-                    </div>
-                    <div class="z-10">
-                        <button onclick="scrollToStoreGrid()" class="bg-shopee-yellow hover:bg-yellow-400 text-shopee-orange font-extrabold text-xs px-5 py-2.5 rounded-lg shadow transition uppercase tracking-wide">
-                            Ver ofertas <i class="fas fa-arrow-down ml-1"></i>
-                        </button>
+                    <button onclick="scrollToStoreGrid()" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
+                        Ver produtos <i class="fas fa-arrow-down"></i>
+                    </button>
+                </div>
+                <div id="campaigns-track" class="flex gap-3 overflow-x-auto pb-2 snap-x">
+                    <div class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white flex items-center justify-center">
+                        <span class="text-sm font-bold opacity-90"><i class="fas fa-spinner fa-spin mr-2"></i> Carregando campanhas…</span>
                     </div>
                 </div>
-
-                <div class="grid grid-cols-2 lg:grid-cols-1 gap-3">
-                    <div class="bg-[#26aa99] text-white rounded-xl p-4 flex items-center gap-3 shadow-md relative overflow-hidden h-auto lg:h-[120px]">
-                        <div class="h-11 w-11 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl">
-                            <i class="fas fa-truck-fast"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold leading-tight">Frete grátis Shopee</h3>
-                            <p class="text-[11px] text-white/90 mt-0.5">Produtos elegíveis ao Frete Grátis do app.</p>
-                        </div>
-                    </div>
-
-                    <div class="bg-amber-600 text-white rounded-xl p-4 flex items-center gap-3 shadow-md relative overflow-hidden h-auto lg:h-[120px]">
-                        <div class="h-11 w-11 shrink-0 rounded-full bg-white/15 flex items-center justify-center text-xl">
-                            <i class="fas fa-tags"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-sm font-bold leading-tight">Ofertas com desconto</h3>
-                            <p class="text-[11px] text-white/90 mt-0.5">Preços promocionais direto da Shopee.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </section>
 
             <!-- Categories Row -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60">
                 <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-                    <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Navegar por Categorias
+                    <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Categorias
                 </h3>
                 <div class="grid grid-cols-4 sm:grid-cols-8 gap-2" id="store-categories-container">
                     <!-- Dynamic categories generated inside script -->
@@ -195,46 +169,43 @@
             </div>
 
             <!-- FLASH SALE BOX -->
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200/60">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200/60" id="flash-sale-section">
                 <div class="bg-gradient-to-r from-orange-500/10 to-red-500/10 p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center bg-shopee-orange text-white font-black px-3 py-1.5 rounded-lg text-xs italic tracking-wide animate-subtle-pulse">
-                            <i class="fas fa-bolt mr-1.5 text-shopee-yellow"></i> OFERTAS RELÂMPAGO
+                            <i class="fas fa-bolt mr-1.5 text-shopee-yellow"></i> TERMINA EM BREVE
                         </div>
-                        <!-- Countdown timer -->
                         <div class="flex items-center space-x-1 font-bold text-sm text-slate-800">
-                            <span id="flash-hour" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">02</span>
+                            <span id="flash-hour" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">--</span>
                             <span>:</span>
-                            <span id="flash-min" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">15</span>
+                            <span id="flash-min" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">--</span>
                             <span>:</span>
-                            <span id="flash-sec" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">30</span>
+                            <span id="flash-sec" class="bg-slate-900 text-white px-2 py-1 rounded text-xs">--</span>
                         </div>
                     </div>
-                    <span class="text-xs text-shopee-orange font-bold flex items-center gap-1">
-                        Estoque limitado <i class="fas fa-chevron-right text-[9px]"></i>
-                    </span>
+                    <span class="text-xs text-slate-500 font-semibold">Baseado no prazo real da oferta</span>
                 </div>
-                <!-- Flash Items Container (Horizontal scrollable) -->
-                <div class="p-4 overflow-x-auto flex space-x-4 pb-6" id="flash-products-container">
-                    <!-- Filled by Script -->
-                </div>
+                <div class="p-4 overflow-x-auto flex space-x-4 pb-6" id="flash-products-container"></div>
             </div>
 
             <!-- PRODUCTS SHOWCASE GRID -->
             <div id="store-grid-section" class="space-y-4 pt-2">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <i class="fas fa-fire text-shopee-orange"></i> Ofertas em destaque
                     </h3>
-                    <div id="store-results-info" class="text-xs text-slate-500">
-                        Carregando ofertas…
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold" id="store-sort-tabs">
+                            <button type="button" data-sort="recent" onclick="setStoreSort('recent')" class="store-sort-btn px-2.5 py-1.5 rounded-md bg-white text-shopee-orange shadow-sm">Recentes</button>
+                            <button type="button" data-sort="sales" onclick="setStoreSort('sales')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Mais vendidos</button>
+                            <button type="button" data-sort="discount" onclick="setStoreSort('discount')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Maior desconto</button>
+                            <button type="button" data-sort="rating" onclick="setStoreSort('rating')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Melhor avaliação</button>
+                        </div>
+                        <div id="store-results-info" class="text-xs text-slate-500">Carregando ofertas…</div>
                     </div>
                 </div>
 
-                <!-- Cards Grid -->
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3.5" id="store-products-grid">
-                    <!-- Populated Dynamically -->
-                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5" id="store-products-grid"></div>
             </div>
         </main>
     </div>
@@ -255,6 +226,9 @@
             <div class="flex flex-wrap gap-2">
                 <button onclick="runAutoSyncNow()" id="btn-run-auto" class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">
                     <i class="fas fa-bolt mr-1"></i> Rodar sincronização agora
+                </button>
+                <button onclick="runTopPerformanceNow()" id="btn-top-perf" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                    <i class="fas fa-trophy mr-1"></i> Popular destaques
                 </button>
                 <button onclick="loadOffersFromSupabase({silent:false, reset:true})" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
                     <i class="fas fa-rotate mr-1"></i> Recarregar cache
@@ -515,8 +489,8 @@
                         </div>
 
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <span class="bg-shopee-greenLight text-shopee-greenFree text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
-                                <i class="fas fa-truck"></i> Frete grátis
+                            <span class="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
+                                <i class="fas fa-truck"></i> Ver frete na Shopee
                             </span>
                             <span class="bg-orange-50 text-shopee-orange text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
                                 <i class="fas fa-shield-halved"></i> Compra protegida
@@ -527,11 +501,12 @@
                         </div>
 
                         <p id="modal-desc" class="text-xs text-slate-500 leading-relaxed mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100"></p>
+                        <p id="modal-deadline" class="hidden text-[11px] text-red-600 font-bold mt-2"></p>
 
                         <a id="modal-buy-btn" href="#" target="_blank" rel="noopener noreferrer sponsored"
-                           class="mt-auto pt-4 block">
+                           class="mt-auto pt-4 block" onclick="return handleBuyClick(event)">
                             <span class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white py-3 px-4 rounded-xl font-bold text-sm shadow flex items-center justify-center gap-2 transition uppercase tracking-wide">
-                                <i class="fas fa-bag-shopping"></i> Comprar na Shopee <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
+                                <i class="fas fa-bag-shopping"></i> <span id="modal-buy-label">Comprar na Shopee</span> <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
                             </span>
                         </a>
                         <p class="text-[10px] text-slate-400 text-center mt-2">Você será direcionado para a página oficial na Shopee.</p>
@@ -753,6 +728,9 @@
         // App Core State
         let productsDatabase = [];
         let currentStoreCategory = 'todos';
+        let currentStoreSort = 'recent';
+        let activeProductForBuy = null;
+        let flashEndsAt = null;
 
         // Categories Map — carregado dinâmicamente de /api/categorias (com fallback)
         let categories = [
@@ -805,6 +783,7 @@
             renderCategories();
             renderStoreProducts();
             renderConsoleProducts();
+            loadCampaigns();
             if (isAdminMode()) {
                 populateAdminCategorySelect();
                 loadAdminStats();
@@ -895,7 +874,7 @@
                 const res = await fetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ limit: 20 }),
+                    body: JSON.stringify({ limit: 20, listType: 0, sortType: 2 }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -911,7 +890,7 @@
             if (!catId || catId === "todos") return syncAllCategories({ silent });
             try {
                 showToast(`Buscando ofertas de "${catId}" na Shopee…`, "success");
-                const res = await fetch(`${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25`);
+                const res = await fetch(`${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25&listType=0&sortType=2`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 if (!silent) showToast(`✓ ${data.count} produtos em "${catId}"`, "success");
@@ -958,7 +937,8 @@
             const offset = currentPage * PAGE_SIZE;
             const url = `${API_BASE}/api/ofertas/db?limit=${limit}&offset=${offset}`
                 + `&keyword=${encodeURIComponent(keyword)}`
-                + `&category=${encodeURIComponent(category)}`;
+                + `&category=${encodeURIComponent(category)}`
+                + `&sort=${encodeURIComponent(opts.sort || currentStoreSort)}`;
             try {
                 const res = await fetch(url);
                 const data = await res.json();
@@ -1005,7 +985,7 @@
                 const res = await fetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ limit: 12 }),
+                    body: JSON.stringify({ limit: 12, listType: 0, sortType: 2 }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1074,22 +1054,102 @@
             }
         }
 
-        // Active Countdown Timer for Relampago Section
+        // Countdown baseado no próximo periodEnd real das ofertas relâmpago
         function initCountdown() {
-            let totalSeconds = (2 * 3600) + (15 * 60) + 30; // 2h 15m 30s
             setInterval(() => {
-                totalSeconds--;
-                if (totalSeconds <= 0) {
-                    totalSeconds = 3 * 3600; // loop reset
+                const hourEl = document.getElementById('flash-hour');
+                if (!hourEl) return;
+                if (!flashEndsAt) {
+                    hourEl.innerText = '--';
+                    document.getElementById('flash-min').innerText = '--';
+                    document.getElementById('flash-sec').innerText = '--';
+                    return;
                 }
+                let totalSeconds = Math.max(0, Math.floor(flashEndsAt - Date.now() / 1000));
                 const hrs = Math.floor(totalSeconds / 3600);
                 const mins = Math.floor((totalSeconds % 3600) / 60);
                 const secs = totalSeconds % 60;
-
-                document.getElementById('flash-hour').innerText = String(hrs).padStart(2, '0');
+                hourEl.innerText = String(hrs).padStart(2, '0');
                 document.getElementById('flash-min').innerText = String(mins).padStart(2, '0');
                 document.getElementById('flash-sec').innerText = String(secs).padStart(2, '0');
             }, 1000);
+        }
+
+        function parseSalesNumber(p) {
+            const raw = String(p.salesRaw || p.sales || '').replace(/[^\d.,]/g, '').replace(',', '.');
+            const n = parseFloat(raw);
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function sortProductsLocal(list) {
+            const arr = [...list];
+            if (currentStoreSort === 'sales') {
+                arr.sort((a, b) => parseSalesNumber(b) - parseSalesNumber(a));
+            } else if (currentStoreSort === 'discount') {
+                arr.sort((a, b) => (b.discountPct || parseInt(b.discount, 10) || 0) - (a.discountPct || parseInt(a.discount, 10) || 0));
+            } else if (currentStoreSort === 'rating') {
+                arr.sort((a, b) => (b.stars || 0) - (a.stars || 0));
+            } else if (currentStoreSort === 'ending') {
+                arr.sort((a, b) => (a.periodEnd || Infinity) - (b.periodEnd || Infinity));
+            }
+            return arr;
+        }
+
+        async function setStoreSort(sort) {
+            currentStoreSort = sort || 'recent';
+            document.querySelectorAll('.store-sort-btn').forEach((btn) => {
+                const active = btn.getAttribute('data-sort') === currentStoreSort;
+                btn.className = active
+                    ? 'store-sort-btn px-2.5 py-1.5 rounded-md bg-white text-shopee-orange shadow-sm'
+                    : 'store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500';
+            });
+            if (apiLive) {
+                await loadOffersFromSupabase({ silent: true, reset: true, sort: currentStoreSort });
+            } else {
+                renderStoreProducts();
+            }
+        }
+
+        async function loadCampaigns() {
+            const track = document.getElementById('campaigns-track');
+            if (!track) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/campanhas?limit=8`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const list = (data.campaigns || []).filter((c) => c.affiliateLink && c.affiliateLink !== '#');
+                if (!list.length) {
+                    track.innerHTML = `
+                        <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
+                            <p class="text-[11px] font-black uppercase text-shopee-yellow">Afiliada Mestre</p>
+                            <h3 class="text-2xl font-black leading-tight mt-1">Ofertas selecionadas da Shopee</h3>
+                            <p class="text-sm text-orange-100 mt-2">Explore produtos com desconto e compre com segurança.</p>
+                        </div>`;
+                    return;
+                }
+                track.innerHTML = list.map((c, i) => {
+                    const img = c.image
+                        ? `<img src="${escapeAttr(c.image)}" alt="" class="absolute inset-0 w-full h-full object-cover">`
+                        : '';
+                    return `
+                        <a href="${escapeAttr(c.affiliateLink)}" target="_blank" rel="noopener noreferrer sponsored"
+                           class="shrink-0 snap-start w-[85%] sm:w-[60%] md:w-[48%] lg:w-[38%] h-44 md:h-56 rounded-2xl overflow-hidden relative group shadow-md border border-orange-100">
+                            ${img}
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                            <div class="absolute bottom-0 left-0 right-0 p-4 text-white">
+                                <span class="text-[10px] font-black uppercase text-shopee-yellow">Campanha ${i + 1}</span>
+                                <h3 class="text-base md:text-lg font-black leading-snug line-clamp-2 mt-0.5">${escapeHtml(c.title)}</h3>
+                                <span class="inline-flex mt-2 text-[11px] font-bold bg-shopee-orange px-2.5 py-1 rounded-lg">Ver na Shopee <i class="fas fa-arrow-up-right-from-square ml-1 text-[9px]"></i></span>
+                            </div>
+                        </a>`;
+                }).join('');
+            } catch (err) {
+                track.innerHTML = `
+                    <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
+                        <h3 class="text-2xl font-black">Ofertas da Shopee</h3>
+                        <p class="text-sm text-orange-100 mt-2">Clique para ver os produtos selecionados.</p>
+                    </div>`;
+            }
         }
 
         // Render Categories list
@@ -1147,109 +1207,106 @@
         function renderStoreProducts() {
             const grid = document.getElementById('store-products-grid');
             const flashContainer = document.getElementById('flash-products-container');
-            const searchVal = document.getElementById('store-search-input').value.toLowerCase().trim();
+            const flashSection = document.getElementById('flash-sale-section');
+            const searchVal = (document.getElementById('store-search-input')?.value || '').toLowerCase().trim();
+            if (!grid || !flashContainer) return;
 
             grid.innerHTML = '';
             flashContainer.innerHTML = '';
 
-            // Filter logic
-            const filtered = productsDatabase.filter(p => {
+            let filtered = productsDatabase.filter(p => {
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
-                const matchesSearch = p.title.toLowerCase().includes(searchVal) || p.desc.toLowerCase().includes(searchVal);
+                const title = (p.title || '').toLowerCase();
+                const desc = (p.desc || '').toLowerCase();
+                const matchesSearch = !searchVal || title.includes(searchVal) || desc.includes(searchVal);
                 return matchesCategory && matchesSearch;
             });
+            filtered = sortProductsLocal(filtered);
 
-            // Populate Flash sales
-            const flashSales = filtered.filter(p => p.isFlashSale);
+            const now = Math.floor(Date.now() / 1000);
+            const flashSales = filtered
+                .filter(p => p.isFlashSale && p.periodEnd && p.periodEnd > now)
+                .sort((a, b) => (a.periodEnd || 0) - (b.periodEnd || 0));
+
+            flashEndsAt = flashSales.length ? flashSales[0].periodEnd : null;
+            if (flashSection) flashSection.classList.toggle('hidden', flashSales.length === 0);
+
             if (flashSales.length === 0) {
                 flashContainer.innerHTML = `
                     <div class="py-4 text-center text-slate-400 text-xs w-full">
-                        Nenhuma oferta relâmpago correspondente nesta categoria.
-                    </div>
-                `;
+                        Nenhuma oferta com prazo de término próximo nesta categoria.
+                    </div>`;
             } else {
-                flashSales.forEach(p => {
-                    const priceFormatted = p.newPrice.toFixed(2).replace('.', ',');
+                flashSales.slice(0, 16).forEach(p => {
+                    const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
                     flashContainer.innerHTML += `
-                        <div 
-                            onclick="openProductModal(${p.id})"
-                            class="bg-white rounded-xl overflow-hidden border border-orange-100 hover:border-shopee-orange shadow-sm cursor-pointer transition shrink-0 w-36 md:w-44 flex flex-col group relative"
-                        >
+                        <div onclick="openProductModal(${p.id})"
+                            class="bg-white rounded-xl overflow-hidden border border-orange-100 hover:border-shopee-orange shadow-sm cursor-pointer transition shrink-0 w-36 md:w-44 flex flex-col group relative">
                             <span class="absolute top-0 right-0 bg-shopee-yellow text-shopee-orange text-[9px] font-black px-1.5 py-0.5 rounded-bl-lg z-10">
                                 -${p.discount}
                             </span>
-                            <div class="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                            <div class="aspect-square bg-slate-50 relative overflow-hidden">
                                 <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
                             </div>
-                            <div class="p-2 space-y-2 flex flex-col justify-between flex-1 bg-white">
+                            <div class="p-2 space-y-1.5 flex flex-col justify-between flex-1">
                                 <h4 class="text-[11px] text-slate-800 font-semibold truncate">${escapeHtml(p.title)}</h4>
                                 <div class="text-center">
-                                    <p class="text-[9px] text-slate-400 line-through leading-none">R$ ${p.oldPrice.toFixed(2).replace('.', ',')}</p>
+                                    <p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>
                                     <p class="text-shopee-orange text-sm font-black mt-0.5">R$ ${priceFormatted}</p>
                                 </div>
-                                <div class="relative bg-red-100 h-3.5 rounded-full overflow-hidden flex items-center justify-center">
-                                    <div class="absolute left-0 top-0 bg-gradient-to-r from-orange-500 to-red-500 h-full" style="width: ${p.flashStock}%"></div>
-                                    <span class="relative text-[8px] font-black text-white uppercase z-10">Restam ${p.flashStock}%</span>
-                                </div>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
             }
 
-            // Populate Main discoveries grid — mostra TODOS os filtrados (flash entra no carrossel + no grid)
-            const normalOffers = filtered;
-            if (normalOffers.length === 0) {
+            if (filtered.length === 0) {
                 grid.innerHTML = `
                     <div class="col-span-full py-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-2">
                         <i class="far fa-folder-open text-3xl"></i>
                         <p class="font-bold text-sm">Nenhum produto correspondente encontrado.</p>
                         <p class="text-xs">Tente mudar sua busca ou categoria!</p>
-                    </div>
-                `;
+                    </div>`;
             } else {
-                normalOffers.forEach(p => {
-                    const priceFormatted = p.newPrice.toFixed(2).replace('.', ',');
-                    const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars)) + (p.stars % 1 >= 0.5 ? '<i class="fas fa-star-half-alt"></i>' : '');
+                filtered.forEach(p => {
+                    const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
+                    const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars || 4)) + ((p.stars % 1 >= 0.5) ? '<i class="fas fa-star-half-alt"></i>' : '');
+                    const showOff = p.discount && p.discount !== '0%';
+                    const shopLine = p.shopName ? `<p class="text-[9px] text-slate-400 truncate">${escapeHtml(p.shopName)}</p>` : '';
 
                     grid.innerHTML += `
-                        <div 
-                            onclick="openProductModal(${p.id})"
-                            class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group"
-                        >
+                        <div onclick="openProductModal(${p.id})"
+                            class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group">
+                            ${showOff ? `
                             <div class="absolute top-0 right-0 bg-[#ffe97a] text-shopee-orange text-[9px] font-black px-1.5 py-1 text-center rounded-bl-lg z-10 leading-none">
-                                <span class="block">${p.discount}</span>
+                                <span class="block">${escapeHtml(p.discount)}</span>
                                 <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
-                            </div>
-
-                            <div class="aspect-square bg-slate-50 relative overflow-hidden flex items-center justify-center">
+                            </div>` : ''}
+                            <div class="aspect-square bg-slate-50 relative overflow-hidden">
                                 <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
-                                <div class="absolute bottom-1.5 left-1.5 bg-shopee-greenFree text-white text-[8px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 leading-none shadow-sm">
-                                    <i class="fas fa-truck text-[7px]"></i> FRETE GRÁTIS
-                                </div>
                             </div>
-
                             <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
-                                <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 h-8 leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                                <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                                ${shopLine}
                                 <div>
-                                    <p class="text-[9px] text-slate-400 line-through leading-none min-h-[9px]">R$ ${p.oldPrice.toFixed(2).replace('.', ',')}</p>
-                                    <p class="text-shopee-orange text-sm font-black mt-0.5">R$ ${priceFormatted}</p>
+                                    ${p.oldPrice > p.newPrice ? `<p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>` : ''}
+                                    <p class="text-shopee-orange text-base font-black mt-0.5">R$ ${priceFormatted}</p>
                                 </div>
                                 <div class="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-50">
                                     <div class="text-amber-400 flex gap-0.5">${starsHtml}</div>
                                     <span>${escapeHtml(String(p.sales || ''))}</span>
                                 </div>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
             }
 
             const info = document.getElementById('store-results-info');
             const catLabel = (categories.find(c => c.id === currentStoreCategory) || {}).label || 'Tudo';
-            info.textContent = filtered.length
-                ? `${filtered.length} ofertas · ${catLabel}`
-                : 'Nenhuma oferta nesta categoria';
+            if (info) {
+                info.textContent = filtered.length
+                    ? `${filtered.length} ofertas · ${catLabel}`
+                    : 'Nenhuma oferta nesta categoria';
+            }
             renderLoadMoreBtn();
         }
 
@@ -1297,6 +1354,7 @@
         function openProductModal(id) {
             const p = productsDatabase.find(prod => prod.id === id);
             if (!p) return;
+            activeProductForBuy = p;
 
             const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || 'Oferta';
 
@@ -1323,9 +1381,29 @@
             }
 
             document.getElementById('modal-desc').innerText = p.desc
-                || 'Oferta disponível na Shopee com frete grátis para itens elegíveis. Clique para ver o preço final e finalizar a compra com segurança.';
+                || 'Oferta disponível na Shopee. Clique para ver o preço final, frete e finalizar a compra com segurança.';
 
-            document.getElementById('modal-buy-btn').href = p.affiliateLink || '#';
+            const deadlineEl = document.getElementById('modal-deadline');
+            const now = Math.floor(Date.now() / 1000);
+            if (deadlineEl) {
+                if (p.periodEnd && p.periodEnd > now) {
+                    const left = p.periodEnd - now;
+                    const h = Math.floor(left / 3600);
+                    const m = Math.floor((left % 3600) / 60);
+                    deadlineEl.textContent = `Termina em ${h}h ${m}min — aproveite enquanto a oferta estiver válida.`;
+                    deadlineEl.classList.remove('hidden');
+                } else {
+                    deadlineEl.classList.add('hidden');
+                }
+            }
+
+            const buyBtn = document.getElementById('modal-buy-btn');
+            const buyLabel = document.getElementById('modal-buy-label');
+            if (buyLabel) buyLabel.textContent = 'Comprar na Shopee';
+            buyBtn.href = p.shortLink || p.affiliateLink || '#';
+            buyBtn.dataset.itemId = String(p.id);
+            buyBtn.dataset.category = String(p.category || 'todos');
+            buyBtn.dataset.origin = p.affiliateLink || p.productLink || '';
 
             const modal = document.getElementById('product-modal');
             const card = document.getElementById('modal-card');
@@ -1336,6 +1414,50 @@
                 modal.classList.remove('opacity-0');
                 card.classList.remove('scale-95');
             });
+        }
+
+        async function resolveAffiliateUrl(p) {
+            if (!p) return '#';
+            if (p.shortLink) return p.shortLink;
+            const origin = p.affiliateLink || p.productLink;
+            if (!origin || origin === '#') return '#';
+            try {
+                const res = await fetch(`${API_BASE}/api/shortlink`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        originUrl: origin,
+                        itemId: p.id,
+                        subIds: ['vitrine', String(p.category || 'geral').slice(0, 20), 'web'],
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok && data.shortLink) {
+                    p.shortLink = data.shortLink;
+                    const idx = productsDatabase.findIndex((x) => String(x.id) === String(p.id));
+                    if (idx >= 0) productsDatabase[idx].shortLink = data.shortLink;
+                    return data.shortLink;
+                }
+            } catch (_) {}
+            return origin;
+        }
+
+        async function handleBuyClick(event) {
+            const p = activeProductForBuy;
+            if (!p) return true;
+            const label = document.getElementById('modal-buy-label');
+            const btn = document.getElementById('modal-buy-btn');
+            if (p.shortLink) {
+                btn.href = p.shortLink;
+                return true;
+            }
+            event.preventDefault();
+            if (label) label.textContent = 'Abrindo…';
+            const url = await resolveAffiliateUrl(p);
+            btn.href = url;
+            if (label) label.textContent = 'Comprar na Shopee';
+            window.open(url, '_blank', 'noopener,noreferrer');
+            return false;
         }
 
         function closeProductModal() {
@@ -1414,7 +1536,7 @@
                                     <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-600">${escapeHtml(String(p.category || ''))}</span>
                                     ${labelFlash}
                                     <span class="text-shopee-orange font-bold text-[10px]">R$ ${Number(p.newPrice).toFixed(2)}</span>
-                                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
+                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
@@ -1635,6 +1757,30 @@
                 loadAutoStatus();
             } catch (err) {
                 showToast(`Falha ao sincronizar: ${err.message}`, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = original; }
+            }
+        }
+
+        async function runTopPerformanceNow() {
+            const btn = document.getElementById('btn-top-perf');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Buscando…`; }
+            showToast('Populando destaques (Top Performance)…', 'success');
+            try {
+                const res = await fetch(`${API_BASE}/api/auto/top-performance`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const ups = data.result?.upserts ?? 0;
+                showToast(`Destaques: ${ups} itens atualizados.`, 'success');
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                await loadCategoriesFromApi({ silent: true });
+                populateAdminCategorySelect();
+                loadAdminStats();
+                loadAutoStatus();
+                loadCampaigns();
+            } catch (err) {
+                showToast(`Falha nos destaques: ${err.message}`, 'error');
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = original; }
             }
