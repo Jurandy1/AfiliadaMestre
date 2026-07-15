@@ -141,11 +141,9 @@
                                 Buscar
                             </button>
                         </div>
-                        <div class="flex gap-4 mt-2 text-[11px] text-orange-100 px-1">
-                            <span class="font-semibold text-white">Populares:</span>
-                            <button onclick="applyStoreSearch('Mini Projetor')" class="hover:text-shopee-yellow underline">Mini Projetor</button>
-                            <button onclick="applyStoreSearch('Smartwatch')" class="hover:text-shopee-yellow underline">Smartwatch</button>
-                            <button onclick="applyStoreSearch('Umidificador')" class="hover:text-shopee-yellow underline">Umidificador</button>
+                        <div class="flex items-center gap-2 mt-2 text-[11px] text-orange-100 px-1 flex-wrap">
+                            <span class="font-semibold text-white shrink-0">Populares:</span>
+                            <div id="popular-terms" class="flex flex-wrap items-center gap-1.5"></div>
                         </div>
                     </div>
                 </div>
@@ -1034,6 +1032,7 @@
             renderCategories();
             renderSubcategories();
             renderStoreProducts();
+            renderPopularTerms();
             renderConsoleProducts();
             loadHeroProducts();
             if (isAdminMode()) {
@@ -1094,6 +1093,7 @@
                 localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
             } catch (_) {}
             renderStoreProducts();
+            renderPopularTerms();
             if (isAdminMode()) {
                 renderConsoleProducts();
                 loadAdminStats();
@@ -1940,6 +1940,44 @@
             document.getElementById('store-search-input').value = term;
             searchStoreProducts();
             scrollToStoreGrid();
+        }
+
+        const POPULAR_TERM_CANDIDATES = [
+            'Smartwatch', 'Fone', 'Projetor', 'Câmera', 'Carregador', 'LED',
+            'Vestido', 'Blusa', 'Tênis', 'Bolsa', 'Legging', 'Pijama',
+            'Perfume', 'Skincare', 'Maquiagem', 'Cabelo', 'Batom',
+            'Umidificador', 'Kit', 'Relógio'
+        ];
+
+        function renderPopularTerms() {
+            const container = document.getElementById('popular-terms');
+            if (!container) return;
+            const scored = POPULAR_TERM_CANDIDATES
+                .map(term => {
+                    const t = term.toLowerCase();
+                    const count = productsDatabase.filter(p =>
+                        (p.title || '').toLowerCase().includes(t)
+                    ).length;
+                    return { term, count };
+                })
+                .filter(x => x.count > 0)
+                .sort((a, b) => b.count - a.count);
+
+            const items = (scored.length ? scored : [
+                { term: 'Mini Projetor' },
+                { term: 'Smartwatch' },
+                { term: 'Umidificador' }
+            ]).slice(0, 4);
+
+            container.innerHTML = '';
+            items.forEach(({ term }) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = term;
+                btn.className = 'bg-white/20 hover:bg-white/30 active:bg-white/40 text-white rounded-full px-3 py-1 text-[11px] font-semibold transition min-h-[28px] cursor-pointer';
+                btn.addEventListener('click', () => applyStoreSearch(term));
+                container.appendChild(btn);
+            });
         }
 
         let searchDebounce = null;
