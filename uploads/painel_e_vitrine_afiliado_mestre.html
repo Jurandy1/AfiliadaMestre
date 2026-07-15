@@ -152,16 +152,6 @@
             </div>
         </div>
 
-        <!-- Trust strip -->
-        <div class="bg-slate-800 py-2.5 px-4">
-            <div class="max-w-7xl mx-auto flex items-center gap-6 overflow-x-auto text-[11px] font-semibold text-slate-200 whitespace-nowrap">
-                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-shield-halved text-shopee-yellow"></i>Compra protegida</span>
-                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-truck-fast text-shopee-yellow"></i>Frete rastreado</span>
-                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-rotate-left text-shopee-yellow"></i>Devolução garantida</span>
-                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-headset text-shopee-yellow"></i>Suporte via WhatsApp</span>
-            </div>
-        </div>
-
         <!-- CORE PUBLIC STOREFRONT CONTENT -->
         <main id="store-main" class="max-w-7xl w-full mx-auto p-4 pb-24 md:pb-4 space-y-6 flex-1">
             <!-- Hero: produtos em destaque (ofertas relâmpago) -->
@@ -185,23 +175,50 @@
             </section>
 
             <!-- Categories Row -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60">
-                <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60 scroll-mt-24" id="store-categories-card">
+                <h3 class="hidden sm:flex text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 items-center gap-1.5">
                     <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Categorias
                 </h3>
-                <div class="flex gap-2 overflow-x-auto pb-1 snap-x sm:grid sm:grid-cols-8 sm:overflow-visible sm:pb-0" id="store-categories-container">
-                    <!-- Dynamic categories generated inside script -->
+
+                <!-- Mobile: botão único abre folha inferior com acordeão categoria > subcategoria -->
+                <div class="sm:hidden">
+                    <button id="mobile-category-trigger" onclick="openMobileCategorySheet()" class="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3.5 min-h-[48px] shadow-sm active:bg-slate-50">
+                        <span class="flex items-center gap-2 min-w-0 text-sm truncate">
+                            <span class="text-slate-500 font-semibold shrink-0">Categoria:</span>
+                            <span id="mobile-category-trigger-label" class="font-bold text-slate-800 truncate">Todas</span>
+                        </span>
+                        <i class="fas fa-chevron-down text-slate-400 text-xs shrink-0"></i>
+                    </button>
                 </div>
-                <div id="store-subcategories" class="hidden mt-4 pt-3 border-t border-slate-100">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Subcategorias</span>
-                            <span id="subcat-breadcrumb" class="text-[10px] text-shopee-orange font-bold truncate"></span>
+
+                <!-- Desktop / tablet: grid + inline subcategory row -->
+                <div class="hidden sm:block">
+                    <div class="grid sm:grid-cols-8 gap-2" id="store-categories-container">
+                        <!-- Dynamic categories generated inside script -->
+                    </div>
+                    <div id="store-subcategories" class="hidden mt-4 pt-3 border-t border-slate-100">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Subcategorias</span>
+                                <span id="subcat-breadcrumb" class="text-[10px] text-shopee-orange font-bold truncate"></span>
+                            </div>
+                        </div>
+                        <div id="store-subcategories-container" class="flex gap-1.5 overflow-x-auto pb-1 snap-x scrollbar-thin">
+                            <!-- Dynamic subcategories -->
                         </div>
                     </div>
-                    <div id="store-subcategories-container" class="flex gap-1.5 overflow-x-auto pb-1 snap-x scrollbar-thin">
-                        <!-- Dynamic subcategories -->
+                </div>
+            </div>
+
+            <!-- Mobile category/subcategory picker sheet -->
+            <div id="mobile-category-sheet" class="hidden sm:hidden fixed inset-0 z-50">
+                <div class="absolute inset-0 bg-black/50" onclick="closeMobileCategorySheet()"></div>
+                <div class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl max-h-[80vh] flex flex-col">
+                    <div class="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">
+                        <h4 class="font-bold text-sm text-slate-800">Escolha uma categoria</h4>
+                        <button onclick="closeMobileCategorySheet()" class="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
                     </div>
+                    <div id="mobile-category-list" class="overflow-y-auto p-3 space-y-2"></div>
                 </div>
             </div>
 
@@ -1029,14 +1046,7 @@
 
             if (health && health.supabaseConfigured) {
                 await loadCategoriesFromApi({ silent: true });
-                const fromDb = await loadOffersFromSupabase({ silent: true, reset: true });
-                if (!fromDb && health.shopeeConfigured) {
-                    if (isAdminMode()) showToast("Populando vitrine com a Shopee…", "success");
-                    syncAllCategories({ silent: !isAdminMode() }).then(() => {
-                        loadOffersFromSupabase({ silent: true, reset: true });
-                        loadCategoriesFromApi({ silent: true });
-                    });
-                }
+                await loadOffersFromSupabase({ silent: true, reset: true });
             } else if (isAdminMode()) {
                 showToast("Backend offline — rode: npm start", "error");
             }
@@ -1366,7 +1376,11 @@
             input.focus();
         }
         function scrollToStoreCategories() {
-            document.getElementById('store-categories-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (window.matchMedia('(max-width: 639px)').matches) {
+                openMobileCategorySheet();
+                return;
+            }
+            document.getElementById('store-categories-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         function scrollToFlashSale() {
             document.getElementById('flash-sale-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -1470,11 +1484,9 @@
         function productMatchesSubcategory(p, catId, subId) {
             if (!subId) return true;
             if (String(p.subcategory || '') === subId) return true;
-
             const subKws = getSubcategoryKeywords(catId, subId);
             const kw = String(p.keyword || '').toLowerCase().trim();
             if (subKws.includes(kw)) return true;
-
             const title = String(p.title || '').toLowerCase();
             const subRules = {
                 plus_size: (t) => /\b(plus\s*size|tam(?:anho)?\s*g{2,}|\bxg\b|\bxxg\b|4[6-9]|5[0-4])\b/i.test(t),
@@ -1554,7 +1566,7 @@
                 container.innerHTML += `
                     <button
                         onclick="setStoreCategory('${cat.id}')"
-                        class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group shrink-0 w-[74px] snap-start sm:w-auto"
+                        class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group w-full"
                     >
                         <div class="h-11 w-11 rounded-full ${bgIconClass} flex items-center justify-center text-base mb-1.5 transition transform group-hover:scale-105">
                             <i class="fas ${normalizeCategoryIcon(cat.icon)}"></i>
@@ -1581,15 +1593,6 @@
                 await loadOffersFromSupabase({ silent: true, reset: true, category: '' });
             } else {
                 await loadCategoryProducts(catId);
-            }
-            const inThisCat = productsDatabase.filter(p => catId === 'todos' || p.category === catId).length;
-            if (catId !== 'todos' && inThisCat < 8) {
-                syncCategory(catId, { silent: false }).then((data) => {
-                    if (data) {
-                        loadCategoryProducts(catId);
-                        loadCategoriesFromApi({ silent: true });
-                    }
-                });
             }
         }
 
@@ -1626,6 +1629,7 @@
                 wrapper.classList.add('hidden');
                 container.innerHTML = '';
                 if (breadcrumb) breadcrumb.textContent = '';
+                updateMobileCategoryUI();
                 return;
             }
 
@@ -1649,6 +1653,98 @@
             container.innerHTML =
                 chip('', 'Todas', totalInCat, currentStoreSubcategory === '')
                 + subs.map(s => chip(s.id || s.key, s.label, Number(s.count || 0), currentStoreSubcategory === (s.id || s.key))).join('');
+            updateMobileCategoryUI();
+        }
+
+        // ===== Mobile category/subcategory picker sheet =====
+        let mobileExpandedCat = null;
+
+        function openMobileCategorySheet() {
+            document.getElementById('mobile-category-sheet')?.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            renderMobileCategoryList();
+        }
+        function closeMobileCategorySheet() {
+            document.getElementById('mobile-category-sheet')?.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function toggleMobileCategory(catId) {
+            const cat = categories.find(c => c.id === catId);
+            if (!cat) return;
+            const hasSubs = cat.id !== 'todos'
+                && Array.isArray(cat.subcategories)
+                && cat.subcategories.length > 0;
+            if (!hasSubs) {
+                setStoreCategory(catId);
+                closeMobileCategorySheet();
+                return;
+            }
+            mobileExpandedCat = (mobileExpandedCat === catId) ? null : catId;
+            renderMobileCategoryList();
+        }
+
+        function selectMobileSubcategory(catId, subId) {
+            setStoreCategory(catId).then(() => {
+                setStoreSubcategory(subId);
+                closeMobileCategorySheet();
+            });
+        }
+
+        function updateMobileCategoryUI() {
+            const label = document.getElementById('mobile-category-trigger-label');
+            if (label) {
+                const cat = categories.find(c => c.id === currentStoreCategory);
+                const subs = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories : [];
+                const activeSub = subs.find(s => (s.id || s.key) === currentStoreSubcategory);
+                if (!cat || cat.id === 'todos') {
+                    label.textContent = 'Todas';
+                } else if (activeSub) {
+                    label.textContent = `${cat.label} › ${activeSub.label}`;
+                } else {
+                    label.textContent = cat.label;
+                }
+            }
+            if (!document.getElementById('mobile-category-sheet')?.classList.contains('hidden')) {
+                renderMobileCategoryList();
+            }
+        }
+
+        function renderMobileCategoryList() {
+            const list = document.getElementById('mobile-category-list');
+            if (!list) return;
+            list.innerHTML = categories.map(cat => {
+                const isActive = cat.id === currentStoreCategory;
+                const hasSubs = cat.id !== 'todos'
+                    && Array.isArray(cat.subcategories)
+                    && cat.subcategories.length > 0;
+                const expanded = mobileExpandedCat === cat.id;
+                const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
+                const rightIcon = hasSubs
+                    ? `<i class="fas fa-chevron-${expanded ? 'up' : 'down'} text-slate-400 text-xs"></i>`
+                    : (isActive ? '<i class="fas fa-check text-shopee-orange"></i>' : '');
+                const subsHtml = expanded ? `
+                    <div class="px-3 pb-3 pt-0 flex flex-wrap gap-1.5">
+                        ${[{ id: '', label: 'Todas', count: Number(cat.count || 0) }, ...cat.subcategories].map(s => {
+                            const active = currentStoreSubcategory === s.id && isActive;
+                            return `<button onclick="selectMobileSubcategory('${cat.id}','${String(s.id).replace(/'/g, "\\'")}')"
+                                class="px-3 py-2 rounded-full text-xs font-bold border min-h-[36px] ${active ? 'bg-shopee-orange text-white border-shopee-orange' : 'bg-slate-50 text-slate-600 border-slate-200'}">
+                                ${escapeHtml(s.label)}${s.count > 0 ? ` <span class="opacity-70 text-[10px]">(${s.count})</span>` : ''}
+                            </button>`;
+                        }).join('')}
+                    </div>` : '';
+                return `
+                    <div class="border border-slate-100 rounded-lg overflow-hidden">
+                        <button onclick="toggleMobileCategory('${cat.id}')" class="w-full flex items-center justify-between gap-3 p-3 min-h-[48px] ${isActive ? 'bg-orange-50/60' : 'bg-white'}">
+                            <span class="flex items-center gap-3">
+                                <span class="h-9 w-9 rounded-full flex items-center justify-center ${bgIconClass}"><i class="fas ${normalizeCategoryIcon(cat.icon)}"></i></span>
+                                <span class="text-sm font-semibold ${isActive ? 'text-shopee-orange' : 'text-slate-700'}">${escapeHtml(cat.label)}</span>
+                            </span>
+                            ${rightIcon}
+                        </button>
+                        ${subsHtml}
+                    </div>`;
+            }).join('');
         }
 
         async function setStoreSubcategory(key) {
@@ -1692,19 +1788,12 @@
             grid.innerHTML = '';
             flashContainer.innerHTML = '';
 
-            const subKws = currentStoreSubcategory
-                ? getSubcategoryKeywords(currentStoreCategory, currentStoreSubcategory)
-                : [];
             let filtered = productsDatabase.filter(p => {
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
                 const title = (p.title || '').toLowerCase();
                 const desc = (p.desc || '').toLowerCase();
                 const matchesSearch = !searchVal || title.includes(searchVal) || desc.includes(searchVal);
-                const matchesSub = productMatchesSubcategory(
-                    p,
-                    currentStoreCategory,
-                    currentStoreSubcategory
-                );
+                const matchesSub = productMatchesSubcategory(p, currentStoreCategory, currentStoreSubcategory);
                 return matchesCategory && matchesSearch && matchesSub;
             });
             filtered = sortProductsLocal(filtered);

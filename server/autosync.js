@@ -13,7 +13,7 @@ const FEMALE_PERCENT = 90;
 const KEYWORDS = allKeywords();
 
 const config = {
-  enabled: /^(1|true|on|yes)$/i.test(String(process.env.AUTO_SYNC ?? "1")),
+  enabled: /^(1|true|on|yes)$/i.test(String(process.env.AUTO_SYNC ?? "0")),
   intervalMin: clampNum(process.env.AUTO_SYNC_INTERVAL_MIN, 90, 15, 1440),
   batch: clampNum(process.env.AUTO_SYNC_BATCH, 5, 1, 20),
   limit: clampNum(process.env.AUTO_SYNC_LIMIT, 20, 5, 50),

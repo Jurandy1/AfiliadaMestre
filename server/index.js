@@ -343,6 +343,9 @@ app.post("/api/auto/top-performance", async (_req, res) => {
 
 app.get("/api/cron/sync", async (_req, res) => {
   try {
+    if (!autosync.config.enabled) {
+      return res.json({ ok: true, skipped: "auto-sync-paused" });
+    }
     const result = await autosync.runOnce({ manual: true });
     res.json({ ok: true, result });
   } catch (err) {
