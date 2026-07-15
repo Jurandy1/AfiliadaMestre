@@ -174,36 +174,30 @@
 
             <!-- Categories Row -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200/60 scroll-mt-24" id="store-categories-card">
-                <h3 class="hidden sm:flex text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 items-center gap-1.5">
-                    <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Categorias
-                </h3>
-
-                <!-- Mobile: barra de destaque (categoria/subcategoria ativa) -->
-                <div class="sm:hidden mb-3">
-                    <button id="mobile-category-trigger" onclick="openMobileCategorySheet()" class="w-full flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-h-[44px] shadow-sm active:bg-slate-50">
-                        <span class="flex items-center gap-2 min-w-0 text-sm truncate">
-                            <span class="text-slate-500 font-semibold shrink-0">Categoria:</span>
-                            <span id="mobile-category-trigger-label" class="font-bold text-slate-800 truncate">Todas</span>
-                        </span>
-                        <i class="fas fa-chevron-down text-slate-400 text-xs shrink-0"></i>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Categorias
+                    </h3>
+                    <button onclick="openMobileCategorySheet()" class="sm:hidden text-xs font-bold text-shopee-orange flex items-center gap-1 active:opacity-70">
+                        Ver Mais <i class="fas fa-chevron-right text-[10px]"></i>
                     </button>
                 </div>
 
-                <!-- Mobile: linha horizontal de fotos (2 linhas x N colunas) -->
-                <div class="sm:hidden -mx-1 px-1">
+                <!-- Mobile: faixa de fotos + nomes (sem "Tudo"; toque abre página de categorias) -->
+                <div class="sm:hidden mt-4 -mx-1 px-1">
                     <div id="mobile-category-strip" class="grid grid-flow-col auto-cols-[22%] grid-rows-2 gap-2 overflow-x-auto snap-x pb-2 scrollbar-thin">
                         <!-- Dynamic photo tiles -->
                     </div>
                 </div>
 
-                <!-- Desktop / tablet: grid de fotos -->
-                <div class="hidden sm:block">
+                <!-- Desktop / tablet: grid de fotos (sem "Tudo") -->
+                <div class="hidden sm:block mt-4">
                     <div class="grid sm:grid-cols-8 gap-2" id="store-categories-container">
                         <!-- Dynamic categories generated inside script -->
                     </div>
                 </div>
 
-                <!-- Subcategorias (mobile + desktop) -->
+                <!-- Subcategorias inline (somente desktop) -->
                 <div id="store-subcategories" class="hidden mt-4 pt-3 border-t border-slate-100">
                     <div class="flex items-center justify-between gap-2 mb-3">
                         <div class="flex items-center gap-2 min-w-0">
@@ -217,15 +211,17 @@
                 </div>
             </div>
 
-            <!-- Mobile category/subcategory picker sheet -->
-            <div id="mobile-category-sheet" class="hidden sm:hidden fixed inset-0 z-50">
-                <div class="absolute inset-0 bg-black/50" onclick="closeMobileCategorySheet()"></div>
-                <div class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl max-h-[80vh] flex flex-col">
-                    <div class="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">
-                        <h4 class="font-bold text-sm text-slate-800">Escolha uma categoria</h4>
-                        <button onclick="closeMobileCategorySheet()" class="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center"><i class="fas fa-times text-slate-500"></i></button>
-                    </div>
-                    <div id="mobile-category-list" class="overflow-y-auto p-3 space-y-2"></div>
+            <!-- Página de categorias em tela cheia (estilo Shopee): sidebar + painel de subcategorias -->
+            <div id="mobile-category-sheet" class="hidden sm:hidden fixed inset-0 z-50 bg-white flex flex-col">
+                <div class="flex items-center gap-2 px-3 py-3 border-b border-slate-100 shrink-0">
+                    <button onclick="closeMobileCategorySheet()" aria-label="Voltar" class="h-10 w-10 rounded-full flex items-center justify-center active:bg-slate-100">
+                        <i class="fas fa-arrow-left text-shopee-orange text-lg"></i>
+                    </button>
+                    <h4 class="flex-1 text-center font-black text-lg text-slate-900 pr-10">Categorias</h4>
+                </div>
+                <div class="flex flex-1 min-h-0">
+                    <aside id="category-page-sidebar" class="w-[96px] shrink-0 overflow-y-auto bg-slate-100/80 pb-6"></aside>
+                    <section id="category-page-panel" class="flex-1 overflow-y-auto px-3 py-4 bg-white pb-10"></section>
                 </div>
             </div>
 
@@ -1722,7 +1718,7 @@
             }
         }
 
-        function categoryTileHTML(cat, { size = 'md', used } = {}) {
+        function categoryTileHTML(cat, { size = 'md', used, openSheet = false } = {}) {
             const isActive = cat.id === currentStoreCategory;
             const borderClass = isActive ? 'border-shopee-orange shadow-sm bg-orange-50/40' : 'border-transparent';
             const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
@@ -1740,9 +1736,12 @@
                 ? tileImgHTML(img, `fas ${normalizeCategoryIcon(cat.icon)} ${iconSize} text-slate-500`)
                 : `<i class="fas ${normalizeCategoryIcon(cat.icon)} ${iconSize}"></i>`;
             const circleBg = img ? 'bg-slate-100' : bgIconClass;
+            const clickAction = openSheet
+                ? `openMobileCategorySheet('${cat.id}')`
+                : `setStoreCategory('${cat.id}')`;
             return `
                 <button
-                    onclick="setStoreCategory('${cat.id}')"
+                    onclick="${clickAction}"
                     class="flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 transition border ${borderClass} group w-full snap-start"
                 >
                     <div class="${circleSize} rounded-full ${circleBg} overflow-hidden flex items-center justify-center mb-1.5 transition transform group-hover:scale-105 ring-2 ${isActive ? 'ring-shopee-orange' : 'ring-transparent'}">
@@ -1756,13 +1755,14 @@
         function renderCategories() {
             const desktop = document.getElementById('store-categories-container');
             const strip = document.getElementById('mobile-category-strip');
+            const visible = categories.filter(cat => cat.id !== 'todos');
             if (desktop) {
                 const used = new Set();
-                desktop.innerHTML = categories.map(cat => categoryTileHTML(cat, { size: 'md', used })).join('');
+                desktop.innerHTML = visible.map(cat => categoryTileHTML(cat, { size: 'md', used })).join('');
             }
             if (strip) {
                 const used = new Set();
-                const tiles = categories.map(cat => categoryTileHTML(cat, { size: 'lg', used })).join('');
+                const tiles = visible.map(cat => categoryTileHTML(cat, { size: 'lg', used, openSheet: true })).join('');
                 const verMais = `
                     <button onclick="openMobileCategorySheet()" class="flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 transition border border-transparent group w-full snap-start">
                         <div class="h-16 w-16 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-1.5">
@@ -1822,12 +1822,19 @@
             }
         }
 
-        // Renderiza subcategorias agrupadas da categoria ativa.
+        // Renderiza subcategorias agrupadas da categoria ativa (somente desktop).
         function renderSubcategories() {
             const wrapper = document.getElementById('store-subcategories');
             const container = document.getElementById('store-subcategories-container');
             const breadcrumb = document.getElementById('subcat-breadcrumb');
             if (!wrapper || !container) return;
+
+            if (window.matchMedia('(max-width: 639px)').matches) {
+                wrapper.classList.add('hidden');
+                container.innerHTML = '';
+                if (breadcrumb) breadcrumb.textContent = '';
+                return;
+            }
 
             const cat = categories.find(c => c.id === currentStoreCategory);
             const subs = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories : [];
@@ -1887,20 +1894,28 @@
             updateMobileCategoryUI();
         }
 
-        // ===== Mobile category/subcategory picker sheet =====
+        // ===== Página de categorias em tela cheia (estilo Shopee) =====
+        // `mobileExpandedCat` guarda a categoria selecionada na sidebar.
         let mobileExpandedCat = null;
 
-        function openMobileCategorySheet() {
+        function openMobileCategorySheet(prefilledCatId) {
             document.getElementById('mobile-category-sheet')?.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
+            if (prefilledCatId && prefilledCatId !== 'todos') {
+                mobileExpandedCat = prefilledCatId;
+            } else if (!mobileExpandedCat || mobileExpandedCat === 'todos') {
+                mobileExpandedCat = currentStoreCategory !== 'todos' ? currentStoreCategory : null;
+            }
             renderMobileCategoryList();
+            if (mobileExpandedCat) preloadSubcategoryCovers(mobileExpandedCat);
         }
         function closeMobileCategorySheet() {
             document.getElementById('mobile-category-sheet')?.classList.add('hidden');
             document.body.style.overflow = '';
         }
 
-        function toggleMobileCategory(catId) {
+        // Seleção na sidebar: categorias sem subcategorias aplicam o filtro direto.
+        function selectCategoryPage(catId) {
             const cat = categories.find(c => c.id === catId);
             if (!cat) return;
             const hasSubs = cat.id !== 'todos'
@@ -1911,8 +1926,8 @@
                 closeMobileCategorySheet();
                 return;
             }
-            mobileExpandedCat = (mobileExpandedCat === catId) ? null : catId;
-            if (mobileExpandedCat) preloadSubcategoryCovers(catId);
+            mobileExpandedCat = catId;
+            preloadSubcategoryCovers(catId);
             renderMobileCategoryList();
         }
 
@@ -1934,77 +1949,76 @@
         }
 
         function updateMobileCategoryUI() {
-            const label = document.getElementById('mobile-category-trigger-label');
-            if (label) {
-                const cat = categories.find(c => c.id === currentStoreCategory);
-                const subs = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories : [];
-                const activeSub = subs.find(s => (s.id || s.key) === currentStoreSubcategory);
-                if (!cat || cat.id === 'todos') {
-                    label.textContent = 'Todas';
-                } else if (activeSub) {
-                    label.textContent = `${cat.label} › ${activeSub.label}`;
-                } else {
-                    label.textContent = cat.label;
-                }
-            }
             if (!document.getElementById('mobile-category-sheet')?.classList.contains('hidden')) {
                 renderMobileCategoryList();
             }
         }
 
         function renderMobileCategoryList() {
-            const list = document.getElementById('mobile-category-list');
-            if (!list) return;
-            const used = new Set();
-            list.innerHTML = categories.map(cat => {
-                const isActive = cat.id === currentStoreCategory;
-                const hasSubs = cat.id !== 'todos'
-                    && Array.isArray(cat.subcategories)
-                    && cat.subcategories.length > 0;
-                const expanded = mobileExpandedCat === cat.id;
-                const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
-                const rightIcon = hasSubs
-                    ? `<i class="fas fa-chevron-${expanded ? 'up' : 'down'} text-slate-400 text-xs"></i>`
-                    : (isActive ? '<i class="fas fa-check text-shopee-orange"></i>' : '');
-                const catProducts = expanded ? productsDatabase.filter(p => p.category === cat.id && p.image) : [];
-                const catImages = catProducts.map(p => p.image);
-                if (categoryCovers[cat.id]) catImages.push(categoryCovers[cat.id]);
-                const catImg = pickUnused(categoryImageCandidates(cat.id), used);
-                const catAvatar = catImg
-                    ? `<span class="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0">${tileImgHTML(catImg, `fas ${normalizeCategoryIcon(cat.icon)} text-slate-500`)}</span>`
-                    : `<span class="h-9 w-9 rounded-full flex items-center justify-center ${bgIconClass} shrink-0"><i class="fas ${normalizeCategoryIcon(cat.icon)}"></i></span>`;
-                const subsHtml = expanded ? `
-                    <div class="px-3 pb-3 pt-0 grid grid-cols-3 gap-2">
-                        ${[{ id: '', label: 'Todas', count: Number(cat.count || 0) }, ...cat.subcategories].map(s => {
-                            const active = currentStoreSubcategory === s.id && isActive;
-                            const subImg = s.id
-                                ? pickUnused(subcategoryImageCandidates(cat.id, s.id, catImages, catProducts), used)
-                                : pickUnused(catImages, used);
-                            const inner = subImg
-                                ? tileImgHTML(subImg, 'fas fa-image text-slate-400 text-lg')
-                                : `<i class="fas fa-image text-slate-400 text-lg"></i>`;
-                            return `<button onclick="selectMobileSubcategory('${cat.id}','${String(s.id).replace(/'/g, "\\'")}')"
-                                class="flex flex-col items-center p-1.5 rounded-xl border ${active ? 'border-shopee-orange bg-orange-50/40' : 'border-slate-100 bg-white'}">
-                                <div class="aspect-square w-full rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center mb-1">
-                                    ${inner}
-                                </div>
-                                <span class="text-[11px] leading-tight text-center line-clamp-2 ${active ? 'text-shopee-orange font-bold' : 'text-slate-700 font-medium'}">${escapeHtml(s.label)}</span>
-                                ${s.count > 0 ? `<span class="text-[9px] text-slate-400 font-semibold">${s.count}</span>` : ''}
-                            </button>`;
-                        }).join('')}
-                    </div>` : '';
+            const sidebar = document.getElementById('category-page-sidebar');
+            const panel = document.getElementById('category-page-panel');
+            if (!sidebar || !panel) return;
+
+            // Sem seleção ainda: cai na primeira categoria com subcategorias.
+            if (!mobileExpandedCat || !categories.some(c => c.id === mobileExpandedCat)) {
+                const firstWithSubs = categories.find(c =>
+                    c.id !== 'todos' && Array.isArray(c.subcategories) && c.subcategories.length > 0
+                );
+                mobileExpandedCat = firstWithSubs ? firstWithSubs.id : null;
+            }
+            const selected = categories.find(c => c.id === mobileExpandedCat) || null;
+
+            sidebar.innerHTML = categories
+                .filter(cat => cat.id !== 'todos')
+                .map(cat => {
+                const isSel = selected && cat.id === selected.id;
                 return `
-                    <div class="border border-slate-100 rounded-lg overflow-hidden">
-                        <button onclick="toggleMobileCategory('${cat.id}')" class="w-full flex items-center justify-between gap-3 p-3 min-h-[48px] ${isActive ? 'bg-orange-50/60' : 'bg-white'}">
-                            <span class="flex items-center gap-3">
-                                ${catAvatar}
-                                <span class="text-sm font-semibold ${isActive ? 'text-shopee-orange' : 'text-slate-700'}">${escapeHtml(cat.label)}</span>
-                            </span>
-                            ${rightIcon}
-                        </button>
-                        ${subsHtml}
-                    </div>`;
+                <button onclick="selectCategoryPage('${cat.id}')"
+                    class="w-full flex flex-col items-center gap-1.5 px-1 py-3.5 text-center border-l-[3px] transition ${isSel
+                        ? 'bg-white text-shopee-orange border-shopee-orange'
+                        : 'text-slate-500 border-transparent active:bg-slate-200/60'}">
+                    <i class="fas ${normalizeCategoryIcon(cat.icon)} text-lg"></i>
+                    <span class="text-[10px] leading-tight font-semibold">${escapeHtml(cat.label)}</span>
+                </button>`;
             }).join('');
+
+            if (!selected) { panel.innerHTML = ''; return; }
+
+            // Fotos sem repetição dentro do painel.
+            const used = new Set();
+            const catProducts = productsDatabase.filter(p => p.category === selected.id && p.image);
+            const catImages = catProducts.map(p => p.image);
+            if (categoryCovers[selected.id]) catImages.push(categoryCovers[selected.id]);
+            const subs = Array.isArray(selected.subcategories) ? selected.subcategories : [];
+
+            const tile = (id, label, img, active) => {
+                const inner = img
+                    ? tileImgHTML(img, 'fas fa-image text-slate-300 text-xl')
+                    : `<i class="fas fa-image text-slate-300 text-xl"></i>`;
+                return `
+                <button onclick="selectMobileSubcategory('${selected.id}','${String(id).replace(/'/g, "\\'")}')"
+                    class="flex flex-col items-center gap-2 py-2">
+                    <span class="h-20 w-20 rounded-full bg-slate-100 overflow-hidden flex items-center justify-center ring-2 ${active ? 'ring-shopee-orange' : 'ring-transparent'}">
+                        ${inner}
+                    </span>
+                    <span class="text-xs leading-tight text-center line-clamp-2 ${active ? 'text-shopee-orange font-bold' : 'text-slate-700 font-medium'}">${escapeHtml(label)}</span>
+                </button>`;
+            };
+
+            const isCatActive = currentStoreCategory === selected.id;
+            panel.innerHTML = `
+                <div class="grid grid-cols-3 gap-x-1 gap-y-3">
+                    ${tile('', 'Ver tudo', pickUnused(catImages, used), isCatActive && currentStoreSubcategory === '')}
+                    ${subs.map(s => {
+                        const subId = s.id || s.key;
+                        return tile(
+                            subId,
+                            s.label,
+                            pickUnused(subcategoryImageCandidates(selected.id, subId, catImages, catProducts), used),
+                            isCatActive && currentStoreSubcategory === subId
+                        );
+                    }).join('')}
+                </div>`;
         }
 
         async function setStoreSubcategory(key) {
