@@ -24,11 +24,12 @@ const {
   getOffersByItemIds,
   countByCategory,
   countBySubcategory,
-  clearAllOfertas,
   rowToProduct,
   getConfig,
 } = require("./supabase");
 const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
+const { refillVitrine } = require("./refillVitrine");
+const { productMatchesSubcategory } = require("./productMeta");
 const autosync = require("./autosync");
 
 const app = express();
@@ -182,8 +183,16 @@ app.get("/api/categorias", async (_req, res) => {
       metaOnly().map(async (c) => {
         let subCounts = {};
         try {
-          subCounts = await countBySubcategory(c.id);
-        } catch (_) {}
+          const rows = await listOfertas({ category: c.id, limit: 200, offset: 0 });
+          const products = (Array.isArray(rows) ? rows : []).map(rowToProduct);
+          for (const sub of c.subcategories || []) {
+            subCounts[sub.id] = products.filter((p) => productMatchesSubcategory(p, c.id, sub.id)).length;
+          }
+        } catch (_) {
+          try {
+            subCounts = await countBySubcategory(c.id);
+          } catch (__) {}
+        }
         return {
           ...c,
           count: counts[c.id] || 0,
@@ -463,60 +472,20 @@ app.get("/api/conversions", async (req, res) => {
 });
 
 /**
- * Limpa o cache da vitrine e realimenta TODAS as categorias.
- * Body: { limit?, pages?, clear? }
- * O foco 90% feminino é aplicado na exibição, não no estoque.
+ * Limpa o cache da vitrine e realimenta categorias.
+ * Body: { limit?, pages?, clear?, maxItems? }
+ * maxItems: para ao atingir N itens únicos (ex.: 2000 para demo).
  */
 app.post("/api/reset-vitrine", async (req, res) => {
   try {
-    const clear = req.body?.clear !== false;
-    const removed = clear ? await clearAllOfertas() : 0;
-    const syncLimit = Math.min(Math.max(Number(req.body?.limit) || 50, 5), 100);
-    const pages = Math.min(Math.max(Number(req.body?.pages) || 2, 1), 5);
-    const keywords = allKeywords();
-    const report = [];
-    const map = new Map();
-    const byCategory = {};
-
-    for (const { keyword, category } of keywords) {
-      let kwCount = 0;
-      for (let page = 1; page <= pages; page += 1) {
-        try {
-          const offer = await fetchProductOffers({
-            keyword,
-            limit: syncLimit,
-            page,
-            listType: 0,
-            sortType: 2,
-          });
-          const nodes = offer.nodes || [];
-          const rows = nodes
-            .map((n) => mapOfferToRow(n, keyword, 0))
-            .filter((r) => r.item_id && r.offer_link)
-            .map((r) => ({ ...r, short_link: null }));
-          if (rows.length) {
-            await upsertOfertas(rows);
-            rows.forEach((r) => map.set(String(r.item_id), r));
-            kwCount += rows.length;
-          }
-          if (!offer.pageInfo?.hasNextPage) break;
-        } catch (e) {
-          report.push({ keyword, category, page, ok: false, error: e.message });
-        }
-        await new Promise((r) => setTimeout(r, 250));
-      }
-      byCategory[category] = (byCategory[category] || 0) + kwCount;
-      report.push({ keyword, category, ok: true, count: kwCount });
-    }
-
-    res.json({
-      ok: true,
-      removed,
-      refilled: map.size,
-      keywordsRun: keywords.length,
-      byCategory,
-      siteSubId: SITE_SUBID,
+    const result = await refillVitrine({
+      clear: req.body?.clear !== false,
+      limit: req.body?.limit,
+      pages: req.body?.pages,
+      maxItems: req.body?.maxItems,
+      gapMs: req.body?.gapMs,
     });
+    res.json(result);
   } catch (err) {
     console.error("[/api/reset-vitrine]", err.message);
     res.status(500).json({ error: err.message });

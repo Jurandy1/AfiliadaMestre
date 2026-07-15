@@ -1,6 +1,22 @@
 "use strict";
 
 const { isFlashActive, toUnixSec } = require("./shopee");
+const { extractProductOptions } = require("./productMeta");
+
+function quoteInFilter(values = []) {
+  return values
+    .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+    .join(",");
+}
+
+function subcategoryFilterQuery(categoryId, subcategoryId) {
+  const { keywordsForSubcategory } = require("./categorias");
+  const cat = encodeURIComponent(String(categoryId));
+  const kws = keywordsForSubcategory(categoryId, subcategoryId);
+  if (!kws.length) return `category=eq.${cat}`;
+  const quoted = quoteInFilter(kws);
+  return `category=eq.${cat}&keyword=in.(${quoted})`;
+}
 
 function getConfig() {
   const url = (process.env.SUPABASE_URL || "").replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
@@ -78,6 +94,8 @@ async function upsertOfertas(rows) {
   const cleaned = rows.map((r) => {
     const copy = { ...r };
     if (copy.short_link == null) delete copy.short_link;
+    if (copy.subcategory == null) delete copy.subcategory;
+    if (copy.product_options == null) delete copy.product_options;
     return copy;
   });
   try {
@@ -90,10 +108,10 @@ async function upsertOfertas(rows) {
   } catch (err) {
     // Schema antigo (sem period_*/list_type/short_link) — grava o essencial.
     const msg = String(err.message || "");
-    if (/period_start|period_end|list_type|short_link|schema cache|PGRST/i.test(msg)) {
+    if (/period_start|period_end|list_type|short_link|subcategory|product_options|schema cache|PGRST/i.test(msg)) {
       const legacy = cleaned.map((r) => {
         const {
-          period_start, period_end, list_type, short_link, ...rest
+          period_start, period_end, list_type, short_link, subcategory, product_options, ...rest
         } = r;
         return rest;
       });
@@ -136,12 +154,7 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
       path += `&category=eq.${encodeURIComponent(cat)}`;
     }
     if (sub && cat) {
-      const { keywordsForSubcategory } = require("./categorias");
-      const kws = keywordsForSubcategory(cat, sub);
-      if (kws.length) {
-        const encoded = kws.map((k) => encodeURIComponent(k)).join(",");
-        path += `&keyword=in.(${encoded})`;
-      }
+      path += `&${subcategoryFilterQuery(cat, sub)}`;
     } else if (kw) {
       path += `&keyword=eq.${encodeURIComponent(kw)}`;
     }
@@ -198,10 +211,7 @@ async function countBySubcategory(categoryId) {
   const counts = {};
   await Promise.all(
     (cat.subcategories || []).map(async (sub) => {
-      const encoded = sub.keywords.map((k) => encodeURIComponent(k)).join(",");
-      const n = await supabaseCount(
-        `category=eq.${encodeURIComponent(categoryId)}&keyword=in.(${encoded})`
-      ).catch(() => 0);
+      const n = await supabaseCount(subcategoryFilterQuery(categoryId, sub.id)).catch(() => 0);
       counts[sub.id] = n;
     })
   );
@@ -262,6 +272,10 @@ function rowToProduct(row) {
   const descParts = [];
   if (discountPct > 0) descParts.push(`Oferta com ${discountPct}% de desconto`);
   else descParts.push("Oferta selecionada");
+  const options = row.product_options && typeof row.product_options === "object"
+    ? row.product_options
+    : extractProductOptions(row.product_name, priceMin, priceMax);
+  if (options.hint) descParts.push(options.hint);
   if (salesLabel && salesLabel !== "—") descParts.push(`${salesLabel}`);
   descParts.push("confira frete e prazo na Shopee");
   if (shop) descParts.push(`vendido por ${shop}`);
@@ -277,6 +291,8 @@ function rowToProduct(row) {
     itemId: row.item_id,
     title: row.product_name || "Produto",
     category: row.category || "todos",
+    subcategory: row.subcategory || null,
+    options,
     oldPrice: priceMax || priceMin,
     newPrice: priceMin,
     discount: discountPct ? `${discountPct}%` : "0%",
@@ -307,6 +323,7 @@ function rowToProduct(row) {
 
 module.exports = {
   getConfig,
+  supabaseRequest,
   upsertOfertas,
   updateShortLink,
   listOfertas,

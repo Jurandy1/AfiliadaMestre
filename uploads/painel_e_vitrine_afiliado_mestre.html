@@ -127,9 +127,16 @@
                                 placeholder="O que você está procurando?" 
                                 class="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
                             >
+                            <button
+                                type="button"
+                                id="store-search-clear"
+                                onclick="clearStoreSearch()"
+                                class="hidden text-slate-300 hover:text-slate-500 px-2 shrink-0"
+                                aria-label="Limpar busca"
+                            ><i class="fas fa-circle-xmark"></i></button>
                             <button 
                                 onclick="searchStoreProducts()"
-                                class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-6 py-2.5 rounded-md transition font-bold text-xs uppercase"
+                                class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-6 py-2.5 rounded-md transition font-bold text-xs uppercase shrink-0"
                             >
                                 Buscar
                             </button>
@@ -145,22 +152,34 @@
             </div>
         </div>
 
+        <!-- Trust strip -->
+        <div class="bg-slate-800 py-2.5 px-4">
+            <div class="max-w-7xl mx-auto flex items-center gap-6 overflow-x-auto text-[11px] font-semibold text-slate-200 whitespace-nowrap">
+                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-shield-halved text-shopee-yellow"></i>Compra protegida</span>
+                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-truck-fast text-shopee-yellow"></i>Frete rastreado</span>
+                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-rotate-left text-shopee-yellow"></i>Devolução garantida</span>
+                <span class="flex items-center gap-2 shrink-0"><i class="fas fa-headset text-shopee-yellow"></i>Suporte via WhatsApp</span>
+            </div>
+        </div>
+
         <!-- CORE PUBLIC STOREFRONT CONTENT -->
-        <main class="max-w-7xl w-full mx-auto p-4 space-y-6 flex-1">
-            <!-- Hero: campanhas oficiais da Shopee -->
-            <section id="campaigns-hero" class="space-y-3">
+        <main id="store-main" class="max-w-7xl w-full mx-auto p-4 pb-24 md:pb-4 space-y-6 flex-1">
+            <!-- Hero: produtos em destaque (ofertas relâmpago) -->
+            <section id="hero-products" class="space-y-3 scroll-mt-24">
                 <div class="flex items-end justify-between gap-2">
                     <div>
-                        <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider">Seleção Afiliada Mestre</p>
-                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas selecionadas para você</h2>
+                        <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-bolt text-shopee-yellow"></i> Promoção por tempo limitado
+                        </p>
+                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas Relâmpago</h2>
                     </div>
                     <button onclick="scrollToStoreGrid()" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
                         Ver produtos <i class="fas fa-arrow-down"></i>
                     </button>
                 </div>
-                <div id="campaigns-track" class="flex gap-3 overflow-x-auto pb-2 snap-x">
+                <div id="hero-products-track" class="flex gap-3 overflow-x-auto pb-2 snap-x">
                     <div class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white flex items-center justify-center">
-                        <span class="text-sm font-bold opacity-90"><i class="fas fa-spinner fa-spin mr-2"></i> Carregando campanhas…</span>
+                        <span class="text-sm font-bold opacity-90"><i class="fas fa-spinner fa-spin mr-2"></i> Carregando produtos…</span>
                     </div>
                 </div>
             </section>
@@ -170,7 +189,7 @@
                 <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
                     <span class="h-2 w-2 rounded-full bg-shopee-orange"></span> Categorias
                 </h3>
-                <div class="grid grid-cols-4 sm:grid-cols-8 gap-2" id="store-categories-container">
+                <div class="flex gap-2 overflow-x-auto pb-1 snap-x sm:grid sm:grid-cols-8 sm:overflow-visible sm:pb-0" id="store-categories-container">
                     <!-- Dynamic categories generated inside script -->
                 </div>
                 <div id="store-subcategories" class="hidden mt-4 pt-3 border-t border-slate-100">
@@ -187,7 +206,7 @@
             </div>
 
             <!-- FLASH SALE BOX -->
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200/60" id="flash-sale-section">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200/60 scroll-mt-24" id="flash-sale-section">
                 <div class="bg-gradient-to-r from-orange-500/10 to-red-500/10 p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center bg-shopee-orange text-white font-black px-3 py-1.5 rounded-lg text-xs italic tracking-wide animate-subtle-pulse">
@@ -207,25 +226,39 @@
             </div>
 
             <!-- PRODUCTS SHOWCASE GRID -->
-            <div id="store-grid-section" class="space-y-4 pt-2">
+            <div id="store-grid-section" class="space-y-4 pt-2 scroll-mt-24">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <i class="fas fa-fire text-shopee-orange"></i> Ofertas em destaque
                     </h3>
                     <div class="flex flex-wrap items-center gap-2">
-                        <div class="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold" id="store-sort-tabs">
+                        <div class="flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-bold overflow-x-auto" id="store-sort-tabs">
                             <button type="button" data-sort="recent" onclick="setStoreSort('recent')" class="store-sort-btn px-2.5 py-1.5 rounded-md bg-white text-shopee-orange shadow-sm">Recentes</button>
                             <button type="button" data-sort="sales" onclick="setStoreSort('sales')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Mais vendidos</button>
                             <button type="button" data-sort="discount" onclick="setStoreSort('discount')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Maior desconto</button>
                             <button type="button" data-sort="rating" onclick="setStoreSort('rating')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Melhor avaliação</button>
+                            <button type="button" data-sort="price-asc" onclick="setStoreSort('price-asc')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Menor preço</button>
+                            <button type="button" data-sort="price-desc" onclick="setStoreSort('price-desc')" class="store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500">Maior preço</button>
                         </div>
                         <div id="store-results-info" class="text-xs text-slate-500">Carregando ofertas…</div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5" id="store-products-grid"></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5" id="store-products-grid"></div>
             </div>
         </main>
+
+        <!-- BACK TO TOP -->
+        <button id="back-to-top-btn" onclick="scrollToStoreTop()" class="hidden fixed right-4 bottom-20 md:bottom-6 h-11 w-11 rounded-full bg-slate-900/90 text-white shadow-lg items-center justify-center z-40 hover:bg-slate-900" aria-label="Voltar ao topo"><i class="fas fa-arrow-up"></i></button>
+
+        <!-- MOBILE BOTTOM NAV -->
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 flex justify-around items-stretch z-40 shadow-[0_-2px_12px_rgba(0,0,0,0.25)]" style="padding-bottom:env(safe-area-inset-bottom);">
+            <button onclick="scrollToStoreTop()" class="flex flex-col items-center justify-center gap-1 text-slate-300 text-[10px] font-bold py-2.5 px-2 min-h-[48px] flex-1"><i class="fas fa-house text-[15px] text-slate-100"></i>Início</button>
+            <button onclick="scrollToStoreCategories()" class="flex flex-col items-center justify-center gap-1 text-slate-300 text-[10px] font-bold py-2.5 px-2 min-h-[48px] flex-1"><i class="fas fa-table-cells-large text-[15px] text-slate-100"></i>Categorias</button>
+            <button onclick="scrollToFlashSale()" class="flex flex-col items-center justify-center gap-1 text-slate-300 text-[10px] font-bold py-2.5 px-2 min-h-[48px] flex-1"><i class="fas fa-bolt text-[15px] text-slate-100"></i>Relâmpago</button>
+            <button onclick="scrollToStoreGrid()" class="flex flex-col items-center justify-center gap-1 text-slate-300 text-[10px] font-bold py-2.5 px-2 min-h-[48px] flex-1"><i class="fas fa-bag-shopping text-[15px] text-slate-100"></i>Ofertas</button>
+            <button onclick="focusStoreSearch()" class="flex flex-col items-center justify-center gap-1 text-slate-300 text-[10px] font-bold py-2.5 px-2 min-h-[48px] flex-1"><i class="fas fa-magnifying-glass text-[15px] text-slate-100"></i>Buscar</button>
+        </nav>
     </div>
 
     <!-- SECTION 2: MASTER CONSOLE & API SIMULATOR MODE -->
@@ -446,12 +479,17 @@
                                 <div>
                                     <label class="block text-slate-600 font-bold mb-1">Categoria</label>
                                     <select id="add-category" class="w-full p-2 border rounded outline-shopee-orange">
-                                        <option value="eletronicos">Eletrônicos</option>
-                                        <option value="casa">Casa & Cozinha</option>
-                                        <option value="moda">Moda</option>
+                                        <option value="moda">Moda Feminina</option>
                                         <option value="beleza">Beleza</option>
-                                        <option value="utilidades">Utilidades</option>
                                         <option value="acessorios">Acessórios</option>
+                                        <option value="maternidade">Mãe & Bebê</option>
+                                        <option value="fitness">Fitness</option>
+                                        <option value="casa">Casa</option>
+                                        <option value="pet">Pet Shop</option>
+                                        <option value="eletronicos">Eletrônicos</option>
+                                        <option value="celular">Celular</option>
+                                        <option value="infantil">Infantil</option>
+                                        <option value="utilidades">Utilidades</option>
                                         <option value="automotivo">Automotivo</option>
                                     </select>
                                 </div>
@@ -597,6 +635,9 @@
                             <p id="modal-old-price" class="text-xs text-slate-400 line-through"></p>
                             <p id="modal-new-price" class="text-shopee-orange text-3xl font-black leading-none"></p>
                         </div>
+
+                        <div id="modal-options" class="hidden mt-3 flex flex-wrap gap-1.5"></div>
+                        <p id="modal-options-hint" class="hidden text-[11px] text-slate-500 mt-2 leading-relaxed"></p>
 
                         <div class="flex flex-wrap gap-2 mt-3">
                             <span class="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
@@ -847,20 +888,88 @@
         let conversionPage = 1;
         let conversionHasNextRemote = false;
         const CONVERSION_PAGE_SIZE = 5;
+        let categoryProductsCache = [];
 
         // Categories Map — carregado dinâmicamente de /api/categorias (com fallback)
+        // Fallback local com as mesmas subcategorias do server/categorias.js —
+        // garante navegação por subcategoria mesmo antes da API responder.
         let categories = [
             { id: 'todos', label: 'Tudo', icon: 'fa-border-all', color: 'orange', count: 0 },
-            { id: 'eletronicos', label: 'Eletrônicos', icon: 'fa-laptop', color: 'blue', count: 0 },
-            { id: 'celular', label: 'Celular', icon: 'fa-mobile-alt', color: 'cyan', count: 0 },
-            { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0 },
-            { id: 'moda', label: 'Moda', icon: 'fa-tshirt', color: 'pink', count: 0 },
-            { id: 'beleza', label: 'Beleza', icon: 'fa-spa', color: 'purple', count: 0 },
-            { id: 'utilidades', label: 'Utilidades', icon: 'fa-tools', color: 'teal', count: 0 },
-            { id: 'acessorios', label: 'Acessórios', icon: 'fa-clock', color: 'yellow', count: 0 },
-            { id: 'automotivo', label: 'Automotivo', icon: 'fa-car', color: 'slate', count: 0 },
-            { id: 'fitness', label: 'Fitness', icon: 'fa-dumbbell', color: 'emerald', count: 0 },
-            { id: 'infantil', label: 'Infantil', icon: 'fa-child', color: 'rose', count: 0 }
+            { id: 'eletronicos', label: 'Eletrônicos', icon: 'fa-laptop', color: 'blue', count: 0, subcategories: [
+                { id: 'audio', label: 'Áudio', count: 0 },
+                { id: 'wearables', label: 'Relógios & Wearables', count: 0 },
+                { id: 'informatica', label: 'Informática', count: 0 },
+                { id: 'video', label: 'Vídeo & Projeção', count: 0 },
+                { id: 'smart_home', label: 'Casa Inteligente', count: 0 }
+            ] },
+            { id: 'celular', label: 'Celular', icon: 'fa-mobile-alt', color: 'cyan', count: 0, subcategories: [
+                { id: 'protecao', label: 'Proteção', count: 0 },
+                { id: 'energia', label: 'Energia & Cabos', count: 0 },
+                { id: 'acessorios_cel', label: 'Acessórios', count: 0 }
+            ] },
+            { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0, subcategories: [
+                { id: 'cozinha', label: 'Cozinha', count: 0 },
+                { id: 'decoracao', label: 'Decoração', count: 0 },
+                { id: 'organizacao', label: 'Organização', count: 0 },
+                { id: 'limpeza', label: 'Limpeza & Clima', count: 0 }
+            ] },
+            { id: 'moda', label: 'Moda Feminina', icon: 'fa-tshirt', color: 'pink', count: 0, subcategories: [
+                { id: 'vestidos', label: 'Vestidos & Saias', count: 0 },
+                { id: 'calcas', label: 'Calças & Leggings', count: 0 },
+                { id: 'tops', label: 'Tops & Blusas', count: 0 },
+                { id: 'calcados', label: 'Calçados', count: 0 },
+                { id: 'bolsas', label: 'Bolsas', count: 0 },
+                { id: 'praia', label: 'Moda Praia', count: 0 },
+                { id: 'plus_size', label: 'Plus Size', count: 0 },
+                { id: 'lingerie', label: 'Lingerie', count: 0 },
+                { id: 'moda_fria', label: 'Moda Fria', count: 0 },
+                { id: 'casa_moda', label: 'Pijamas & Casa', count: 0 }
+            ] },
+            { id: 'beleza', label: 'Beleza', icon: 'fa-spa', color: 'purple', count: 0, subcategories: [
+                { id: 'pele', label: 'Skincare', count: 0 },
+                { id: 'maquiagem', label: 'Maquiagem', count: 0 },
+                { id: 'cabelo', label: 'Cabelo', count: 0 },
+                { id: 'perfumes', label: 'Perfumes', count: 0 },
+                { id: 'unhas', label: 'Unhas', count: 0 },
+                { id: 'acessorios_beleza', label: 'Acessórios de Beleza', count: 0 }
+            ] },
+            { id: 'acessorios', label: 'Acessórios', icon: 'fa-clock', color: 'yellow', count: 0, subcategories: [
+                { id: 'joias', label: 'Joias', count: 0 },
+                { id: 'relogios', label: 'Relógios', count: 0 },
+                { id: 'oculos', label: 'Óculos', count: 0 },
+                { id: 'bolsas_acessorios', label: 'Bolsas & Carteiras', count: 0 },
+                { id: 'cabelo_acessorios', label: 'Cabelo', count: 0 },
+                { id: 'outros', label: 'Outros', count: 0 }
+            ] },
+            { id: 'maternidade', label: 'Mãe & Bebê', icon: 'fa-baby', color: 'rose', count: 0, subcategories: [
+                { id: 'bebe_menina', label: 'Bebê Menina', count: 0 },
+                { id: 'maternidade_roupa', label: 'Maternidade', count: 0 }
+            ] },
+            { id: 'fitness', label: 'Fitness', icon: 'fa-dumbbell', color: 'emerald', count: 0, subcategories: [
+                { id: 'roupa_fitness', label: 'Roupas', count: 0 },
+                { id: 'equipamentos', label: 'Equipamentos', count: 0 },
+                { id: 'bem_estar', label: 'Bem-estar', count: 0 }
+            ] },
+            { id: 'pet', label: 'Pet Shop', icon: 'fa-paw', color: 'orange', count: 0, subcategories: [
+                { id: 'gatos', label: 'Gatos', count: 0 },
+                { id: 'caes', label: 'Cães', count: 0 },
+                { id: 'acessorios_pet', label: 'Acessórios Pet', count: 0 }
+            ] },
+            { id: 'utilidades', label: 'Utilidades', icon: 'fa-tools', color: 'teal', count: 0, subcategories: [
+                { id: 'ferramentas', label: 'Ferramentas', count: 0 },
+                { id: 'dia_a_dia', label: 'Dia a dia', count: 0 },
+                { id: 'organizacao_util', label: 'Organização', count: 0 }
+            ] },
+            { id: 'automotivo', label: 'Automotivo', icon: 'fa-car', color: 'slate', count: 0, subcategories: [
+                { id: 'limpeza_auto', label: 'Limpeza', count: 0 },
+                { id: 'tecnologia_auto', label: 'Tecnologia', count: 0 },
+                { id: 'conforto_auto', label: 'Conforto', count: 0 }
+            ] },
+            { id: 'infantil', label: 'Infantil', icon: 'fa-child', color: 'indigo', count: 0, subcategories: [
+                { id: 'brinquedos', label: 'Brinquedos', count: 0 },
+                { id: 'roupa_infantil', label: 'Roupas & Calçados', count: 0 },
+                { id: 'escola', label: 'Escola', count: 0 }
+            ] }
         ];
 
         function isAdminMode() {
@@ -909,7 +1018,7 @@
             renderSubcategories();
             renderStoreProducts();
             renderConsoleProducts();
-            loadCampaigns();
+            loadHeroProducts();
             if (isAdminMode()) {
                 populateAdminCategorySelect();
                 loadAdminStats();
@@ -956,15 +1065,14 @@
             }
         }
 
-        function applyProducts(list, source, { append = false } = {}) {
+        function applyProducts(list, source, { append = false, allowEmpty = false } = {}) {
             if (!Array.isArray(list)) return false;
             if (append) {
-                // Merge por id para não duplicar
                 const map = new Map(productsDatabase.map(p => [String(p.id), p]));
                 for (const p of list) map.set(String(p.id), p);
                 productsDatabase = [...map.values()];
             } else {
-                if (!list.length) return false;
+                if (!list.length && !allowEmpty) return false;
                 productsDatabase = list;
             }
             lastApiSource = source || "api";
@@ -974,7 +1082,7 @@
             renderStoreProducts();
             renderConsoleProducts();
             if (isAdminMode()) loadAdminStats();
-            return productsDatabase.length > 0;
+            return allowEmpty || productsDatabase.length > 0;
         }
 
         async function loadCategoriesFromApi({ silent = true } = {}) {
@@ -1239,8 +1347,35 @@
                 arr.sort((a, b) => (b.stars || 0) - (a.stars || 0));
             } else if (currentStoreSort === 'ending') {
                 arr.sort((a, b) => (a.periodEnd || Infinity) - (b.periodEnd || Infinity));
+            } else if (currentStoreSort === 'price-asc') {
+                arr.sort((a, b) => (a.newPrice || 0) - (b.newPrice || 0));
+            } else if (currentStoreSort === 'price-desc') {
+                arr.sort((a, b) => (b.newPrice || 0) - (a.newPrice || 0));
             }
             return arr;
+        }
+
+        function scrollToStoreTop() {
+            document.getElementById('main-storefront-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+        function clearStoreSearch() {
+            const input = document.getElementById('store-search-input');
+            if (!input) return;
+            input.value = '';
+            searchStoreProducts();
+            input.focus();
+        }
+        function scrollToStoreCategories() {
+            document.getElementById('store-categories-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        function scrollToFlashSale() {
+            document.getElementById('flash-sale-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+        function focusStoreSearch() {
+            const input = document.getElementById('store-search-input');
+            if (!input) return;
+            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => input.focus(), 350);
         }
 
         async function setStoreSort(sort) {
@@ -1258,44 +1393,65 @@
             }
         }
 
-        async function loadCampaigns() {
-            const track = document.getElementById('campaigns-track');
+        async function loadHeroProducts() {
+            const track = document.getElementById('hero-products-track');
             if (!track) return;
             try {
-                const res = await fetch(`${API_BASE}/api/campanhas?limit=8`);
+                const res = await fetch(`${API_BASE}/api/ofertas/db?limit=12&sort=discount`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                const list = (data.campaigns || []).filter((c) => c.affiliateLink && c.affiliateLink !== '#');
-                if (!list.length) {
+                const list = Array.isArray(data.products) ? data.products : [];
+                if (list.length) applyProducts(list, 'hero', { append: true });
+
+                const now = Math.floor(Date.now() / 1000);
+                const picks = list
+                    .filter(p => p.image && p.newPrice > 0)
+                    .sort((a, b) => {
+                        const flashA = a.isFlashSale && a.periodEnd > now ? 1 : 0;
+                        const flashB = b.isFlashSale && b.periodEnd > now ? 1 : 0;
+                        if (flashB !== flashA) return flashB - flashA;
+                        return (b.discountPct || 0) - (a.discountPct || 0);
+                    })
+                    .slice(0, 10);
+
+                if (!picks.length) {
                     track.innerHTML = `
                         <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
                             <p class="text-[11px] font-black uppercase text-shopee-yellow">Afiliada Mestre</p>
-                            <h3 class="text-2xl font-black leading-tight mt-1">Ofertas selecionadas da Shopee</h3>
-                            <p class="text-sm text-orange-100 mt-2">Explore produtos com desconto e compre com segurança.</p>
+                            <h3 class="text-2xl font-black leading-tight mt-1">Ofertas Relâmpago</h3>
+                            <p class="text-sm text-orange-100 mt-2">Clique para ver todos os produtos.</p>
                         </div>`;
                     return;
                 }
-                track.innerHTML = list.map((c, i) => {
-                    const img = c.image
-                        ? `<img src="${escapeAttr(c.image)}" alt="" class="absolute inset-0 w-full h-full object-cover">`
-                        : '';
+
+                track.innerHTML = picks.map((p) => {
+                    const price = Number(p.newPrice).toFixed(2).replace('.', ',');
+                    const old = Number(p.oldPrice).toFixed(2).replace('.', ',');
+                    const showOld = p.oldPrice > p.newPrice;
+                    const flash = p.isFlashSale && p.periodEnd > now;
                     return `
-                        <a href="${escapeAttr(c.affiliateLink)}" target="_blank" rel="noopener noreferrer sponsored"
-                           class="shrink-0 snap-start w-[85%] sm:w-[60%] md:w-[48%] lg:w-[38%] h-44 md:h-56 rounded-2xl overflow-hidden relative group shadow-md border border-orange-100">
-                            ${img}
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-                            <div class="absolute bottom-0 left-0 right-0 p-4 text-white">
-                                <span class="text-[10px] font-black uppercase text-shopee-yellow">Campanha ${i + 1}</span>
-                                <h3 class="text-base md:text-lg font-black leading-snug line-clamp-2 mt-0.5">${escapeHtml(c.title)}</h3>
-                                <span class="inline-flex mt-2 text-[11px] font-bold bg-shopee-orange px-2.5 py-1 rounded-lg">Ver na Shopee <i class="fas fa-arrow-up-right-from-square ml-1 text-[9px]"></i></span>
+                        <div onclick="openProductModal(${p.id})"
+                            class="shrink-0 snap-start w-[70%] sm:w-[45%] md:w-[32%] lg:w-[24%] h-44 md:h-56 rounded-2xl overflow-hidden relative group shadow-md border border-orange-100 cursor-pointer bg-white">
+                            <img src="${escapeAttr(p.image)}" alt="" class="absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                                onerror="this.onerror=null;this.src='https://placehold.co/400x400/ffebd7/ee4d2d?text=Shopee'">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
+                            ${p.discount && p.discount !== '0%' ? `
+                            <span class="absolute top-2 right-2 bg-shopee-yellow text-shopee-orange text-[10px] font-black px-2 py-0.5 rounded-lg z-10">-${escapeHtml(p.discount)}</span>` : ''}
+                            ${flash ? `<span class="absolute top-2 left-2 bg-shopee-orange text-white text-[9px] font-black px-2 py-0.5 rounded-lg z-10"><i class="fas fa-bolt mr-0.5"></i>RELÂMPAGO</span>` : ''}
+                            <div class="absolute bottom-0 left-0 right-0 p-3 text-white">
+                                <h3 class="text-sm md:text-base font-bold leading-snug line-clamp-2">${escapeHtml(p.title)}</h3>
+                                <div class="flex items-baseline gap-2 mt-1.5">
+                                    <span class="text-shopee-yellow text-lg font-black">R$ ${price}</span>
+                                    ${showOld ? `<span class="text-[10px] text-white/60 line-through">R$ ${old}</span>` : ''}
+                                </div>
                             </div>
-                        </a>`;
+                        </div>`;
                 }).join('');
             } catch (err) {
                 track.innerHTML = `
                     <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
-                        <h3 class="text-2xl font-black">Ofertas da Shopee</h3>
-                        <p class="text-sm text-orange-100 mt-2">Clique para ver os produtos selecionados.</p>
+                        <h3 class="text-2xl font-black">Ofertas Relâmpago</h3>
+                        <p class="text-sm text-orange-100 mt-2">Clique para ver os produtos.</p>
                     </div>`;
             }
         }
@@ -1309,6 +1465,63 @@
                 return sub.keywords.map(k => String(k).toLowerCase().trim());
             }
             return [];
+        }
+
+        function productMatchesSubcategory(p, catId, subId) {
+            if (!subId) return true;
+            if (String(p.subcategory || '') === subId) return true;
+
+            const subKws = getSubcategoryKeywords(catId, subId);
+            const kw = String(p.keyword || '').toLowerCase().trim();
+            if (subKws.includes(kw)) return true;
+
+            const title = String(p.title || '').toLowerCase();
+            const subRules = {
+                plus_size: (t) => /\b(plus\s*size|tam(?:anho)?\s*g{2,}|\bxg\b|\bxxg\b|4[6-9]|5[0-4])\b/i.test(t),
+                lingerie: (t) => /\b(lingerie|calcinha|sutiã|sutia|cinta\s*modeladora)\b/i.test(t),
+                praia: (t) => /\b(biqu[ií]ni|maiô|maio|sa[ií]da\s*de\s*praia|sunga)\b/i.test(t),
+                calcas: (t) => /\b(cal[cç]a|jeans|legging|pantalona|alfaiataria|linho)\b/i.test(t),
+                calcados: (t) => /\b(sand[aá]lia|t[eê]nis|bota|chinelo|scarpin|salto)\b/i.test(t),
+                moda_fria: (t) => /\b(jaquet|casaco|moletom|blusa\s*de\s*frio|oversized)\b/i.test(t),
+                casa_moda: (t) => /\b(pijama|robe|camisola|roup[aã]o)\b/i.test(t),
+                tops: (t) => /\b(cropped|macac[aã]o|conjunto|blusa|camiseta|regata)\b/i.test(t),
+                vestidos: (t) => /\b(vestido|saia)\b/i.test(t),
+            };
+            const rule = subRules[subId];
+            if (rule && rule(title)) return true;
+            return subKws.some((k) => keywordTitleScore(k, title) >= 5);
+        }
+
+        function keywordTitleScore(keyword, title) {
+            const lowerTitle = String(title || '').toLowerCase();
+            const stop = new Set(['feminino', 'feminina', 'mulher', 'para', 'com', 'kit', 'tipo', 'modelo', 'novo', 'nova', 'vestido', 'longo', 'midi', 'saia', 'roupa', 'conjunto', 'blusa', 'camiseta', 'moda']);
+            const tokens = String(keyword || '').toLowerCase().split(/\s+/)
+                .filter((t) => t.length > 3 && !stop.has(t));
+            if (!tokens.length) return 0;
+            const hits = tokens.filter((tok) => lowerTitle.includes(tok));
+            if (!hits.length) return 0;
+            const longest = Math.max(...hits.map((h) => h.length));
+            return hits.length >= 2 ? longest + hits.length : longest;
+        }
+
+        function formatProductOptions(p) {
+            const opts = p.options || {};
+            const labels = Array.isArray(opts.labels) ? opts.labels : [];
+            if (labels.length) return labels;
+            return [...(opts.sizes || []), ...(opts.voltages || [])];
+        }
+
+        function renderOptionBadges(p, compact = false) {
+            const labels = formatProductOptions(p).slice(0, compact ? 3 : 8);
+            if (!labels.length && !(p.options && p.options.hasVariants)) return '';
+            const sizeClass = compact ? 'text-[8px] px-1 py-0.5' : 'text-[10px] px-2 py-1';
+            const chips = labels.map((label) =>
+                `<span class="bg-slate-100 text-slate-600 font-bold rounded ${sizeClass}">${escapeHtml(label)}</span>`
+            ).join('');
+            const more = (p.options && p.options.hasVariants && !labels.length)
+                ? `<span class="bg-blue-50 text-blue-700 font-bold rounded ${sizeClass}">+ variações</span>`
+                : '';
+            return `<div class="flex flex-wrap gap-1">${chips}${more}</div>`;
         }
 
         function subcategoryLabelForProduct(p) {
@@ -1341,7 +1554,7 @@
                 container.innerHTML += `
                     <button
                         onclick="setStoreCategory('${cat.id}')"
-                        class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group"
+                        class="flex flex-col items-center p-2.5 rounded-xl hover:bg-slate-50 transition border ${borderClass} group shrink-0 w-[74px] snap-start sm:w-auto"
                     >
                         <div class="h-11 w-11 rounded-full ${bgIconClass} flex items-center justify-center text-base mb-1.5 transition transform group-hover:scale-105">
                             <i class="fas ${normalizeCategoryIcon(cat.icon)}"></i>
@@ -1353,25 +1566,49 @@
             });
         }
 
-        // Filter by category — busca do Supabase e, se vazio, dispara sync daquela categoria.
+        // Filter by category — carrega todos os produtos da categoria para filtrar subcategorias localmente.
         async function setStoreCategory(catId) {
             currentStoreCategory = catId;
             currentStoreSubcategory = '';
             currentPage = 0;
             renderCategories();
             renderSubcategories();
-            renderStoreProducts();
-            if (!apiLive) return;
-            const gotSomething = await loadOffersFromSupabase({ silent: true, reset: true, category: catId === 'todos' ? '' : catId });
+            if (!apiLive) {
+                renderStoreProducts();
+                return;
+            }
+            if (catId === 'todos') {
+                await loadOffersFromSupabase({ silent: true, reset: true, category: '' });
+            } else {
+                await loadCategoryProducts(catId);
+            }
             const inThisCat = productsDatabase.filter(p => catId === 'todos' || p.category === catId).length;
             if (catId !== 'todos' && inThisCat < 8) {
-                // Poucos produtos no cache → dispara sync focado
                 syncCategory(catId, { silent: false }).then((data) => {
                     if (data) {
-                        loadOffersFromSupabase({ silent: true, reset: true, category: catId });
+                        loadCategoryProducts(catId);
                         loadCategoriesFromApi({ silent: true });
                     }
                 });
+            }
+        }
+
+        async function loadCategoryProducts(catId) {
+            try {
+                const url = `${API_BASE}/api/ofertas/db?limit=200&offset=0`
+                    + `&category=${encodeURIComponent(catId)}`
+                    + `&sort=${encodeURIComponent(currentStoreSort)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                categoryProductsCache = data.products || [];
+                applyProducts(categoryProductsCache, 'supabase', { append: false, allowEmpty: true });
+                hasMore = categoryProductsCache.length >= 200;
+                renderLoadMoreBtn();
+                return categoryProductsCache.length > 0;
+            } catch (err) {
+                showToast(`Erro ao carregar categoria: ${err.message}`, 'error');
+                return false;
             }
         }
 
@@ -1418,22 +1655,13 @@
             currentStoreSubcategory = key || '';
             currentPage = 0;
             renderSubcategories();
-            if (apiLive) {
-                await loadOffersFromSupabase({
-                    silent: true,
-                    reset: true,
-                    category: currentStoreCategory === 'todos' ? '' : currentStoreCategory,
-                    subcategory: currentStoreSubcategory,
-                });
-            } else {
-                renderStoreProducts();
-            }
+            renderStoreProducts();
             scrollToStoreGrid();
         }
 
         function isFemaleProduct(p) {
-            if (['moda', 'beleza', 'acessorios', 'fitness'].includes(String(p.category || ''))) return true;
-            return /feminin|mulher|maquiagem|batom|vestido|legging|saia|bolsa|brinco|colar|skincare|unha|cabelo/i
+            if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade'].includes(String(p.category || ''))) return true;
+            return /feminin|mulher|maquiagem|batom|vestido|legging|saia|bolsa|brinco|colar|skincare|unha|cabelo|bebe menina|gestante|maternidade|lingerie|biquini|maio|pijama|scrunchie|tiara/i
                 .test(`${p.title || ''} ${p.keyword || ''}`);
         }
 
@@ -1471,13 +1699,12 @@
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
                 const title = (p.title || '').toLowerCase();
                 const desc = (p.desc || '').toLowerCase();
-                const kw = (p.keyword || '').toLowerCase().trim();
                 const matchesSearch = !searchVal || title.includes(searchVal) || desc.includes(searchVal);
-                // Se keywords da subcategoria estão disponíveis, filtra localmente.
-                // Se não (cache antigo), confia nos produtos já filtrados pela API.
-                const matchesSub = !currentStoreSubcategory
-                    || !subKws.length
-                    || subKws.includes(kw);
+                const matchesSub = productMatchesSubcategory(
+                    p,
+                    currentStoreCategory,
+                    currentStoreSubcategory
+                );
                 return matchesCategory && matchesSearch && matchesSub;
             });
             filtered = sortProductsLocal(filtered);
@@ -1553,6 +1780,7 @@
                             <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
                                 ${subBadge}
                                 <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                                ${renderOptionBadges(p, true)}
                                 ${shopLine}
                                 <div>
                                     ${p.oldPrice > p.newPrice ? `<p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>` : ''}
@@ -1606,6 +1834,7 @@
         let searchDebounce = null;
         async function searchStoreProducts() {
             const term = (document.getElementById('store-search-input')?.value || "").trim();
+            document.getElementById('store-search-clear')?.classList.toggle('hidden', !term);
             // Filtra o que já está carregado imediatamente (sem custo)
             renderStoreProducts();
             if (!apiLive || term.length < 2) return;
@@ -1636,6 +1865,31 @@
             document.getElementById('modal-old-price').innerText = (p.oldPrice && p.oldPrice > p.newPrice)
                 ? `De: R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}` : '';
             document.getElementById('modal-new-price').innerText = `R$ ${Number(p.newPrice).toFixed(2).replace('.', ',')}`;
+
+            const optionsBox = document.getElementById('modal-options');
+            const optionsHint = document.getElementById('modal-options-hint');
+            const optionLabels = formatProductOptions(p);
+            if (optionsBox) {
+                if (optionLabels.length || (p.options && p.options.hasVariants)) {
+                    optionsBox.innerHTML = renderOptionBadges(p, false);
+                    optionsBox.classList.remove('hidden');
+                } else {
+                    optionsBox.innerHTML = '';
+                    optionsBox.classList.add('hidden');
+                }
+            }
+            if (optionsHint) {
+                const hint = p.options?.hint || (p.oldPrice > p.newPrice * 1.02
+                    ? 'Este produto tem variações de preço na Shopee — escolha tamanho, cor ou voltagem na página oficial.'
+                    : '');
+                if (hint) {
+                    optionsHint.textContent = hint;
+                    optionsHint.classList.remove('hidden');
+                } else {
+                    optionsHint.textContent = '';
+                    optionsHint.classList.add('hidden');
+                }
+            }
 
             const starsBox = document.getElementById('modal-stars');
             starsBox.innerHTML = '<i class="fas fa-star mr-0.5"></i>'.repeat(Math.max(1, Math.floor(p.stars || 4)));
@@ -1758,7 +2012,7 @@
                 const res = await fetch(`${API_BASE}/api/reset-vitrine`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ limit: 20 }),
+                    body: JSON.stringify({ limit: 50, pages: 2, maxItems: 2000 }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -2011,6 +2265,14 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeProductModal();
         });
+
+        window.addEventListener('scroll', () => {
+            const btn = document.getElementById('back-to-top-btn');
+            if (!btn) return;
+            const show = window.scrollY > 500;
+            btn.classList.toggle('hidden', !show);
+            btn.classList.toggle('flex', show);
+        }, { passive: true });
 
         // ---- Gerenciador de produtos (paginado + busca) ----
         let adminPage = 1;
@@ -2315,7 +2577,7 @@
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
-                loadCampaigns();
+                loadHeroProducts();
             } catch (err) {
                 showToast(`Falha nos destaques: ${err.message}`, 'error');
             } finally {

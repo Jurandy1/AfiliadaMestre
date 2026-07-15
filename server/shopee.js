@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { categoryForKeyword } = require("./categorias");
+const { inferSubcategory, extractProductOptions } = require("./productMeta");
 
 const SHOPEE_API_URL = "https://open-api.affiliate.shopee.com.br/graphql";
 
@@ -354,8 +355,11 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
   const salesLabel = sales && !/vendid/i.test(sales) ? `${sales} vendidos` : sales;
 
   const shop = node.shopName ? String(node.shopName).trim() : "";
+  const catId = categoryForKeyword(keyword);
+  const options = extractProductOptions(node.productName, priceMin, priceMax);
   const descParts = [];
   descParts.push(discountPct > 0 ? `Oferta com ${discountPct}% de desconto` : "Oferta selecionada");
+  if (options.hint) descParts.push(options.hint);
   if (salesLabel && salesLabel !== "—") descParts.push(salesLabel);
   descParts.push("confira frete e prazo na Shopee");
   if (shop) descParts.push(`vendido por ${shop}`);
@@ -367,7 +371,9 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
     id: Number(node.itemId) || Date.now(),
     itemId: node.itemId,
     title: node.productName || "Produto Shopee",
-    category: categoryForKeyword(keyword),
+    category: catId,
+    subcategory: inferSubcategory(catId, keyword, node.productName),
+    options,
     oldPrice: priceMax || priceMin,
     newPrice: priceMin,
     discount: discountPct ? `${discountPct}%` : "0%",
@@ -397,6 +403,9 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
 }
 
 function mapOfferToRow(node, keyword = "", listType = null) {
+  const priceMin = Number(node.priceMin) || 0;
+  const priceMax = Number(node.priceMax) || priceMin;
+  const catId = categoryForKeyword(keyword);
   return {
     item_id: Number(node.itemId),
     product_name: node.productName || "",
@@ -416,7 +425,9 @@ function mapOfferToRow(node, keyword = "", listType = null) {
     shop_name: node.shopName || null,
     shop_type: node.shopType != null ? Number(node.shopType) : null,
     keyword: keyword || null,
-    category: categoryForKeyword(keyword),
+    category: catId,
+    subcategory: inferSubcategory(catId, keyword, node.productName),
+    product_options: extractProductOptions(node.productName, priceMin, priceMax),
     period_start: toUnixSec(node.periodStartTime),
     period_end: toUnixSec(node.periodEndTime),
     list_type: listType != null ? Number(listType) : null,

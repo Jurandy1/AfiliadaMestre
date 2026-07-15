@@ -1,7 +1,8 @@
 "use strict";
 
 // Categoria → subcategorias agrupadas (cada subcategoria tem 1+ keywords de busca).
-// Mantém em sincronia com o frontend da vitrine.
+// Keywords baseadas no Mapa Shopee 2026 — foco 90% feminino na exibição.
+// Mantém em sincronia com o fallback do frontend da vitrine.
 const CATEGORIAS = [
   {
     id: "eletronicos",
@@ -9,10 +10,11 @@ const CATEGORIAS = [
     icon: "fa-laptop",
     color: "blue",
     subcategories: [
-      { id: "audio", label: "Áudio", keywords: ["fone bluetooth", "caixa de som bluetooth"] },
+      { id: "audio", label: "Áudio", keywords: ["fone bluetooth sem fio", "fone tws", "caixa de som bluetooth portatil", "fone esportivo"] },
       { id: "wearables", label: "Relógios & Wearables", keywords: ["smartwatch"] },
-      { id: "informatica", label: "Informática", keywords: ["mouse gamer", "teclado mecanico", "carregador", "cabo tipo c"] },
-      { id: "video", label: "Vídeo & Projeção", keywords: ["projetor"] },
+      { id: "informatica", label: "Informática", keywords: ["mouse gamer", "teclado mecanico", "carregador rapido", "cabo tipo c"] },
+      { id: "video", label: "Vídeo & Projeção", keywords: ["projetor portatil"] },
+      { id: "smart_home", label: "Casa Inteligente", keywords: ["lampada led wifi", "camera seguranca wifi"] },
     ],
   },
   {
@@ -21,9 +23,9 @@ const CATEGORIAS = [
     icon: "fa-mobile-alt",
     color: "cyan",
     subcategories: [
-      { id: "protecao", label: "Proteção", keywords: ["capinha celular", "pelicula 3d"] },
-      { id: "energia", label: "Energia & Cabos", keywords: ["power bank", "carregador rapido", "cabo carregador iphone", "adaptador usb c"] },
-      { id: "acessorios_cel", label: "Acessórios", keywords: ["suporte celular", "fone de ouvido com fio"] },
+      { id: "protecao", label: "Proteção", keywords: ["capinha celular", "pelicula vidro temperado"] },
+      { id: "energia", label: "Energia & Cabos", keywords: ["power bank", "carregador rapido tipo c", "cabo carregador iphone", "adaptador usb c"] },
+      { id: "acessorios_cel", label: "Acessórios", keywords: ["suporte celular carro", "suporte celular mesa"] },
     ],
   },
   {
@@ -32,10 +34,10 @@ const CATEGORIAS = [
     icon: "fa-couch",
     color: "amber",
     subcategories: [
-      { id: "cozinha", label: "Cozinha", keywords: ["panela eletrica", "air fryer", "kit cozinha"] },
-      { id: "decoracao", label: "Decoração", keywords: ["luminaria led", "cortina", "tapete sala", "jogo de cama", "difusor aromatizador"] },
-      { id: "organizacao", label: "Organização", keywords: ["organizador", "umidificador"] },
-      { id: "limpeza", label: "Limpeza & Clima", keywords: ["aspirador portatil", "ventilador usb"] },
+      { id: "cozinha", label: "Cozinha", keywords: ["air fryer", "panela antiaderente", "utensilio cozinha"] },
+      { id: "decoracao", label: "Decoração", keywords: ["jogo de cama casal 400 fios", "cortina blackout", "tapete sala", "papel de parede adesivo", "vaso decorativo"] },
+      { id: "organizacao", label: "Organização", keywords: ["organizador geladeira", "caixa organizadora transparente"] },
+      { id: "limpeza", label: "Limpeza & Clima", keywords: ["aspirador portatil", "umidificador ultrassonico"] },
     ],
   },
   {
@@ -44,11 +46,56 @@ const CATEGORIAS = [
     icon: "fa-tshirt",
     color: "pink",
     subcategories: [
-      { id: "vestidos", label: "Vestidos & Saias", keywords: ["vestido feminino", "saia feminina"] },
-      { id: "calcas", label: "Calças & Leggings", keywords: ["calca jeans feminina", "legging feminina", "short feminino"] },
-      { id: "tops", label: "Tops & Blusas", keywords: ["camiseta feminina", "blusa feminina", "conjunto feminino"] },
-      { id: "calcados", label: "Calçados", keywords: ["tenis feminino"] },
-      { id: "bolsas", label: "Bolsas", keywords: ["bolsa feminina"] },
+      {
+        id: "vestidos",
+        label: "Vestidos & Saias",
+        keywords: ["vestido longo feminino", "vestido midi feminino", "saia feminina"],
+      },
+      {
+        id: "calcas",
+        label: "Calças & Leggings",
+        keywords: ["calca jeans feminina", "calca pantalona feminina", "calca linho feminina", "legging cintura alta", "short alfaiataria feminino"],
+      },
+      {
+        id: "tops",
+        label: "Tops & Blusas",
+        keywords: ["cropped feminino", "conjunto feminino", "macacao feminino", "blusa feminina", "camiseta feminina"],
+      },
+      {
+        id: "calcados",
+        label: "Calçados",
+        keywords: ["sandalia feminina", "tenis feminino", "bota feminina", "chinelo feminino"],
+      },
+      {
+        id: "bolsas",
+        label: "Bolsas",
+        keywords: ["bolsa transversal feminina", "bolsa estruturada feminina", "bolsa tiracolo feminina"],
+      },
+      {
+        id: "praia",
+        label: "Moda Praia",
+        keywords: ["biquini feminino", "maio feminino", "saida de praia feminina"],
+      },
+      {
+        id: "plus_size",
+        label: "Plus Size",
+        keywords: ["vestido longo plus size", "calca jeans plus size", "roupa plus size feminina"],
+      },
+      {
+        id: "lingerie",
+        label: "Lingerie",
+        keywords: ["calcinha invisivel", "lingerie feminina", "conjunto lingerie feminino"],
+      },
+      {
+        id: "moda_fria",
+        label: "Moda Fria",
+        keywords: ["jaqueta oversized feminina", "casaco feminino", "conjunto moletom feminino"],
+      },
+      {
+        id: "casa_moda",
+        label: "Pijamas & Casa",
+        keywords: ["pijama feminino", "conjunto pijama feminino", "robe feminino", "roupa de casa feminina"],
+      },
     ],
   },
   {
@@ -57,11 +104,159 @@ const CATEGORIAS = [
     icon: "fa-spa",
     color: "purple",
     subcategories: [
-      { id: "maquiagem", label: "Maquiagem", keywords: ["batom", "base maquiagem", "mascara de cilios", "maquiagem feminina", "pincel maquiagem"] },
-      { id: "cabelo", label: "Cabelo", keywords: ["secador de cabelo", "chapinha"] },
-      { id: "pele", label: "Skincare", keywords: ["kit skincare", "hidratante corporal feminino"] },
-      { id: "perfumes", label: "Perfumes", keywords: ["perfume feminino"] },
+      {
+        id: "pele",
+        label: "Skincare",
+        keywords: [
+          "serum vitamina c",
+          "serum acido hialuronico",
+          "protetor solar fps 50",
+          "mascara facial hidratante",
+          "tonico facial coreano",
+          "kit skincare",
+          "skincare coreano",
+        ],
+      },
+      {
+        id: "maquiagem",
+        label: "Maquiagem",
+        keywords: [
+          "base de maquiagem",
+          "lip tint",
+          "batom liquido matte",
+          "paleta de sombras",
+          "corretivo alta cobertura",
+          "primer maquiagem",
+          "pincel maquiagem profissional",
+        ],
+      },
+      {
+        id: "cabelo",
+        label: "Cabelo",
+        keywords: [
+          "mascara capilar hidratacao",
+          "oleo capilar argan",
+          "leave-in cacheado",
+          "escova alisadora ceramica",
+          "secador de cabelo",
+          "chapinha de cabelo",
+        ],
+      },
+      {
+        id: "perfumes",
+        label: "Perfumes",
+        keywords: ["perfume inspirado feminino", "perfume feminino", "oleo corporal perfumado"],
+      },
       { id: "unhas", label: "Unhas", keywords: ["kit unha gel"] },
+      {
+        id: "acessorios_beleza",
+        label: "Acessórios de Beleza",
+        keywords: ["boob tape", "organizador maquiagem", "espelho led maquiagem"],
+      },
+    ],
+  },
+  {
+    id: "acessorios",
+    label: "Acessórios",
+    icon: "fa-clock",
+    color: "yellow",
+    subcategories: [
+      {
+        id: "joias",
+        label: "Joias",
+        keywords: ["brincos pingente dourado", "colar feminino", "conjunto brinco e colar", "pulseira feminina"],
+      },
+      { id: "relogios", label: "Relógios", keywords: ["relogio feminino"] },
+      {
+        id: "oculos",
+        label: "Óculos",
+        keywords: ["oculos de sol feminino", "oculos retro feminino"],
+      },
+      {
+        id: "bolsas_acessorios",
+        label: "Bolsas & Carteiras",
+        keywords: ["carteira feminina", "necessaire feminina"],
+      },
+      {
+        id: "cabelo_acessorios",
+        label: "Cabelo",
+        keywords: ["xuxinha meia seda kit", "scrunchie", "tiara com laco", "grampo bico de pato", "presilha cabelo"],
+      },
+      {
+        id: "outros",
+        label: "Outros",
+        keywords: ["cinto feminino", "bone feminino", "chapeu bucket feminino"],
+      },
+    ],
+  },
+  {
+    id: "maternidade",
+    label: "Mãe & Bebê",
+    icon: "fa-baby",
+    color: "rose",
+    subcategories: [
+      {
+        id: "bebe_menina",
+        label: "Bebê Menina",
+        keywords: [
+          "roupa de bebe menina",
+          "vestido bebe feminino",
+          "body bebe feminino",
+          "tiara laco bebe",
+          "kit roupas bebe menina",
+        ],
+      },
+      {
+        id: "maternidade_roupa",
+        label: "Maternidade",
+        keywords: ["roupa gestante", "conjunto maternidade", "macacao bebe feminino"],
+      },
+    ],
+  },
+  {
+    id: "fitness",
+    label: "Fitness",
+    icon: "fa-dumbbell",
+    color: "emerald",
+    subcategories: [
+      {
+        id: "roupa_fitness",
+        label: "Roupas",
+        keywords: ["roupa fitness feminina", "legging fitness feminina", "top fitness feminino", "conjunto fitness feminino"],
+      },
+      {
+        id: "equipamentos",
+        label: "Equipamentos",
+        keywords: ["kit elastico resistencia", "tapete yoga", "halter feminino"],
+      },
+      {
+        id: "bem_estar",
+        label: "Bem-estar",
+        keywords: ["oleo essencial lavanda", "difusor ultrassonico", "colageno hidrolisado"],
+      },
+    ],
+  },
+  {
+    id: "pet",
+    label: "Pet Shop",
+    icon: "fa-paw",
+    color: "orange",
+    subcategories: [
+      {
+        id: "gatos",
+        label: "Gatos",
+        keywords: ["areia biodegradavel gato", "areia sanitaria gato", "racao para gatos", "brinquedo gato interativo"],
+      },
+      {
+        id: "caes",
+        label: "Cães",
+        keywords: ["cama para cachorro", "coleira para cao", "antipulgas caes", "roupa para cachorro"],
+      },
+      {
+        id: "acessorios_pet",
+        label: "Acessórios Pet",
+        keywords: ["comedouro elevado pet", "bebedouro automatico pet"],
+      },
     ],
   },
   {
@@ -71,21 +266,8 @@ const CATEGORIAS = [
     color: "teal",
     subcategories: [
       { id: "ferramentas", label: "Ferramentas", keywords: ["kit ferramentas", "furadeira"] },
-      { id: "dia_a_dia", label: "Dia a dia", keywords: ["garrafa termica", "balanca digital", "mochila", "guarda chuva", "necessaire"] },
+      { id: "dia_a_dia", label: "Dia a dia", keywords: ["garrafa termica", "balanca digital", "mochila", "guarda chuva"] },
       { id: "organizacao_util", label: "Organização", keywords: ["kit organizador banheiro"] },
-    ],
-  },
-  {
-    id: "acessorios",
-    label: "Acessórios",
-    icon: "fa-clock",
-    color: "yellow",
-    subcategories: [
-      { id: "joias", label: "Joias", keywords: ["colar feminino", "brinco feminino", "pulseira feminina"] },
-      { id: "relogios", label: "Relógios", keywords: ["relogio feminino"] },
-      { id: "oculos", label: "Óculos", keywords: ["oculos de sol feminino"] },
-      { id: "bolsas_acessorios", label: "Bolsas & Carteiras", keywords: ["carteira feminina", "bolsa transversal feminina"] },
-      { id: "cabelo_acessorios", label: "Cabelo", keywords: ["presilha cabelo"] },
     ],
   },
   {
@@ -95,25 +277,15 @@ const CATEGORIAS = [
     color: "slate",
     subcategories: [
       { id: "limpeza_auto", label: "Limpeza", keywords: ["aspirador automotivo", "cera automotiva"] },
-      { id: "tecnologia_auto", label: "Tecnologia", keywords: ["camera automotiva", "suporte celular carro"] },
+      { id: "tecnologia_auto", label: "Tecnologia", keywords: ["camera automotiva", "suporte celular carro automotivo"] },
       { id: "conforto_auto", label: "Conforto", keywords: ["organizador porta malas", "capa de banco automotivo", "aromatizante carro"] },
-    ],
-  },
-  {
-    id: "fitness",
-    label: "Fitness",
-    icon: "fa-dumbbell",
-    color: "emerald",
-    subcategories: [
-      { id: "roupa_fitness", label: "Roupas", keywords: ["roupa academia feminina", "legging academia feminina", "top academia feminino"] },
-      { id: "equipamentos", label: "Equipamentos", keywords: ["faixa elastica fitness", "tapete yoga feminino", "kit fitness feminino"] },
     ],
   },
   {
     id: "infantil",
     label: "Infantil",
     icon: "fa-child",
-    color: "rose",
+    color: "indigo",
     subcategories: [
       { id: "brinquedos", label: "Brinquedos", keywords: ["brinquedo educativo", "lego montar", "boneca", "carrinho de brinquedo", "pelucia"] },
       { id: "roupa_infantil", label: "Roupas & Calçados", keywords: ["roupa infantil menina", "tenis infantil"] },
@@ -122,7 +294,7 @@ const CATEGORIAS = [
   },
 ];
 
-const FEMININE_CATEGORY_IDS = new Set(["moda", "beleza", "acessorios", "fitness"]);
+const FEMININE_CATEGORY_IDS = new Set(["moda", "beleza", "acessorios", "fitness", "maternidade"]);
 
 // Índices keyword → categoria / subcategoria
 const KEYWORD_TO_CATEGORY = new Map();
@@ -235,6 +407,37 @@ function metaOnly() {
   }));
 }
 
+/** Keywords únicas em ordem de prioridade (90% feminino primeiro). */
+function prioritizedKeywords({ femalePercent = 90 } = {}) {
+  const seen = new Set();
+  const result = [];
+
+  for (const entry of weightedKeywords({ femalePercent })) {
+    if (seen.has(entry.keyword)) continue;
+    seen.add(entry.keyword);
+    result.push(entry);
+  }
+  for (const entry of allKeywords()) {
+    if (seen.has(entry.keyword)) continue;
+    seen.add(entry.keyword);
+    result.push(entry);
+  }
+  return result;
+}
+
+/** Uma keyword de cada categoria por rodada — melhor variedade em demos limitadas. */
+function roundRobinKeywords() {
+  const buckets = CATEGORIAS.map((cat) => flatKeywords(cat));
+  const maxLen = Math.max(0, ...buckets.map((b) => b.length));
+  const result = [];
+  for (let i = 0; i < maxLen; i += 1) {
+    for (const bucket of buckets) {
+      if (bucket[i]) result.push(bucket[i]);
+    }
+  }
+  return result;
+}
+
 module.exports = {
   CATEGORIAS,
   categoryForKeyword,
@@ -245,6 +448,8 @@ module.exports = {
   femaleKeywords,
   generalKeywords,
   weightedKeywords,
+  prioritizedKeywords,
+  roundRobinKeywords,
   subcategoriesFor,
   metaOnly,
 };
