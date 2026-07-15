@@ -732,7 +732,7 @@
         let apiLive = false;
         let lastApiSource = "mock";
         let currentPage = 0;
-        const PAGE_SIZE = 60;
+        const PAGE_SIZE = 36;
         let hasMore = false;
         let loadingMore = false;
 
@@ -1248,7 +1248,7 @@
             const btn = document.createElement('button');
             btn.id = 'load-more-btn';
             btn.className = 'ml-3 px-3 py-1 text-[11px] font-bold rounded-lg bg-shopee-orange text-white hover:bg-shopee-orangeHover';
-            btn.textContent = 'Carregar mais 60';
+            btn.textContent = `Carregar mais ${PAGE_SIZE}`;
             btn.onclick = loadMoreProducts;
             info.appendChild(btn);
         }
@@ -1480,8 +1480,11 @@
                     return `
                         <div onclick="openProductModal(${p.id})"
                             class="shrink-0 snap-start w-[70%] sm:w-[45%] md:w-[32%] lg:w-[24%] h-44 md:h-56 rounded-2xl overflow-hidden relative group shadow-md border border-orange-100 cursor-pointer bg-white">
-                            <img src="${escapeAttr(p.image)}" alt="" class="absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                                onerror="this.onerror=null;this.src='https://placehold.co/400x400/ffebd7/ee4d2d?text=Shopee'">
+                            ${productImgHTML(p.image, {
+                                eager: picks.indexOf(p) < 2,
+                                className: 'absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105',
+                                fallbackSize: 400
+                            })}
                             <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
                             ${p.discount && p.discount !== '0%' ? `
                             <span class="absolute top-2 right-2 bg-shopee-yellow text-shopee-orange text-[10px] font-black px-2 py-0.5 rounded-lg z-10">-${escapeHtml(p.discount)}</span>` : ''}
@@ -1598,7 +1601,9 @@
         // Miniatura da CDN da Shopee (_tn) — bem mais leve para os círculos/tiles.
         function thumbUrl(url) {
             if (!url) return url;
-            return /(shopee|susercontent)\./.test(url) && !/_tn$/.test(url) ? `${url}_tn` : url;
+            if (!/(shopee|susercontent)\./i.test(url)) return url;
+            const [base, query = ''] = String(url).split('?');
+            return `${/_tn$/.test(base) ? base : `${base}_tn`}${query ? `?${query}` : ''}`;
         }
 
         // onerror em cadeia: miniatura falhou → tenta a imagem cheia → cai no ícone.
@@ -1608,8 +1613,25 @@
             img.replaceWith(Object.assign(document.createElement('i'), { className: iconClass }));
         }
 
-        function tileImgHTML(img, iconClass) {
-            return `<img src="${thumbUrl(img)}" data-full="${img}" alt="" loading="lazy" decoding="async" fetchpriority="low" class="w-full h-full object-cover" onerror="tileImgError(this, '${iconClass}')">`;
+        function tileImgHTML(img, iconClass, eager = false) {
+            return `<img src="${escapeAttr(thumbUrl(img))}" data-full="${escapeAttr(img)}" alt="" width="80" height="80" loading="${eager ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${eager ? 'high' : 'low'}" class="w-full h-full object-cover" onerror="tileImgError(this, '${iconClass}')">`;
+        }
+
+        function productImgError(img, fallbackSize) {
+            const full = img.dataset.full;
+            if (full && img.src !== full) {
+                img.src = full;
+                img.removeAttribute('data-full');
+                return;
+            }
+            img.onerror = null;
+            img.src = `https://placehold.co/${fallbackSize}x${fallbackSize}/ffebd7/ee4d2d?text=Shopee`;
+        }
+
+        function productImgHTML(url, { eager = false, className = '', fallbackSize = 200 } = {}) {
+            const safeUrl = escapeAttr(url || '');
+            const safeThumb = escapeAttr(thumbUrl(url || ''));
+            return `<img src="${safeThumb}" data-full="${safeUrl}" alt="" width="${fallbackSize}" height="${fallbackSize}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${eager ? 'high' : 'low'}" class="${className}" onerror="productImgError(this, ${fallbackSize})">`;
         }
 
         // Imagens candidatas de uma categoria, na ordem do catálogo local.
@@ -1742,7 +1764,7 @@
                 ? pickUnused(categoryImageCandidates(cat.id), used)
                 : getCategoryImage(cat.id);
             const inner = img
-                ? tileImgHTML(img, `fas ${normalizeCategoryIcon(cat.icon)} ${iconSize} text-slate-500`)
+                ? tileImgHTML(img, `fas ${normalizeCategoryIcon(cat.icon)} ${iconSize} text-slate-500`, true)
                 : `<i class="fas ${normalizeCategoryIcon(cat.icon)} ${iconSize}"></i>`;
             const circleBg = img ? 'bg-slate-100' : bgIconClass;
             const clickAction = openSheet
@@ -1813,7 +1835,7 @@
 
         async function loadCategoryProducts(catId) {
             try {
-                const url = `${API_BASE}/api/ofertas/db?limit=60&offset=0`
+                const url = `${API_BASE}/api/ofertas/db?limit=${PAGE_SIZE}&offset=0`
                     + (catId === 'todos' ? '' : `&category=${encodeURIComponent(catId)}`)
                     + `&sort=${encodeURIComponent(currentStoreSort)}`;
                 const res = await fetch(url);
@@ -1822,7 +1844,7 @@
                 categoryProductsCache = data.products || [];
                 // append=true preserva o cache das outras categorias
                 applyProducts(categoryProductsCache, 'supabase', { append: true, allowEmpty: true });
-                hasMore = categoryProductsCache.length >= 60;
+                hasMore = categoryProductsCache.length >= PAGE_SIZE;
                 renderLoadMoreBtn();
                 return categoryProductsCache.length > 0;
             } catch (err) {
@@ -2082,6 +2104,8 @@
             if (currentStoreCategory === 'todos' && !searchVal) {
                 filtered = prioritizeFemaleProducts(filtered);
             }
+            const totalFiltered = filtered.length;
+            filtered = filtered.slice(0, (currentPage + 1) * PAGE_SIZE);
 
             const now = Math.floor(Date.now() / 1000);
             const flashSales = filtered
@@ -2097,7 +2121,7 @@
                         Nenhuma oferta com prazo de término próximo nesta categoria.
                     </div>`;
             } else {
-                flashContainer.innerHTML = flashSales.slice(0, 16).map(p => {
+                flashContainer.innerHTML = flashSales.slice(0, 16).map((p, index) => {
                     const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
                     return `
                         <div onclick="openProductModal(${p.id})"
@@ -2106,7 +2130,10 @@
                                 -${p.discount}
                             </span>
                             <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                <img src="${p.image}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                                ${productImgHTML(p.image, {
+                                    eager: index < 2,
+                                    className: 'w-full h-full object-cover transition duration-300 group-hover:scale-105'
+                                })}
                             </div>
                             <div class="p-2 space-y-1.5 flex flex-col justify-between flex-1">
                                 <h4 class="text-[11px] text-slate-800 font-semibold truncate">${escapeHtml(p.title)}</h4>
@@ -2127,7 +2154,7 @@
                         <p class="text-xs">Tente mudar sua busca ou categoria!</p>
                     </div>`;
             } else {
-                grid.innerHTML = filtered.map(p => {
+                grid.innerHTML = filtered.map((p, index) => {
                     const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
                     const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars || 4)) + ((p.stars % 1 >= 0.5) ? '<i class="fas fa-star-half-alt"></i>' : '');
                     const showOff = p.discount && p.discount !== '0%';
@@ -2145,7 +2172,10 @@
                                 <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
                             </div>` : ''}
                             <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                <img src="${p.image}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
+                                ${productImgHTML(p.image, {
+                                    eager: index < 8,
+                                    className: 'w-full h-full object-cover transition duration-300 group-hover:scale-105'
+                                })}
                             </div>
                             <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
                                 ${subBadge}
@@ -2172,7 +2202,7 @@
             const scopeLabel = subObj ? `${catLabel} › ${subObj.label}` : catLabel;
             if (info) {
                 info.textContent = filtered.length
-                    ? `${filtered.length} ofertas · ${scopeLabel}`
+                    ? `${filtered.length}${totalFiltered > filtered.length ? ` de ${totalFiltered}` : ''} ofertas · ${scopeLabel}`
                     : 'Nenhuma oferta nesta seleção';
             }
             renderLoadMoreBtn();
