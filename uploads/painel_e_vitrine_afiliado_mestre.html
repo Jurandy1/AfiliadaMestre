@@ -1084,6 +1084,19 @@
             }
         }
 
+        // Coalesce re-renders de categorias/subcategorias/termos populares:
+        // cargas em lote (append por página) disparavam 3 rebuilds de innerHTML
+        // por chamada; agora agrupamos num único render após a rajada.
+        let chromeRenderTimer = null;
+        function scheduleChromeRender() {
+            clearTimeout(chromeRenderTimer);
+            chromeRenderTimer = setTimeout(() => {
+                renderCategories();
+                renderSubcategories();
+                renderPopularTerms();
+            }, 150);
+        }
+
         function applyProducts(list, source, { append = false, allowEmpty = false } = {}) {
             if (!Array.isArray(list)) return false;
             if (append) {
@@ -1103,9 +1116,7 @@
                 localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
             } catch (_) {}
             renderStoreProducts();
-            renderSubcategories();
-            renderCategories();
-            renderPopularTerms();
+            scheduleChromeRender();
             if (isAdminMode()) {
                 renderConsoleProducts();
                 loadAdminStats();
@@ -1565,15 +1576,58 @@
             return sub?.label || '';
         }
 
-        // Render Categories list — build once, single innerHTML write.
-        // Cache de imagem de capa por categoria (preenchido em background).
+        // ===== Fotos de capa de categorias/subcategorias =====
+        // Caches preenchidos em background e persistidos para render instantâneo
+        // (e zero fetch extra) nas visitas seguintes.
         const categoryCovers = {};
+        const subcategoryCovers = {};
+        try { Object.assign(categoryCovers, JSON.parse(localStorage.getItem('am_cat_covers_v1') || '{}')); } catch (_) {}
+        try { Object.assign(subcategoryCovers, JSON.parse(localStorage.getItem('am_sub_covers_v1') || '{}')); } catch (_) {}
+        function persistCovers() {
+            try {
+                localStorage.setItem('am_cat_covers_v1', JSON.stringify(categoryCovers));
+                localStorage.setItem('am_sub_covers_v1', JSON.stringify(subcategoryCovers));
+            } catch (_) {}
+        }
 
-        // Escolhe uma foto real do catálogo para representar uma categoria.
+        // Miniatura da CDN da Shopee (_tn) — bem mais leve para os círculos/tiles.
+        function thumbUrl(url) {
+            if (!url) return url;
+            return /(shopee|susercontent)\./.test(url) && !/_tn$/.test(url) ? `${url}_tn` : url;
+        }
+
+        // onerror em cadeia: miniatura falhou → tenta a imagem cheia → cai no ícone.
+        function tileImgError(img, iconClass) {
+            const full = img.dataset.full;
+            if (full && img.src !== full) { img.src = full; return; }
+            img.replaceWith(Object.assign(document.createElement('i'), { className: iconClass }));
+        }
+
+        function tileImgHTML(img, iconClass) {
+            return `<img src="${thumbUrl(img)}" data-full="${img}" alt="" loading="lazy" decoding="async" fetchpriority="low" class="w-full h-full object-cover" onerror="tileImgError(this, '${iconClass}')">`;
+        }
+
+        // Imagens candidatas de uma categoria, na ordem do catálogo local.
+        function categoryImageCandidates(catId) {
+            const out = [];
+            if (!catId || catId === 'todos') return out;
+            for (const p of productsDatabase) {
+                if (p.category === catId && p.image) out.push(p.image);
+            }
+            if (categoryCovers[catId]) out.push(categoryCovers[catId]);
+            return out;
+        }
+
+        // Primeira candidata ainda não usada no render atual — evita fotos repetidas.
+        function pickUnused(candidates, used) {
+            for (const img of candidates) {
+                if (img && !used.has(img)) { used.add(img); return img; }
+            }
+            return null;
+        }
+
         function getCategoryImage(catId) {
-            if (!catId || catId === 'todos') return null;
-            const p = productsDatabase.find(p => p.category === catId && p.image);
-            return p ? p.image : (categoryCovers[catId] || null);
+            return categoryImageCandidates(catId)[0] || null;
         }
 
         // Busca 1 produto por categoria em background para garantir uma foto de capa.
@@ -1595,6 +1649,7 @@
                     if (first && first.image) categoryCovers[cat.id] = first.image;
                 } catch (_) {}
             }));
+            persistCovers();
             renderCategories();
             renderSubcategories();
             const sheet = document.getElementById('mobile-category-sheet');
@@ -1603,17 +1658,19 @@
             }
         }
 
-        // Cache de imagem de capa por subcategoria: `${catId}::${subId}` → image URL.
-        const subcategoryCovers = {};
-
-        // Escolhe uma foto real para uma subcategoria específica.
-        function getSubcategoryImage(catId, subId) {
-            if (!subId) return getCategoryImage(catId);
-            const p = productsDatabase.find(p =>
-                p.category === catId && p.image && productMatchesSubcategory(p, catId, subId)
-            );
-            if (p) return p.image;
-            return subcategoryCovers[`${catId}::${subId}`] || getCategoryImage(catId);
+        // Imagens candidatas de uma subcategoria: produtos que casam com o filtro,
+        // depois a capa em cache, depois qualquer produto da categoria (fallback).
+        function subcategoryImageCandidates(catId, subId, catImages, catProducts) {
+            const out = [];
+            let matched = 0;
+            for (const p of catProducts) {
+                if (matched >= 4) break;
+                if (productMatchesSubcategory(p, catId, subId)) { out.push(p.image); matched++; }
+            }
+            const cached = subcategoryCovers[`${catId}::${subId}`];
+            if (cached) out.push(cached);
+            out.push(...catImages);
+            return out;
         }
 
         const preloadedSubCovers = new Set();
@@ -1624,19 +1681,40 @@
             const cat = categories.find(c => c.id === catId);
             const subs = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories : [];
             if (!subs.length) return;
-            await Promise.all(subs.map(async s => {
+
+            // 1 request só: um lote da categoria já rende capas distintas para a
+            // maioria das subcategorias via matching local (em vez de 1 fetch por sub).
+            if (productsDatabase.filter(p => p.category === catId && p.image).length < 12) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/ofertas/db?limit=40&offset=0&category=${encodeURIComponent(catId)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data.products) && data.products.length) {
+                            applyProducts(data.products, 'supabase', { append: true, allowEmpty: true });
+                        }
+                    }
+                } catch (_) {}
+            }
+
+            // Busca dirigida apenas para subcategorias que seguem sem capa própria.
+            const catProducts = productsDatabase.filter(p => p.category === catId && p.image);
+            const missing = subs.filter(s => {
                 const subId = s.id || s.key;
-                const key = `${catId}::${subId}`;
-                if (subcategoryCovers[key]) return;
+                if (subcategoryCovers[`${catId}::${subId}`]) return false;
+                return !catProducts.some(p => productMatchesSubcategory(p, catId, subId));
+            });
+            await Promise.all(missing.map(async s => {
+                const subId = s.id || s.key;
                 try {
                     const url = `${API_BASE}/api/ofertas/db?limit=1&offset=0&category=${encodeURIComponent(catId)}&subcategory=${encodeURIComponent(subId)}`;
                     const res = await fetch(url);
                     if (!res.ok) return;
                     const data = await res.json();
                     const first = (data.products || [])[0];
-                    if (first && first.image) subcategoryCovers[key] = first.image;
+                    if (first && first.image) subcategoryCovers[`${catId}::${subId}`] = first.image;
                 } catch (_) {}
             }));
+            persistCovers();
             renderSubcategories();
             const sheet = document.getElementById('mobile-category-sheet');
             if (sheet && !sheet.classList.contains('hidden')) {
@@ -1644,7 +1722,7 @@
             }
         }
 
-        function categoryTileHTML(cat, { size = 'md' } = {}) {
+        function categoryTileHTML(cat, { size = 'md', used } = {}) {
             const isActive = cat.id === currentStoreCategory;
             const borderClass = isActive ? 'border-shopee-orange shadow-sm bg-orange-50/40' : 'border-transparent';
             const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
@@ -1655,9 +1733,11 @@
                 : '';
             const circleSize = size === 'lg' ? 'h-16 w-16' : 'h-11 w-11';
             const iconSize = size === 'lg' ? 'text-2xl' : 'text-base';
-            const img = getCategoryImage(cat.id);
+            const img = used
+                ? pickUnused(categoryImageCandidates(cat.id), used)
+                : getCategoryImage(cat.id);
             const inner = img
-                ? `<img src="${img}" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fas ${normalizeCategoryIcon(cat.icon)} ${iconSize} text-slate-500'}))" class="w-full h-full object-cover">`
+                ? tileImgHTML(img, `fas ${normalizeCategoryIcon(cat.icon)} ${iconSize} text-slate-500`)
                 : `<i class="fas ${normalizeCategoryIcon(cat.icon)} ${iconSize}"></i>`;
             const circleBg = img ? 'bg-slate-100' : bgIconClass;
             return `
@@ -1676,9 +1756,13 @@
         function renderCategories() {
             const desktop = document.getElementById('store-categories-container');
             const strip = document.getElementById('mobile-category-strip');
-            if (desktop) desktop.innerHTML = categories.map(cat => categoryTileHTML(cat, { size: 'md' })).join('');
+            if (desktop) {
+                const used = new Set();
+                desktop.innerHTML = categories.map(cat => categoryTileHTML(cat, { size: 'md', used })).join('');
+            }
             if (strip) {
-                const tiles = categories.map(cat => categoryTileHTML(cat, { size: 'lg' })).join('');
+                const used = new Set();
+                const tiles = categories.map(cat => categoryTileHTML(cat, { size: 'lg', used })).join('');
                 const verMais = `
                     <button onclick="openMobileCategorySheet()" class="flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 transition border border-transparent group w-full snap-start">
                         <div class="h-16 w-16 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-1.5">
@@ -1766,7 +1850,7 @@
 
             const tile = (id, label, count, active, img) => {
                 const inner = img
-                    ? `<img src="${img}" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fas fa-image text-slate-400 text-xl'}))" class="w-full h-full object-cover">`
+                    ? tileImgHTML(img, 'fas fa-image text-slate-400 text-xl')
                     : `<i class="fas fa-image text-slate-400 text-xl"></i>`;
                 return `
                 <button onclick="setStoreSubcategory('${String(id).replace(/'/g, "\\'")}')"
@@ -1781,16 +1865,25 @@
                 </button>`;
             };
 
+            // Uma foto por tile, sem repetir dentro do bloco de subcategorias.
+            const catProducts = productsDatabase.filter(p => p.category === cat.id && p.image);
+            const catImages = catProducts.map(p => p.image);
+            if (categoryCovers[cat.id]) catImages.push(categoryCovers[cat.id]);
+            const used = new Set();
+
             const totalInCat = Number(cat.count || 0);
             container.innerHTML =
-                tile('', 'Todas', totalInCat, currentStoreSubcategory === '', getCategoryImage(cat.id))
-                + subs.map(s => tile(
-                    s.id || s.key,
-                    s.label,
-                    Number(s.count || 0),
-                    currentStoreSubcategory === (s.id || s.key),
-                    getSubcategoryImage(cat.id, s.id || s.key)
-                )).join('');
+                tile('', 'Todas', totalInCat, currentStoreSubcategory === '', pickUnused(catImages, used))
+                + subs.map(s => {
+                    const subId = s.id || s.key;
+                    return tile(
+                        subId,
+                        s.label,
+                        Number(s.count || 0),
+                        currentStoreSubcategory === subId,
+                        pickUnused(subcategoryImageCandidates(cat.id, subId, catImages, catProducts), used)
+                    );
+                }).join('');
             updateMobileCategoryUI();
         }
 
@@ -1862,6 +1955,7 @@
         function renderMobileCategoryList() {
             const list = document.getElementById('mobile-category-list');
             if (!list) return;
+            const used = new Set();
             list.innerHTML = categories.map(cat => {
                 const isActive = cat.id === currentStoreCategory;
                 const hasSubs = cat.id !== 'todos'
@@ -1872,17 +1966,22 @@
                 const rightIcon = hasSubs
                     ? `<i class="fas fa-chevron-${expanded ? 'up' : 'down'} text-slate-400 text-xs"></i>`
                     : (isActive ? '<i class="fas fa-check text-shopee-orange"></i>' : '');
-                const catImg = getCategoryImage(cat.id);
+                const catProducts = expanded ? productsDatabase.filter(p => p.category === cat.id && p.image) : [];
+                const catImages = catProducts.map(p => p.image);
+                if (categoryCovers[cat.id]) catImages.push(categoryCovers[cat.id]);
+                const catImg = pickUnused(categoryImageCandidates(cat.id), used);
                 const catAvatar = catImg
-                    ? `<span class="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0"><img src="${catImg}" alt="" loading="lazy" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<i class=\\'fas ${normalizeCategoryIcon(cat.icon)} text-slate-500\\'></i>'"></span>`
+                    ? `<span class="h-9 w-9 rounded-full overflow-hidden bg-slate-100 shrink-0">${tileImgHTML(catImg, `fas ${normalizeCategoryIcon(cat.icon)} text-slate-500`)}</span>`
                     : `<span class="h-9 w-9 rounded-full flex items-center justify-center ${bgIconClass} shrink-0"><i class="fas ${normalizeCategoryIcon(cat.icon)}"></i></span>`;
                 const subsHtml = expanded ? `
                     <div class="px-3 pb-3 pt-0 grid grid-cols-3 gap-2">
                         ${[{ id: '', label: 'Todas', count: Number(cat.count || 0) }, ...cat.subcategories].map(s => {
                             const active = currentStoreSubcategory === s.id && isActive;
-                            const subImg = s.id ? getSubcategoryImage(cat.id, s.id) : catImg;
+                            const subImg = s.id
+                                ? pickUnused(subcategoryImageCandidates(cat.id, s.id, catImages, catProducts), used)
+                                : pickUnused(catImages, used);
                             const inner = subImg
-                                ? `<img src="${subImg}" alt="" loading="lazy" class="w-full h-full object-cover" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'fas fa-image text-slate-400 text-lg'}))">`
+                                ? tileImgHTML(subImg, 'fas fa-image text-slate-400 text-lg')
                                 : `<i class="fas fa-image text-slate-400 text-lg"></i>`;
                             return `<button onclick="selectMobileSubcategory('${cat.id}','${String(s.id).replace(/'/g, "\\'")}')"
                                 class="flex flex-col items-center p-1.5 rounded-xl border ${active ? 'border-shopee-orange bg-orange-50/40' : 'border-slate-100 bg-white'}">
