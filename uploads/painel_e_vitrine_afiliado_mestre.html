@@ -91,6 +91,13 @@
                 >
                     <i class="fas fa-terminal mr-1.5"></i> Console Admin
                 </button>
+                <button
+                    onclick="switchMainMode('performance')"
+                    id="btn-mode-performance"
+                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
+                >
+                    <i class="fas fa-chart-line mr-1.5"></i> Desempenho
+                </button>
             </div>
         </div>
     </header>
@@ -144,8 +151,8 @@
             <section id="campaigns-hero" class="space-y-3">
                 <div class="flex items-end justify-between gap-2">
                     <div>
-                        <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider">Campanhas Shopee</p>
-                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas oficiais para você aproveitar</h2>
+                        <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider">Seleção Afiliada Mestre</p>
+                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas selecionadas para você</h2>
                     </div>
                     <button onclick="scrollToStoreGrid()" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
                         Ver produtos <i class="fas fa-arrow-down"></i>
@@ -165,6 +172,17 @@
                 </h3>
                 <div class="grid grid-cols-4 sm:grid-cols-8 gap-2" id="store-categories-container">
                     <!-- Dynamic categories generated inside script -->
+                </div>
+                <div id="store-subcategories" class="hidden mt-4 pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Subcategorias</span>
+                            <span id="subcat-breadcrumb" class="text-[10px] text-shopee-orange font-bold truncate"></span>
+                        </div>
+                    </div>
+                    <div id="store-subcategories-container" class="flex gap-1.5 overflow-x-auto pb-1 snap-x scrollbar-thin">
+                        <!-- Dynamic subcategories -->
+                    </div>
                 </div>
             </div>
 
@@ -362,6 +380,38 @@
                     </div>
                 </div>
 
+                <!-- Sub IDs de rastreamento -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-chart-simple text-slate-500"></i> Rastreamento automático do site
+                        </h4>
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <p class="text-slate-500 leading-relaxed">
+                            Os Sub IDs são criados automaticamente quando o cliente clica em <strong>Comprar</strong>.
+                            Eles servem para medir se a divulgação do site está gerando vendas — não vêm do sync de produtos.
+                        </p>
+                        <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 font-mono text-[10px] text-slate-700 space-y-1">
+                            <div><span class="text-shopee-orange font-bold">site</span> → afiliada_mestre</div>
+                            <div><span class="text-shopee-orange font-bold">canal</span> → site</div>
+                            <div><span class="text-shopee-orange font-bold">campanha</span> → vitrine</div>
+                            <div><span class="text-shopee-orange font-bold">+ categoria e produto</span> → gerados no clique</div>
+                        </div>
+                        <p id="subid-preview" class="text-[10px] text-slate-400 font-mono break-all"></p>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="switchMainMode('performance')"
+                                class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
+                                <i class="fas fa-chart-line mr-1"></i> Abrir desempenho
+                            </button>
+                            <button onclick="resetVitrineAndRefill()"
+                                class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                                <i class="fas fa-broom mr-1"></i> Limpar e realimentar vitrine
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- RIGHT COLUMN: Active Database Manager (5 cols) -->
@@ -458,6 +508,66 @@
             </div>
 
         </div>
+
+        <!-- Relatório de conversões e Sub IDs -->
+        <section id="performance-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                        <i class="fas fa-chart-line text-shopee-orange"></i> Conversões por Sub ID
+                    </h4>
+                    <p class="text-[10px] text-slate-400 mt-1">Só vendas geradas por este site (Sub ID afiliada_mestre). Outras campanhas da Shopee ficam de fora.</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <select id="conversion-days" onchange="loadConversions({reset:true})" class="p-2 border rounded-lg">
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30" selected>Últimos 30 dias</option>
+                        <option value="60">Últimos 60 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                    </select>
+                    <select id="conversion-status" onchange="loadConversions({reset:true})" class="p-2 border rounded-lg">
+                        <option value="">Todos os status</option>
+                        <option value="PENDING">Pendente</option>
+                        <option value="COMPLETED">Concluído</option>
+                        <option value="CANCELLED">Cancelado</option>
+                        <option value="UNPAID">Não pago</option>
+                    </select>
+                    <button onclick="loadConversions({reset:true})" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold">
+                        Atualizar
+                    </button>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-slate-100">
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Conversões</p>
+                    <p id="conversion-total" class="text-xl font-black text-slate-800">0</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Pedidos</p>
+                    <p id="conversion-orders" class="text-xl font-black text-slate-800">0</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Comissão</p>
+                    <p id="conversion-commission" class="text-lg font-black text-emerald-600">R$ 0,00</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Sub IDs encontrados</p>
+                    <p id="conversion-subids" class="text-xl font-black text-shopee-orange">0</p>
+                </div>
+            </div>
+            <div id="conversion-list" class="p-4 space-y-3">
+                <div class="py-8 text-center text-slate-400 text-xs">Clique em “Atualizar relatório” para carregar.</div>
+            </div>
+            <div id="conversion-pagination" class="hidden p-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                <button id="conversion-prev" onclick="previousConversionPage()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left mr-1"></i> Anterior
+                </button>
+                <span id="conversion-page-info" class="text-[11px] font-semibold text-slate-500">Página 1</span>
+                <button id="conversion-next" onclick="nextConversionPage()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+                    Próxima <i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </section>
 
     </div>
 
@@ -728,9 +838,15 @@
         // App Core State
         let productsDatabase = [];
         let currentStoreCategory = 'todos';
+        let currentStoreSubcategory = '';
         let currentStoreSort = 'recent';
         let activeProductForBuy = null;
         let flashEndsAt = null;
+        let conversionScrollId = '';
+        let conversionRows = [];
+        let conversionPage = 1;
+        let conversionHasNextRemote = false;
+        const CONVERSION_PAGE_SIZE = 5;
 
         // Categories Map — carregado dinâmicamente de /api/categorias (com fallback)
         let categories = [
@@ -748,7 +864,8 @@
         ];
 
         function isAdminMode() {
-            return new URLSearchParams(window.location.search).has("admin");
+            const params = new URLSearchParams(window.location.search);
+            return params.has("admin") || params.get("mode") === "admin";
         }
 
         function initAdminUi() {
@@ -758,7 +875,15 @@
                 bar.classList.remove("hidden");
                 const badge = document.getElementById("api-status-badge");
                 if (badge) badge.classList.remove("hidden");
-                if (window.location.hash === "#console") switchMainMode("console");
+                loadSubIdSettings();
+                const wantsPerformance = window.location.hash === "#performance"
+                    || new URLSearchParams(window.location.search).get("view") === "performance";
+                const wantsConsole = window.location.hash === "#console"
+                    || new URLSearchParams(window.location.search).get("view") === "console";
+                if (wantsPerformance || wantsConsole) {
+                    // Garante troca após o DOM/handlers estarem prontos
+                    setTimeout(() => switchMainMode(wantsPerformance ? "performance" : "console"), 0);
+                }
             }
         }
 
@@ -781,6 +906,7 @@
             initDatabase();
             initCountdown();
             renderCategories();
+            renderSubcategories();
             renderStoreProducts();
             renderConsoleProducts();
             loadCampaigns();
@@ -788,6 +914,7 @@
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+                loadConversions({ reset: true });
             }
             const health = await checkApiHealth();
 
@@ -861,6 +988,7 @@
                         icon: normalizeCategoryIcon(c.icon),
                     }));
                     renderCategories();
+                    renderSubcategories();
                 }
                 return true;
             } catch (err) {
@@ -929,7 +1057,9 @@
         }
 
         async function loadOffersFromSupabase(opts = {}) {
-            const keyword = opts.keyword ?? (document.getElementById("store-search-input")?.value || "");
+            const searchTerm = document.getElementById("store-search-input")?.value || "";
+            const keyword = opts.keyword ?? searchTerm;
+            const subcategory = opts.subcategory ?? (currentStoreSubcategory || "");
             const category = opts.category ?? (currentStoreCategory !== "todos" ? currentStoreCategory : "");
             const reset = opts.reset !== false;
             if (reset) currentPage = 0;
@@ -937,6 +1067,7 @@
             const offset = currentPage * PAGE_SIZE;
             const url = `${API_BASE}/api/ofertas/db?limit=${limit}&offset=${offset}`
                 + `&keyword=${encodeURIComponent(keyword)}`
+                + `&subcategory=${encodeURIComponent(subcategory)}`
                 + `&category=${encodeURIComponent(category)}`
                 + `&sort=${encodeURIComponent(opts.sort || currentStoreSort)}`;
             try {
@@ -1034,23 +1165,40 @@
             const consoleSection = document.getElementById('main-console-section');
             const btnStore = document.getElementById('btn-mode-storefront');
             const btnConsole = document.getElementById('btn-mode-console');
+            const btnPerformance = document.getElementById('btn-mode-performance');
+            const performanceSection = document.getElementById('performance-section');
+            const inactive = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
+            const active = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
 
             if (mode === 'storefront') {
                 storefront.classList.remove('hidden');
                 consoleSection.classList.add('hidden');
-                btnStore.className = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
-                btnConsole.className = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
+                btnStore.className = active;
+                btnConsole.className = inactive;
+                btnPerformance.className = inactive;
                 renderStoreProducts();
-            } else {
+            } else if (mode === 'console') {
                 storefront.classList.add('hidden');
                 consoleSection.classList.remove('hidden');
-                btnStore.className = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
-                btnConsole.className = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
+                Array.from(consoleSection.children).forEach(child => child.classList.remove('hidden'));
+                btnStore.className = inactive;
+                btnConsole.className = active;
+                btnPerformance.className = inactive;
                 adminPage = 1;
                 renderConsoleProducts();
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+            } else {
+                storefront.classList.add('hidden');
+                consoleSection.classList.remove('hidden');
+                Array.from(consoleSection.children).forEach(child => {
+                    child.classList.toggle('hidden', child !== performanceSection);
+                });
+                btnStore.className = inactive;
+                btnConsole.className = inactive;
+                btnPerformance.className = active;
+                loadConversions({ reset: true });
             }
         }
 
@@ -1152,6 +1300,28 @@
             }
         }
 
+        function getSubcategoryKeywords(catId, subId) {
+            if (!subId) return [];
+            const cat = categories.find(c => c.id === catId);
+            const sub = (cat?.subcategories || []).find(s => (s.id || s.key) === subId);
+            if (!sub) return [];
+            if (Array.isArray(sub.keywords) && sub.keywords.length) {
+                return sub.keywords.map(k => String(k).toLowerCase().trim());
+            }
+            return [];
+        }
+
+        function subcategoryLabelForProduct(p) {
+            const cat = categories.find(c => c.id === p.category);
+            if (!cat || !Array.isArray(cat.subcategories)) return '';
+            const kw = String(p.keyword || '').toLowerCase();
+            const sub = cat.subcategories.find(s => {
+                const kws = getSubcategoryKeywords(cat.id, s.id || s.key);
+                return kws.includes(kw);
+            });
+            return sub?.label || '';
+        }
+
         // Render Categories list
         function renderCategories() {
             const container = document.getElementById('store-categories-container');
@@ -1186,8 +1356,10 @@
         // Filter by category — busca do Supabase e, se vazio, dispara sync daquela categoria.
         async function setStoreCategory(catId) {
             currentStoreCategory = catId;
+            currentStoreSubcategory = '';
             currentPage = 0;
             renderCategories();
+            renderSubcategories();
             renderStoreProducts();
             if (!apiLive) return;
             const gotSomething = await loadOffersFromSupabase({ silent: true, reset: true, category: catId === 'todos' ? '' : catId });
@@ -1203,6 +1375,84 @@
             }
         }
 
+        // Renderiza subcategorias agrupadas da categoria ativa.
+        function renderSubcategories() {
+            const wrapper = document.getElementById('store-subcategories');
+            const container = document.getElementById('store-subcategories-container');
+            const breadcrumb = document.getElementById('subcat-breadcrumb');
+            if (!wrapper || !container) return;
+
+            const cat = categories.find(c => c.id === currentStoreCategory);
+            const subs = (cat && Array.isArray(cat.subcategories)) ? cat.subcategories : [];
+
+            if (currentStoreCategory === 'todos' || !subs.length) {
+                wrapper.classList.add('hidden');
+                container.innerHTML = '';
+                if (breadcrumb) breadcrumb.textContent = '';
+                return;
+            }
+
+            wrapper.classList.remove('hidden');
+            const activeSub = subs.find(s => (s.id || s.key) === currentStoreSubcategory);
+            if (breadcrumb) {
+                breadcrumb.textContent = activeSub
+                    ? `${cat.label} › ${activeSub.label}`
+                    : cat.label;
+            }
+
+            const chip = (id, label, count, active) => `
+                <button onclick="setStoreSubcategory('${String(id).replace(/'/g, "\\'")}')"
+                    class="shrink-0 snap-start px-3 py-1.5 rounded-full text-[11px] font-bold border transition whitespace-nowrap ${active
+                        ? 'bg-shopee-orange text-white border-shopee-orange shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-shopee-orange hover:text-shopee-orange'}">
+                    ${escapeHtml(label)}${count > 0 ? ` <span class="opacity-70 text-[9px]">(${count})</span>` : ''}
+                </button>`;
+
+            const totalInCat = Number(cat.count || 0);
+            container.innerHTML =
+                chip('', 'Todas', totalInCat, currentStoreSubcategory === '')
+                + subs.map(s => chip(s.id || s.key, s.label, Number(s.count || 0), currentStoreSubcategory === (s.id || s.key))).join('');
+        }
+
+        async function setStoreSubcategory(key) {
+            currentStoreSubcategory = key || '';
+            currentPage = 0;
+            renderSubcategories();
+            if (apiLive) {
+                await loadOffersFromSupabase({
+                    silent: true,
+                    reset: true,
+                    category: currentStoreCategory === 'todos' ? '' : currentStoreCategory,
+                    subcategory: currentStoreSubcategory,
+                });
+            } else {
+                renderStoreProducts();
+            }
+            scrollToStoreGrid();
+        }
+
+        function isFemaleProduct(p) {
+            if (['moda', 'beleza', 'acessorios', 'fitness'].includes(String(p.category || ''))) return true;
+            return /feminin|mulher|maquiagem|batom|vestido|legging|saia|bolsa|brinco|colar|skincare|unha|cabelo/i
+                .test(`${p.title || ''} ${p.keyword || ''}`);
+        }
+
+        function prioritizeFemaleProducts(list) {
+            const female = list.filter(isFemaleProduct);
+            const general = list.filter(p => !isFemaleProduct(p));
+            if (!female.length) return list;
+
+            const allowedGeneral = general.slice(0, Math.ceil(female.length / 9));
+            const result = [];
+            let fi = 0;
+            let gi = 0;
+            while (fi < female.length) {
+                for (let i = 0; i < 9 && fi < female.length; i += 1) result.push(female[fi++]);
+                if (gi < allowedGeneral.length) result.push(allowedGeneral[gi++]);
+            }
+            return result;
+        }
+
         // Render Products in the Public Storefront Grid
         function renderStoreProducts() {
             const grid = document.getElementById('store-products-grid');
@@ -1214,14 +1464,26 @@
             grid.innerHTML = '';
             flashContainer.innerHTML = '';
 
+            const subKws = currentStoreSubcategory
+                ? getSubcategoryKeywords(currentStoreCategory, currentStoreSubcategory)
+                : [];
             let filtered = productsDatabase.filter(p => {
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
                 const title = (p.title || '').toLowerCase();
                 const desc = (p.desc || '').toLowerCase();
+                const kw = (p.keyword || '').toLowerCase().trim();
                 const matchesSearch = !searchVal || title.includes(searchVal) || desc.includes(searchVal);
-                return matchesCategory && matchesSearch;
+                // Se keywords da subcategoria estão disponíveis, filtra localmente.
+                // Se não (cache antigo), confia nos produtos já filtrados pela API.
+                const matchesSub = !currentStoreSubcategory
+                    || !subKws.length
+                    || subKws.includes(kw);
+                return matchesCategory && matchesSearch && matchesSub;
             });
             filtered = sortProductsLocal(filtered);
+            if (currentStoreCategory === 'todos' && !searchVal) {
+                filtered = prioritizeFemaleProducts(filtered);
+            }
 
             const now = Math.floor(Date.now() / 1000);
             const flashSales = filtered
@@ -1272,6 +1534,10 @@
                     const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars || 4)) + ((p.stars % 1 >= 0.5) ? '<i class="fas fa-star-half-alt"></i>' : '');
                     const showOff = p.discount && p.discount !== '0%';
                     const shopLine = p.shopName ? `<p class="text-[9px] text-slate-400 truncate">${escapeHtml(p.shopName)}</p>` : '';
+                    const subLabel = subcategoryLabelForProduct(p);
+                    const subBadge = subLabel
+                        ? `<span class="self-start bg-orange-50 text-shopee-orange text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">${escapeHtml(subLabel)}</span>`
+                        : '';
 
                     grid.innerHTML += `
                         <div onclick="openProductModal(${p.id})"
@@ -1285,6 +1551,7 @@
                                 <img src="${p.image}" alt="" class="w-full h-full object-cover transition duration-300 group-hover:scale-105" onerror="this.onerror=null; this.src='https://placehold.co/200x200/ffebd7/ee4d2d?text=Shopee'">
                             </div>
                             <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
+                                ${subBadge}
                                 <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
                                 ${shopLine}
                                 <div>
@@ -1301,11 +1568,14 @@
             }
 
             const info = document.getElementById('store-results-info');
-            const catLabel = (categories.find(c => c.id === currentStoreCategory) || {}).label || 'Tudo';
+            const catObj = categories.find(c => c.id === currentStoreCategory) || {};
+            const catLabel = catObj.label || 'Tudo';
+            const subObj = (catObj.subcategories || []).find(s => (s.id || s.key) === currentStoreSubcategory);
+            const scopeLabel = subObj ? `${catLabel} › ${subObj.label}` : catLabel;
             if (info) {
                 info.textContent = filtered.length
-                    ? `${filtered.length} ofertas · ${catLabel}`
-                    : 'Nenhuma oferta nesta categoria';
+                    ? `${filtered.length} ofertas · ${scopeLabel}`
+                    : 'Nenhuma oferta nesta seleção';
             }
             renderLoadMoreBtn();
         }
@@ -1416,9 +1686,274 @@
             });
         }
 
+        const SITE_SUBID = 'afiliada_mestre';
+
+        function sanitizeSubId(value, fallback) {
+            const clean = String(value || '')
+                .trim()
+                .replace(/[^a-zA-Z0-9_-]/g, '_')
+                .replace(/_+/g, '_')
+                .slice(0, 40);
+            return clean || fallback;
+        }
+
+        function getSubIdSettings() {
+            return {
+                channel: 'site',
+                campaign: 'vitrine',
+                source: SITE_SUBID,
+            };
+        }
+
+        function getTrackingSubIds(category, itemId = '') {
+            const s = getSubIdSettings();
+            return [
+                s.source,
+                s.channel,
+                s.campaign,
+                sanitizeSubId(category, 'geral'),
+                sanitizeSubId(itemId ? `p${itemId}` : 'produto', 'produto'),
+            ].slice(0, 5);
+        }
+
+        function getSubIdSignature(category, itemId) {
+            return getTrackingSubIds(category, itemId).join('|');
+        }
+
+        function hasMatchingTrackedLink(p) {
+            if (!p?.shortLink) return false;
+            try {
+                const map = JSON.parse(sessionStorage.getItem('afiliada_mestre_tracked_links') || '{}');
+                return map[String(p.id)] === getSubIdSignature(p.category, p.id);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function rememberTrackedLink(p) {
+            try {
+                const map = JSON.parse(sessionStorage.getItem('afiliada_mestre_tracked_links') || '{}');
+                map[String(p.id)] = getSubIdSignature(p.category, p.id);
+                sessionStorage.setItem('afiliada_mestre_tracked_links', JSON.stringify(map));
+            } catch (_) {}
+        }
+
+        function updateSubIdPreview() {
+            const preview = document.getElementById('subid-preview');
+            if (!preview) return;
+            const ids = getTrackingSubIds('moda', '123456');
+            preview.textContent = `Exemplo no clique Comprar: ${ids.join(' | ')}`;
+        }
+
+        function loadSubIdSettings() {
+            // Sub IDs são fixos do site — sem edição manual.
+            localStorage.removeItem('afiliada_mestre_subids');
+            updateSubIdPreview();
+        }
+
+        async function resetVitrineAndRefill() {
+            if (!confirm('Isso apaga todos os produtos do Supabase e busca de novo (foco feminino). Continuar?')) return;
+            showToast('Limpando e realimentando a vitrine…', 'success');
+            try {
+                const res = await fetch(`${API_BASE}/api/reset-vitrine`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 20 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                sessionStorage.removeItem('afiliada_mestre_tracked_links');
+                localStorage.removeItem('afiliado_mestre_db_v1');
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                await loadCategoriesFromApi({ silent: true });
+                loadAdminStats();
+                loadAutoStatus();
+                showToast(`Vitrine resetada: ${data.removed} removidos · ${data.refilled} novos itens`, 'success');
+            } catch (err) {
+                showToast(`Falha no reset: ${err.message}`, 'error');
+            }
+        }
+
+        function commissionNumber(value) {
+            if (typeof value === 'number') return value;
+            const clean = String(value ?? '0').replace(/[^\d,.-]/g, '').replace(',', '.');
+            return Number(clean) || 0;
+        }
+
+        function conversionDate(unix) {
+            const n = Number(unix);
+            if (!n) return 'Data não informada';
+            return new Date(n * 1000).toLocaleString('pt-BR');
+        }
+
+        function conversionStatusLabel(status) {
+            const labels = {
+                COMPLETED: 'Concluído',
+                PENDING: 'Pendente',
+                CANCELLED: 'Cancelado',
+                UNPAID: 'Não pago',
+            };
+            return labels[String(status || '').toUpperCase()] || status || '—';
+        }
+
+        function renderConversions() {
+            const list = document.getElementById('conversion-list');
+            if (!list) return;
+
+            const orders = conversionRows.flatMap(c =>
+                (Array.isArray(c.orders) ? c.orders : []).map(order => ({ conversion: c, order }))
+            );
+            const totalLoadedPages = Math.max(1, Math.ceil(orders.length / CONVERSION_PAGE_SIZE));
+            conversionPage = Math.min(Math.max(conversionPage, 1), totalLoadedPages);
+            const pageStart = (conversionPage - 1) * CONVERSION_PAGE_SIZE;
+            const visibleOrders = orders.slice(pageStart, pageStart + CONVERSION_PAGE_SIZE);
+            const subIds = new Set(
+                conversionRows.map(c => String(c.utmContent || '').trim()).filter(Boolean)
+            );
+            const commission = conversionRows.reduce((sum, c) => sum + commissionNumber(c.totalCommission), 0);
+
+            document.getElementById('conversion-total').textContent = String(conversionRows.length);
+            document.getElementById('conversion-orders').textContent = String(orders.length);
+            document.getElementById('conversion-commission').textContent =
+                commission.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('conversion-subids').textContent = String(subIds.size);
+
+            if (!orders.length) {
+                document.getElementById('conversion-pagination')?.classList.add('hidden');
+                list.innerHTML = `
+                    <div class="py-8 text-center text-slate-400 text-xs space-y-2">
+                        <i class="fas fa-chart-line text-2xl mb-2 block"></i>
+                        <p class="font-bold text-slate-600">Nenhuma venda deste site ainda</p>
+                        <p>O painel só mostra pedidos com Sub ID <strong>afiliada_mestre</strong>.</p>
+                        <p>Vendas de Stories, Pin e outras campanhas da Shopee ficam de fora — isso é esperado.</p>
+                        <p class="text-slate-500">Assim que alguém comprar pela vitrine, a conversão aparece aqui.</p>
+                    </div>`;
+                return;
+            }
+
+            list.innerHTML = visibleOrders.map(({ conversion, order }) => {
+                const items = Array.isArray(order.items) ? order.items : [];
+                const status = conversionStatusLabel(order.orderStatus);
+                const statusClass = order.orderStatus === 'COMPLETED'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : order.orderStatus === 'CANCELLED'
+                        ? 'bg-red-50 text-red-600'
+                        : 'bg-amber-50 text-amber-700';
+                return `
+                    <article class="border border-slate-200 rounded-xl p-3 text-xs">
+                        <div class="flex flex-wrap justify-between gap-2 mb-3">
+                            <div>
+                                <p class="font-bold text-slate-800">Pedido ${escapeHtml(String(order.orderId || '—'))}</p>
+                                <p class="text-[10px] text-slate-400">${escapeHtml(conversionDate(conversion.purchaseTime))}</p>
+                            </div>
+                            <span class="self-start px-2 py-1 rounded-md text-[9px] font-bold ${statusClass}">${escapeHtml(status)}</span>
+                        </div>
+                        <div class="bg-orange-50 border border-orange-100 rounded-lg p-2 mb-3">
+                            <p class="text-[9px] uppercase font-black text-shopee-orange mb-1">Sub IDs / utmContent</p>
+                            <p class="font-mono text-[10px] text-slate-700 break-all">${escapeHtml(String(conversion.utmContent || 'Sem Sub ID informado'))}</p>
+                        </div>
+                        <div class="space-y-2">
+                            ${items.map(item => {
+                                const category = categories.find(c => c.id === item.category);
+                                const categoryLabel = category?.label || (item.category === 'todos' ? 'Categoria não identificada' : item.category);
+                                const image = item.imageUrl
+                                    ? escapeAttr(item.imageUrl)
+                                    : 'https://placehold.co/96x96/ffebd7/ee4d2d?text=Shopee';
+                                return `
+                                <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
+                                    <img src="${image}" alt="" class="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-100 shrink-0"
+                                        onerror="this.onerror=null;this.src='https://placehold.co/96x96/ffebd7/ee4d2d?text=Shopee'">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold text-slate-700 line-clamp-2">${escapeHtml(String(item.itemName || `Item ${item.itemId || ''}`))}</p>
+                                        <div class="flex flex-wrap items-center gap-1 mt-1">
+                                            <span class="bg-orange-50 text-shopee-orange rounded px-1.5 py-0.5 text-[8px] font-bold uppercase">${escapeHtml(String(categoryLabel))}</span>
+                                            <span class="text-[9px] text-slate-400">${escapeHtml(String(item.shopName || 'Loja Shopee'))} · Qtd. ${Number(item.qty) || 1}</span>
+                                        </div>
+                                    </div>
+                                    <span class="font-bold text-emerald-600 whitespace-nowrap">
+                                        ${commissionNumber(item.itemTotalCommission).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                </div>`;
+                            }).join('') || '<p class="text-slate-400 text-[10px]">Itens não detalhados pela Shopee.</p>'}
+                        </div>
+                    </article>`;
+            }).join('');
+
+            const pagination = document.getElementById('conversion-pagination');
+            const prev = document.getElementById('conversion-prev');
+            const next = document.getElementById('conversion-next');
+            pagination?.classList.toggle('hidden', orders.length <= CONVERSION_PAGE_SIZE && !conversionHasNextRemote);
+            if (prev) prev.disabled = conversionPage <= 1;
+            if (next) next.disabled = conversionPage >= totalLoadedPages && !conversionHasNextRemote;
+            const pageInfo = document.getElementById('conversion-page-info');
+            if (pageInfo) {
+                pageInfo.textContent = `Página ${conversionPage} de ${totalLoadedPages}${conversionHasNextRemote ? '+' : ''}`;
+            }
+        }
+
+        async function loadConversions({ reset = false, advance = false } = {}) {
+            const list = document.getElementById('conversion-list');
+            if (!list || !isAdminMode()) return;
+            if (reset) {
+                conversionScrollId = '';
+                conversionRows = [];
+                conversionPage = 1;
+                conversionHasNextRemote = false;
+            }
+            list.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-spinner fa-spin mr-2"></i>Consultando a Shopee…</div>';
+            try {
+                const days = document.getElementById('conversion-days')?.value || '30';
+                const status = document.getElementById('conversion-status')?.value || '';
+                const params = new URLSearchParams({ days, limit: '20', siteOnly: '1' });
+                if (status) params.set('status', status);
+                if (conversionScrollId) params.set('scrollId', conversionScrollId);
+                const res = await fetch(`${API_BASE}/api/conversions?${params}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Não foi possível consultar as conversões');
+                const received = Array.isArray(data.conversions) ? data.conversions : [];
+                conversionRows = reset ? received : conversionRows.concat(received);
+                conversionScrollId = data.pageInfo?.scrollId || '';
+                conversionHasNextRemote = Boolean(data.pageInfo?.hasNextPage && conversionScrollId);
+                if (advance && received.length) conversionPage += 1;
+                renderConversions();
+                if (reset && data.ignoredFromOtherChannels > 0 && !received.length) {
+                    showToast(`${data.ignoredFromOtherChannels} vendas de outras campanhas foram ocultadas (não são deste site)`, 'success');
+                }
+            } catch (err) {
+                list.innerHTML = `
+                    <div class="py-8 text-center text-red-500 text-xs">
+                        <i class="fas fa-circle-exclamation mr-1"></i>${escapeHtml(err.message)}
+                    </div>`;
+            }
+        }
+
+        function previousConversionPage() {
+            if (conversionPage <= 1) return;
+            conversionPage -= 1;
+            renderConversions();
+            document.getElementById('conversion-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function nextConversionPage() {
+            const orderCount = conversionRows.reduce(
+                (total, conversion) => total + (Array.isArray(conversion.orders) ? conversion.orders.length : 0),
+                0
+            );
+            const totalLoadedPages = Math.max(1, Math.ceil(orderCount / CONVERSION_PAGE_SIZE));
+            if (conversionPage < totalLoadedPages) {
+                conversionPage += 1;
+                renderConversions();
+                document.getElementById('conversion-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            if (conversionHasNextRemote && conversionScrollId) {
+                loadConversions({ reset: false, advance: true });
+            }
+        }
+
         async function resolveAffiliateUrl(p) {
             if (!p) return '#';
-            if (p.shortLink) return p.shortLink;
+            if (hasMatchingTrackedLink(p)) return p.shortLink;
             const origin = p.affiliateLink || p.productLink;
             if (!origin || origin === '#') return '#';
             try {
@@ -1428,12 +1963,13 @@
                     body: JSON.stringify({
                         originUrl: origin,
                         itemId: p.id,
-                        subIds: ['vitrine', String(p.category || 'geral').slice(0, 20), 'web'],
+                        subIds: getTrackingSubIds(p.category, p.id),
                     }),
                 });
                 const data = await res.json();
                 if (res.ok && data.shortLink) {
                     p.shortLink = data.shortLink;
+                    rememberTrackedLink(p);
                     const idx = productsDatabase.findIndex((x) => String(x.id) === String(p.id));
                     if (idx >= 0) productsDatabase[idx].shortLink = data.shortLink;
                     return data.shortLink;
@@ -1447,7 +1983,7 @@
             if (!p) return true;
             const label = document.getElementById('modal-buy-label');
             const btn = document.getElementById('modal-buy-btn');
-            if (p.shortLink) {
+            if (hasMatchingTrackedLink(p)) {
                 btn.href = p.shortLink;
                 return true;
             }
@@ -1724,6 +2260,7 @@
                     box.innerHTML = [
                         `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado'}`,
                         `lote..........: ${s.batch} keyword(s) / execução`,
+                        `foco feminino.: ${s.femalePercentTarget || 90}% das buscas`,
                         `intervalo.....: ${s.intervalMin} min`,
                         `itens/keyword.: ${s.limit}`,
                         `keywords total: ${s.keywordsTotal} (posição ${s.cursor})`,

@@ -9,26 +9,34 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const {
   fetchProductOffers,
+  fetchProductDetailsByIds,
   fetchShopeeOffers,
   generateShortLink,
   mapOfferToProduct,
   mapOfferToRow,
   mapCampaignNode,
+  fetchConversionReport,
 } = require("./shopee");
 const {
   upsertOfertas,
   updateShortLink,
   listOfertas,
+  getOffersByItemIds,
   countByCategory,
+  countBySubcategory,
+  clearAllOfertas,
   rowToProduct,
   getConfig,
 } = require("./supabase");
-const { CATEGORIAS, allKeywords, metaOnly } = require("./categorias");
+const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
 const autosync = require("./autosync");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3789;
 const ROOT = path.join(__dirname, "..");
+
+/** Marcador fixo nos Sub IDs deste site (aparece em utmContent da Shopee). */
+const SITE_SUBID = "afiliada_mestre";
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -106,10 +114,11 @@ app.get("/api/ofertas/db", async (req, res) => {
   try {
     const keyword = String(req.query.keyword || "").trim();
     const category = String(req.query.category || "").trim();
+    const subcategory = String(req.query.subcategory || "").trim();
     const limit = Number(req.query.limit) || 60;
     const offset = Number(req.query.offset) || 0;
     const sort = String(req.query.sort || "recent").trim();
-    const rows = await listOfertas({ keyword, category, limit, offset, sort });
+    const rows = await listOfertas({ keyword, category, subcategory, limit, offset, sort });
     const list = Array.isArray(rows) ? rows : [];
     res.json({
       source: "supabase",
@@ -169,16 +178,29 @@ app.get("/api/categorias", async (_req, res) => {
     } catch (e) {
       console.warn("[/api/categorias] Supabase indisponível:", e.message);
     }
-    const categories = metaOnly().map((c) => ({
-      ...c,
-      count: counts[c.id] || 0,
-    }));
+    const categories = await Promise.all(
+      metaOnly().map(async (c) => {
+        let subCounts = {};
+        try {
+          subCounts = await countBySubcategory(c.id);
+        } catch (_) {}
+        return {
+          ...c,
+          count: counts[c.id] || 0,
+          subcategories: (c.subcategories || []).map((sub) => ({
+            ...sub,
+            count: subCounts[sub.id] || 0,
+          })),
+        };
+      })
+    );
     categories.unshift({
       id: "todos",
       label: "Tudo",
       icon: "fa-border-all",
       color: "orange",
       count: counts.total || 0,
+      subcategories: [],
     });
     res.json({ categories, updatedAt: new Date().toISOString() });
   } catch (err) {
@@ -198,9 +220,12 @@ app.post("/api/sync", async (req, res) => {
     } else if (req.body?.category) {
       const target = String(req.body.category).trim();
       const cat = CATEGORIAS.find((c) => c.id === target);
-      plano = (cat?.keywords || []).map((k) => ({ keyword: k, category: cat.id }));
+      plano = (cat?.subcategories || []).flatMap((sub) =>
+        sub.keywords.map((k) => ({ keyword: k, category: cat.id, subcategory: sub.id }))
+      );
     } else {
-      plano = allKeywords();
+      // Lote manual limitado: 27 buscas femininas + 3 gerais.
+      plano = weightedKeywords({ femalePercent: 90 }).slice(0, 30);
     }
 
     if (!plano.length) {
@@ -253,7 +278,8 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
     const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
     const all = [];
     const report = [];
-    for (const kw of cat.keywords) {
+    const keywords = (cat.subcategories || []).flatMap((sub) => sub.keywords);
+    for (const kw of keywords) {
       try {
         const offer = await fetchProductOffers({ keyword: kw, limit, page: 1, listType, sortType });
         const nodes = offer.nodes || [];
@@ -271,7 +297,7 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
     res.json({
       ok: true,
       category: cat.id,
-      keywordsRun: cat.keywords.length,
+      keywordsRun: keywords.length,
       listType,
       sortType,
       count: map.size,
@@ -325,7 +351,7 @@ app.post("/api/shortlink", async (req, res) => {
     if (!originUrl) return res.status(400).json({ error: "originUrl obrigatório" });
     const subIds = Array.isArray(req.body?.subIds)
       ? req.body.subIds.map(String)
-      : ["vitrine", "web"];
+      : [SITE_SUBID, "site", "vitrine"];
     const itemId = req.body?.itemId != null ? Number(req.body.itemId) : null;
     const shortLink = await generateShortLink(originUrl, subIds);
     if (shortLink && itemId) {
@@ -341,11 +367,170 @@ app.post("/api/shortlink", async (req, res) => {
   }
 });
 
+/**
+ * Relatório real de conversões da Shopee para o painel admin.
+ * Por padrão (siteOnly=1) só retorna vendas rastreadas por este site.
+ */
+app.get("/api/conversions", async (req, res) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const now = Math.floor(Date.now() / 1000);
+    const orderStatus = String(req.query.status || "").toUpperCase();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    const scrollId = String(req.query.scrollId || "").trim();
+    const siteOnly = String(req.query.siteOnly ?? "1") !== "0";
+    const marker = String(req.query.marker || SITE_SUBID).toLowerCase();
+    const report = await fetchConversionReport({
+      purchaseTimeStart: now - days * 24 * 3600,
+      purchaseTimeEnd: now,
+      orderStatus,
+      limit,
+      scrollId,
+    });
+    let nodes = Array.isArray(report.nodes) ? report.nodes : [];
+    const totalFromShopee = nodes.length;
+    if (siteOnly) {
+      nodes = nodes.filter((conversion) =>
+        String(conversion.utmContent || "").toLowerCase().includes(marker)
+      );
+    }
+    const itemIds = nodes.flatMap((conversion) =>
+      (conversion.orders || []).flatMap((order) =>
+        (order.items || []).map((item) => item.itemId)
+      )
+    );
+    let offersById = new Map();
+    try {
+      const offers = await getOffersByItemIds(itemIds);
+      offersById = new Map((offers || []).map((offer) => [String(offer.item_id), offer]));
+    } catch (enrichError) {
+      console.warn("[/api/conversions] detalhes Supabase indisponíveis:", enrichError.message);
+    }
+    const missingIds = [...new Set(itemIds.map(String))]
+      .filter((itemId) => !offersById.has(itemId))
+      .slice(0, 20);
+    if (missingIds.length) {
+      try {
+        const liveProducts = await fetchProductDetailsByIds(missingIds);
+        for (const product of liveProducts || []) {
+          const id = String(product.itemId || "");
+          if (!id) continue;
+          offersById.set(id, {
+            item_id: product.itemId,
+            image_url: product.imageUrl || "",
+            product_name: product.productName || "",
+            category: categoryForKeyword(product.productName),
+          });
+        }
+      } catch (imageError) {
+        console.warn("[/api/conversions] fotos Shopee indisponíveis:", imageError.message);
+      }
+    }
+    const conversions = nodes.map((conversion) => ({
+      ...conversion,
+      orders: (conversion.orders || []).map((order) => ({
+        ...order,
+        items: (order.items || []).map((item) => {
+          const offer = offersById.get(String(item.itemId));
+          return {
+            ...item,
+            imageUrl: offer?.image_url || "",
+            category: offer?.category || categoryForKeyword(item.itemName) || "todos",
+            itemName: item.itemName || offer?.product_name || `Item ${item.itemId || ""}`,
+          };
+        }),
+      })),
+    }));
+    res.json({
+      source: "shopee",
+      days,
+      siteOnly,
+      siteMarker: SITE_SUBID,
+      count: conversions.length,
+      ignoredFromOtherChannels: siteOnly ? Math.max(0, totalFromShopee - conversions.length) : 0,
+      conversions,
+      pageInfo: report.pageInfo || {},
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[/api/conversions]", err.message);
+    res.status(err.status || 500).json({
+      error: err.message,
+      code: err.code || null,
+      details: err.payload || null,
+    });
+  }
+});
+
+/**
+ * Limpa o cache da vitrine e realimenta TODAS as categorias.
+ * Body: { limit?, pages?, clear? }
+ * O foco 90% feminino é aplicado na exibição, não no estoque.
+ */
+app.post("/api/reset-vitrine", async (req, res) => {
+  try {
+    const clear = req.body?.clear !== false;
+    const removed = clear ? await clearAllOfertas() : 0;
+    const syncLimit = Math.min(Math.max(Number(req.body?.limit) || 50, 5), 100);
+    const pages = Math.min(Math.max(Number(req.body?.pages) || 2, 1), 5);
+    const keywords = allKeywords();
+    const report = [];
+    const map = new Map();
+    const byCategory = {};
+
+    for (const { keyword, category } of keywords) {
+      let kwCount = 0;
+      for (let page = 1; page <= pages; page += 1) {
+        try {
+          const offer = await fetchProductOffers({
+            keyword,
+            limit: syncLimit,
+            page,
+            listType: 0,
+            sortType: 2,
+          });
+          const nodes = offer.nodes || [];
+          const rows = nodes
+            .map((n) => mapOfferToRow(n, keyword, 0))
+            .filter((r) => r.item_id && r.offer_link)
+            .map((r) => ({ ...r, short_link: null }));
+          if (rows.length) {
+            await upsertOfertas(rows);
+            rows.forEach((r) => map.set(String(r.item_id), r));
+            kwCount += rows.length;
+          }
+          if (!offer.pageInfo?.hasNextPage) break;
+        } catch (e) {
+          report.push({ keyword, category, page, ok: false, error: e.message });
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      byCategory[category] = (byCategory[category] || 0) + kwCount;
+      report.push({ keyword, category, ok: true, count: kwCount });
+    }
+
+    res.json({
+      ok: true,
+      removed,
+      refilled: map.size,
+      keywordsRun: keywords.length,
+      byCategory,
+      siteSubId: SITE_SUBID,
+    });
+  } catch (err) {
+    console.error("[/api/reset-vitrine]", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(ROOT));
 app.use("/uploads", express.static(path.join(ROOT, "uploads")));
 
-app.get("/", (_req, res) => {
-  res.redirect("/uploads/painel_e_vitrine_afiliado_mestre.html");
+app.get("/", (req, res) => {
+  // Mantém ?admin=1 e outros parâmetros no redirect para a vitrine.
+  const qs = new URLSearchParams(req.query).toString();
+  const target = `/uploads/painel_e_vitrine_afiliado_mestre.html${qs ? `?${qs}` : ""}`;
+  res.redirect(302, target);
 });
 
 if (require.main === module) {

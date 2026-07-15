@@ -7,6 +7,9 @@ const { fetchProductOffers, mapOfferToRow, SYNC_ROTATION } = require("./shopee")
 const { upsertOfertas, pruneOlderThan } = require("./supabase");
 const { allKeywords } = require("./categorias");
 
+// Alimenta TODAS as categorias de forma justa (round-robin).
+// A proporção 90% feminina é aplicada só na exibição da vitrine.
+const FEMALE_PERCENT = 90;
 const KEYWORDS = allKeywords();
 
 const config = {
@@ -91,6 +94,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
         processed.push({
           keyword,
           category,
+          audience: KEYWORDS[idx].audience,
           ok: true,
           count: rows.length,
           mode: mode.label,
@@ -172,6 +176,7 @@ function status() {
     limit: config.limit,
     pruneDays: config.pruneDays,
     keywordsTotal: KEYWORDS.length,
+    femalePercentTarget: FEMALE_PERCENT,
     cursor: state.cursor,
     rotationCursor: state.rotationCursor,
     modes: SYNC_ROTATION,

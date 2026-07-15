@@ -166,6 +166,24 @@ async function fetchProductOffers({
   };
 }
 
+async function fetchProductDetailsByIds(itemIds = []) {
+  const ids = [...new Set(
+    itemIds.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0)
+  )].slice(0, 20);
+  if (!ids.length) return [];
+
+  const selections = ids.map((itemId, index) => `
+    item${index}: productOfferV2(itemId: ${itemId}, page: 1, limit: 1) {
+      nodes {
+        itemId
+        productName
+        imageUrl
+      }
+    }`).join("\n");
+  const data = await shopeeGraphql(`{ ${selections} }`);
+  return ids.flatMap((_itemId, index) => data?.[`item${index}`]?.nodes || []);
+}
+
 /** Campanhas / coleções oficiais (shopeeOfferV2). */
 async function fetchShopeeOffers({ keyword = "", sortType = 1, page = 1, limit = 12 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 12, 1), 50);
@@ -208,7 +226,7 @@ function mapCampaignNode(node) {
   const start = toUnixSec(node.periodStartTime);
   return {
     id: String(node.collectionId || node.categoryId || node.offerName || Math.random()),
-    title: node.offerName || "Campanha Shopee",
+    title: normalizeCampaignTitle(node.offerName),
     image: node.imageUrl || "",
     affiliateLink: node.offerLink || node.originalLink || "#",
     offerType: node.offerType,
@@ -221,7 +239,93 @@ function mapCampaignNode(node) {
   };
 }
 
-async function generateShortLink(originUrl, subIds = ["vitrine", "afiliada_mestre"]) {
+function normalizeCampaignTitle(rawTitle) {
+  let title = String(rawTitle || "Ofertas especiais da Shopee")
+    .replace(/Afiliados?\s+Gerenciados?\s*[-–—:]?\s*/gi, "")
+    .replace(/Comiss[aã]o\s+Especial\s*[^-–—|]*[-–—|]?\s*/gi, "")
+    .replace(/\bHealth\b/gi, "Saúde e bem-estar")
+    .replace(/\bFashion Accessories\b/gi, "Acessórios femininos")
+    .replace(/\bWomen['’]?s Clothing\b/gi, "Moda feminina")
+    .replace(/\bBeauty\b/gi, "Beleza")
+    .replace(/\bHome\s*&?\s*Living\b/gi, "Casa e decoração")
+    .replace(/\bSports?\b/gi, "Esporte e bem-estar")
+    .replace(/\s*[-–—|]\s*$/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!title) title = "Ofertas especiais da Shopee";
+  if (!/oferta|desconto|promo|moda|beleza|acessório|saúde|casa|esporte/i.test(title)) {
+    title = `Ofertas de ${title}`;
+  }
+  return title.charAt(0).toUpperCase() + title.slice(1);
+}
+
+/**
+ * Relatório real de conversões. Os Sub IDs usados no short link aparecem
+ * concatenados no campo utmContent.
+ */
+async function fetchConversionReport({
+  purchaseTimeStart,
+  purchaseTimeEnd,
+  orderStatus = "",
+  limit = 20,
+  scrollId = "",
+} = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const start = Math.max(1, Number(purchaseTimeStart) || now - 30 * 24 * 3600);
+  const end = Math.max(start, Number(purchaseTimeEnd) || now);
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+  const validStatuses = new Set(["UNPAID", "PENDING", "COMPLETED", "CANCELLED"]);
+
+  const args = [
+    `purchaseTimeStart: ${Math.floor(start)}`,
+    `purchaseTimeEnd: ${Math.floor(end)}`,
+    `limit: ${safeLimit}`,
+  ];
+  if (validStatuses.has(String(orderStatus).toUpperCase())) {
+    args.push(`orderStatus: ${JSON.stringify(String(orderStatus).toUpperCase())}`);
+  }
+  if (scrollId) args.push(`scrollId: ${JSON.stringify(String(scrollId))}`);
+
+  const query = `{
+    conversionReport(${args.join(", ")}) {
+      nodes {
+        purchaseTime
+        clickTime
+        conversionId
+        totalCommission
+        sellerCommission
+        shopeeCommissionCapped
+        buyerType
+        device
+        utmContent
+        orders {
+          orderId
+          orderStatus
+          items {
+            itemId
+            itemName
+            shopName
+            itemPrice
+            qty
+            itemTotalCommission
+            attributionType
+          }
+        }
+      }
+      pageInfo {
+        limit
+        hasNextPage
+        scrollId
+      }
+    }
+  }`;
+
+  const data = await shopeeGraphql(query);
+  return data?.conversionReport || { nodes: [], pageInfo: {} };
+}
+
+async function generateShortLink(originUrl, subIds = ["afiliada_mestre", "site", "vitrine"]) {
   const clean = (Array.isArray(subIds) ? subIds : ["vitrine"])
     .map((s) => String(s).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40))
     .filter(Boolean)
@@ -322,11 +426,14 @@ function mapOfferToRow(node, keyword = "", listType = null) {
 
 module.exports = {
   fetchProductOffers,
+  fetchProductDetailsByIds,
   fetchShopeeOffers,
+  fetchConversionReport,
   generateShortLink,
   mapOfferToProduct,
   mapOfferToRow,
   mapCampaignNode,
+  normalizeCampaignTitle,
   filterQualityNodes,
   isQualityOffer,
   isFlashActive,

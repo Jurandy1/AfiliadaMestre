@@ -53,6 +53,26 @@ async function supabaseRequest(path, { method = "GET", body, prefer, useService 
   return json;
 }
 
+/** Conta linhas via header Content-Range (Prefer: count=exact). Ignora o limite de 1000. */
+async function supabaseCount(query = "") {
+  const { rest, serviceKey, anonKey } = getConfig();
+  const key = serviceKey || anonKey;
+  if (!key) return 0;
+  const res = await fetch(`${rest}/ofertas?select=item_id${query ? `&${query}` : ""}`, {
+    method: "HEAD",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+      "Range-Unit": "items",
+      Range: "0-0",
+    },
+  });
+  const range = res.headers.get("content-range") || "";
+  const total = Number(range.split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}
+
 async function upsertOfertas(rows) {
   if (!rows?.length) return [];
   const cleaned = rows.map((r) => {
@@ -103,7 +123,7 @@ async function updateShortLink(itemId, shortLink) {
   }
 }
 
-async function listOfertas({ limit = 60, offset = 0, keyword = "", category = "", sort = "recent" } = {}) {
+async function listOfertas({ limit = 60, offset = 0, keyword = "", category = "", subcategory = "", sort = "recent" } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 60, 1), 200);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
@@ -111,11 +131,19 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
     let path = `/ofertas?select=*&order=${order}&limit=${safeLimit}&offset=${safeOffset}`;
     const kw = String(keyword || "").trim();
     const cat = String(category || "").trim();
+    const sub = String(subcategory || "").trim();
     if (cat && cat !== "todos") {
       path += `&category=eq.${encodeURIComponent(cat)}`;
     }
-    if (kw) {
-      path += `&or=(product_name.ilike.*${encodeURIComponent(kw)}*,keyword.ilike.*${encodeURIComponent(kw)}*)`;
+    if (sub && cat) {
+      const { keywordsForSubcategory } = require("./categorias");
+      const kws = keywordsForSubcategory(cat, sub);
+      if (kws.length) {
+        const encoded = kws.map((k) => encodeURIComponent(k)).join(",");
+        path += `&keyword=in.(${encoded})`;
+      }
+    } else if (kw) {
+      path += `&keyword=eq.${encodeURIComponent(kw)}`;
     }
     return path;
   }
@@ -137,17 +165,46 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
   }
 }
 
-async function countByCategory() {
-  const rows = await supabaseRequest(
-    "/ofertas?select=category&limit=5000",
+async function getOffersByItemIds(itemIds = []) {
+  const ids = [...new Set(
+    itemIds.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0)
+  )].slice(0, 100);
+  if (!ids.length) return [];
+  const filter = encodeURIComponent(`(${ids.join(",")})`);
+  return supabaseRequest(
+    `/ofertas?select=item_id,image_url,category,product_name&item_id=in.${filter}`,
     { method: "GET", useService: true }
   );
+}
+
+async function countByCategory() {
+  const { CATEGORIAS } = require("./categorias");
   const counts = {};
-  for (const r of rows || []) {
-    const c = r.category || "todos";
-    counts[c] = (counts[c] || 0) + 1;
-  }
-  counts.total = (rows || []).length;
+  const results = await Promise.all(
+    CATEGORIAS.map(async (cat) => {
+      const n = await supabaseCount(`category=eq.${encodeURIComponent(cat.id)}`).catch(() => 0);
+      return [cat.id, n];
+    })
+  );
+  for (const [id, n] of results) counts[id] = n;
+  counts.total = await supabaseCount().catch(() => 0);
+  return counts;
+}
+
+async function countBySubcategory(categoryId) {
+  const { CATEGORIAS } = require("./categorias");
+  const cat = CATEGORIAS.find((c) => c.id === categoryId);
+  if (!cat) return {};
+  const counts = {};
+  await Promise.all(
+    (cat.subcategories || []).map(async (sub) => {
+      const encoded = sub.keywords.map((k) => encodeURIComponent(k)).join(",");
+      const n = await supabaseCount(
+        `category=eq.${encodeURIComponent(categoryId)}&keyword=in.(${encoded})`
+      ).catch(() => 0);
+      counts[sub.id] = n;
+    })
+  );
   return counts;
 }
 
@@ -163,9 +220,18 @@ async function pruneOlderThan(days = 60) {
   return Array.isArray(removed) ? removed.length : 0;
 }
 
+/** Remove todas as ofertas do cache (reset completo da vitrine). */
+async function clearAllOfertas() {
+  const removed = await supabaseRequest("/ofertas?item_id=gt.0", {
+    method: "DELETE",
+    prefer: "return=representation",
+    useService: true,
+  });
+  return Array.isArray(removed) ? removed.length : 0;
+}
+
 async function countOfertas() {
-  const counts = await countByCategory();
-  return counts.total || 0;
+  return supabaseCount().catch(() => 0);
 }
 
 function parseDiscountFromRow(row) {
@@ -244,8 +310,11 @@ module.exports = {
   upsertOfertas,
   updateShortLink,
   listOfertas,
+  getOffersByItemIds,
   countByCategory,
+  countBySubcategory,
   countOfertas,
   pruneOlderThan,
+  clearAllOfertas,
   rowToProduct,
 };
