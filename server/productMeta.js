@@ -1,6 +1,6 @@
 "use strict";
 
-const { CATEGORIAS, subcategoryForKeyword } = require("./categorias");
+const { CATEGORIAS, subcategoryForKeyword, categoryForKeyword } = require("./categorias");
 
 const SIZE_TOKENS = new Set([
   "pp", "p", "m", "g", "gg", "xg", "xxg", "xxxg", "plus", "unico", "único",
@@ -13,7 +13,7 @@ const SHOE_SIZE_RE = /\b(?:n[º°]?\s*)?(\d{2,3})(?:\s*(?:br|brasil))?\b/gi;
 
 const STOP_TOKENS = new Set([
   "feminino", "feminina", "mulher", "para", "com", "kit", "tipo", "modelo", "novo", "nova",
-  "vestido", "longo", "midi", "saia", "roupa", "conjunto", "blusa", "camiseta", "moda",
+  "de", "da", "do", "das", "dos", "em", "no", "na", "um", "uma", "the", "and",
 ]);
 
 const SUB_TITLE_RULES = {
@@ -26,17 +26,41 @@ const SUB_TITLE_RULES = {
   casa_moda: (title) => /\b(pijama|robe|camisola|roup[aã]o)\b/i.test(title),
   tops: (title) => /\b(cropped|macac[aã]o|conjunto|blusa|camiseta|regata)\b/i.test(title),
   vestidos: (title) => /\b(vestido|saia)\b/i.test(title),
+  audio: (title) => /\b(fone|earbud|headset|caixa\s*de\s*som|speaker)\b/i.test(title),
+  wearables: (title) => /\b(smartwatch|rel[oó]gio\s*inteligente)\b/i.test(title),
+  protecao: (title) => /\b(capinha|pel[ií]cula|case)\b/i.test(title),
+  energia: (title) => /\b(power\s*bank|carregador|cabo)\b/i.test(title),
+  cozinha: (title) => /\b(air\s*fryer|panela|utens[ií]lio|cozinha)\b/i.test(title),
 };
+
+function tokenize(text) {
+  return String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 2 && !STOP_TOKENS.has(t));
+}
 
 function keywordTitleScore(keyword, title) {
   const lowerTitle = String(title || "").toLowerCase();
-  const tokens = String(keyword || "").toLowerCase().split(/\s+/)
-    .filter((t) => t.length > 3 && !STOP_TOKENS.has(t));
+  const tokens = tokenize(keyword);
   if (!tokens.length) return 0;
   const hits = tokens.filter((tok) => lowerTitle.includes(tok));
   if (!hits.length) return 0;
   const longest = Math.max(...hits.map((h) => h.length));
-  return hits.length >= 2 ? longest + hits.length : longest;
+  return hits.length >= 2 ? longest + hits.length * 2 : longest;
+}
+
+function keywordOverlapScore(a, b) {
+  const ta = new Set(tokenize(a));
+  const tb = new Set(tokenize(b));
+  if (!ta.size || !tb.size) return 0;
+  let hits = 0;
+  for (const t of ta) if (tb.has(t)) hits += 1;
+  if (!hits) return 0;
+  const ratio = hits / Math.min(ta.size, tb.size);
+  return hits * 3 + ratio * 5;
 }
 
 function uniqueList(items) {
@@ -49,7 +73,6 @@ function extractProductOptions(title = "", priceMin = 0, priceMax = 0) {
   const sizes = [];
   const voltages = uniqueList((text.match(VOLTAGE_RE) || []).map((v) => v.replace(/\s+/g, "").toUpperCase()));
 
-  let match;
   const sizeList = text.match(SIZE_LIST_RE) || [];
   for (const s of sizeList) {
     const token = s.toLowerCase();
@@ -81,7 +104,6 @@ function extractProductOptions(title = "", priceMin = 0, priceMax = 0) {
   return {
     sizes: normalizedSizes,
     voltages,
-    hasVariants: hasPriceRange || normalizedSizes.length > 1 || voltages.length > 1,
     hint: hints.join(" · "),
     labels: [...normalizedSizes, ...voltages],
   };
@@ -95,16 +117,25 @@ function inferSubcategory(categoryId, keyword = "", title = "") {
   const lowerKw = String(keyword || "").toLowerCase().trim();
 
   let best = subcategoryForKeyword(keyword);
-  let bestScore = best ? 8 : 0;
+  let bestScore = best ? 10 : 0;
 
   for (const sub of cat.subcategories) {
+    const rule = SUB_TITLE_RULES[sub.id];
+    if (rule && rule(lowerTitle)) {
+      const ruleScore = 12;
+      if (ruleScore > bestScore) {
+        bestScore = ruleScore;
+        best = sub.id;
+      }
+    }
     for (const kw of sub.keywords || []) {
       const k = String(kw).toLowerCase().trim();
       if (!k) continue;
-      if (lowerKw === k) {
-        return sub.id;
-      }
-      const score = keywordTitleScore(k, lowerTitle);
+      if (lowerKw === k) return sub.id;
+      const score =
+        keywordTitleScore(k, lowerTitle) +
+        keywordOverlapScore(k, lowerKw) +
+        (lowerKw && (k.includes(lowerKw) || lowerKw.includes(k)) ? 6 : 0);
       if (score > bestScore) {
         bestScore = score;
         best = sub.id;
@@ -113,6 +144,75 @@ function inferSubcategory(categoryId, keyword = "", title = "") {
   }
 
   return bestScore >= 5 ? best : (best || null);
+}
+
+/**
+ * Resolve categoria + subcategoria da vitrine a partir da keyword de busca
+ * e do título do produto. Usado em todo save/sync.
+ */
+function resolveTaxonomy(keyword = "", productName = "", opts = {}) {
+  const forceCategory = opts.forceCategory && opts.forceCategory !== "todos"
+    ? String(opts.forceCategory)
+    : null;
+  const forceSubcategory = opts.forceSubcategory ? String(opts.forceSubcategory) : null;
+
+  if (forceCategory) {
+    const sub = forceSubcategory || inferSubcategory(forceCategory, keyword, productName);
+    return {
+      category: forceCategory,
+      subcategory: sub,
+      source: forceSubcategory ? "forced" : "forced_category",
+    };
+  }
+
+  const kw = String(keyword || "").toLowerCase().trim();
+  const title = String(productName || "");
+
+  let category = categoryForKeyword(kw);
+  let subcategory = category !== "todos" ? inferSubcategory(category, kw, title) : null;
+  let source = category !== "todos" ? "keyword" : "none";
+  let score = category !== "todos" ? 10 : 0;
+
+  let best = { category: null, subcategory: null, score: 0 };
+  for (const cat of CATEGORIAS) {
+    for (const sub of cat.subcategories || []) {
+      const rule = SUB_TITLE_RULES[sub.id];
+      if (rule && rule(title.toLowerCase())) {
+        const s = 14;
+        if (s > best.score) best = { category: cat.id, subcategory: sub.id, score: s };
+      }
+      for (const mapKw of sub.keywords || []) {
+        const s =
+          keywordTitleScore(mapKw, title) +
+          keywordOverlapScore(mapKw, kw) +
+          (kw && (String(mapKw).toLowerCase().includes(kw) || kw.includes(String(mapKw).toLowerCase())) ? 4 : 0);
+        if (s > best.score) {
+          best = { category: cat.id, subcategory: sub.id, score: s };
+        }
+      }
+    }
+  }
+
+  if (best.score >= 6 && (category === "todos" || best.score > score + 2)) {
+    category = best.category;
+    subcategory = best.subcategory;
+    source = "title";
+    score = best.score;
+  } else if (category !== "todos" && !subcategory && best.category === category && best.subcategory) {
+    subcategory = best.subcategory;
+    source = "keyword+title";
+  }
+
+  if (category && category !== "todos" && !subcategory) {
+    subcategory = inferSubcategory(category, kw, title);
+  }
+
+  return {
+    category: category || "todos",
+    subcategory: subcategory || null,
+    source,
+    score,
+  };
 }
 
 function productMatchesSubcategory(product, categoryId, subcategoryId) {
@@ -137,5 +237,6 @@ function productMatchesSubcategory(product, categoryId, subcategoryId) {
 module.exports = {
   extractProductOptions,
   inferSubcategory,
+  resolveTaxonomy,
   productMatchesSubcategory,
 };

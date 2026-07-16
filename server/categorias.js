@@ -363,6 +363,20 @@ function categoryForKeyword(keyword) {
   for (const [key, catId] of KEYWORD_TO_CATEGORY.entries()) {
     if (kw.includes(key) || key.includes(kw)) return catId;
   }
+  // Match por tokens (ex.: "vestido feminino" ↔ "vestido longo feminino")
+  const tokens = kw.split(/\s+/).filter((t) => t.length > 3);
+  if (tokens.length) {
+    let best = null;
+    let bestHits = 0;
+    for (const [key, catId] of KEYWORD_TO_CATEGORY.entries()) {
+      const hits = tokens.filter((t) => key.includes(t)).length;
+      if (hits > bestHits && hits >= Math.min(2, tokens.length)) {
+        bestHits = hits;
+        best = catId;
+      }
+    }
+    if (best) return best;
+  }
   return "todos";
 }
 
@@ -372,6 +386,19 @@ function subcategoryForKeyword(keyword) {
   if (KEYWORD_TO_SUBCATEGORY.has(kw)) return KEYWORD_TO_SUBCATEGORY.get(kw);
   for (const [key, subId] of KEYWORD_TO_SUBCATEGORY.entries()) {
     if (kw.includes(key) || key.includes(kw)) return subId;
+  }
+  const tokens = kw.split(/\s+/).filter((t) => t.length > 3);
+  if (tokens.length) {
+    let best = null;
+    let bestHits = 0;
+    for (const [key, subId] of KEYWORD_TO_SUBCATEGORY.entries()) {
+      const hits = tokens.filter((t) => key.includes(t)).length;
+      if (hits > bestHits && hits >= Math.min(2, tokens.length)) {
+        bestHits = hits;
+        best = subId;
+      }
+    }
+    if (best) return best;
   }
   return null;
 }

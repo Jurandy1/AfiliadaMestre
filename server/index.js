@@ -246,19 +246,34 @@ app.post("/api/ofertas/batch", async (req, res) => {
 });
 
 /**
- * Salva produtos já pré-visualizados (seleção do Explorador).
- * Body: { products: [...] } — usa itemId/offerLink/productName etc.
- *   OU { itemIds: [], keyword? } — rebusca na API (não preferido)
+ * Salva produtos já pré-visualizados (Explorador) ou nodes crus da Shopee.
+ * Body: { products: [...] } e/ou { nodes: [...], keyword?, listType? }
+ * Classifica category/subcategory via resolveTaxonomy (mapa da vitrine).
  */
 app.post("/api/ofertas/save-bulk", async (req, res) => {
   try {
     const body = req.body || {};
     const products = Array.isArray(body.products) ? body.products : [];
-    if (!products.length) {
+    const nodes = Array.isArray(body.nodes) ? body.nodes : [];
+    const defaultKeyword = String(body.keyword || "").trim();
+    const defaultListType = body.listType != null ? Number(body.listType) : null;
+
+    if (!products.length && !nodes.length) {
       return res.status(400).json({ error: "Nenhum produto para salvar", code: "NO_PRODUCTS" });
     }
 
     const byId = new Map();
+
+    for (const n of nodes) {
+      const itemId = Number(n.itemId ?? n.item_id);
+      if (!Number.isSafeInteger(itemId) || itemId <= 0) continue;
+      if (byId.has(String(itemId))) continue;
+      const kw = n.keyword || defaultKeyword || "oferta";
+      const lt = n.listType != null ? Number(n.listType) : defaultListType;
+      const row = mapOfferToRow(n, kw, lt);
+      if (row.item_id && row.offer_link) byId.set(String(itemId), row);
+    }
+
     for (const p of products) {
       const itemId = Number(p.itemId ?? p.item_id ?? p.id);
       if (!Number.isSafeInteger(itemId) || itemId <= 0) continue;
@@ -266,7 +281,6 @@ app.post("/api/ofertas/save-bulk", async (req, res) => {
       if (!offerLink) continue;
       if (byId.has(String(itemId))) continue;
 
-      // Preferir mapOfferToRow a partir de um "node-like" para manter schema consistente
       const node = {
         itemId,
         productName: p.title || p.productName || p.product_name || "",
@@ -288,9 +302,15 @@ app.post("/api/ofertas/save-bulk", async (req, res) => {
         periodStartTime: p.periodStart || p.period_start,
         periodEndTime: p.periodEnd || p.period_end,
       };
-      const keyword = p.keyword || body.keyword || "";
-      const listType = p.listType != null ? Number(p.listType) : (body.listType != null ? Number(body.listType) : null);
-      byId.set(String(itemId), mapOfferToRow(node, keyword, listType));
+      const keyword = p.keyword || defaultKeyword || "";
+      const listType = p.listType != null ? Number(p.listType) : defaultListType;
+      // Se já veio classificado pelo explorador/batch, respeita; senão resolve pelo título+keyword
+      const forceCategory = p.category && p.category !== "todos" ? p.category : null;
+      const forceSubcategory = p.subcategory || null;
+      byId.set(String(itemId), mapOfferToRow(node, keyword, listType, {
+        forceCategory,
+        forceSubcategory: forceCategory ? forceSubcategory : null,
+      }));
     }
 
     const rows = [...byId.values()].filter((r) => r.item_id && r.offer_link);
@@ -305,9 +325,10 @@ app.post("/api/ofertas/save-bulk", async (req, res) => {
 
     res.json({
       ok: true,
-      requested: products.length,
+      requested: products.length + nodes.length,
       unique: rows.length,
       saved,
+      count: saved,
     });
   } catch (err) {
     console.error("[/api/ofertas/save-bulk]", err.message);
@@ -538,9 +559,19 @@ app.post("/api/sync", async (req, res) => {
 
     let saved = 0;
     if (batch.nodes?.length) {
+      const planoByKw = new Map(
+        plano.map((p) => [String(p.keyword).toLowerCase().trim(), p])
+      );
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
       const rows = batch.nodes
-        .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || keywords[0], batch.listType))
+        .map((n) => {
+          const kw = kwById.get(String(n.itemId)) || keywords[0];
+          const plan = planoByKw.get(String(kw).toLowerCase().trim());
+          return mapOfferToRow(n, kw, batch.listType, {
+            forceCategory: plan?.category || null,
+            forceSubcategory: plan?.subcategory || null,
+          });
+        })
         .filter((r) => r.item_id && r.offer_link);
       if (rows.length) {
         const result = await upsertOfertas(rows);
@@ -584,6 +615,12 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
     const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
     const requireCommission = req.query.requireCommission === "1" || req.query.requireCommission === "true";
     const keywords = (cat.subcategories || []).flatMap((sub) => sub.keywords);
+    const subByKeyword = new Map();
+    for (const sub of cat.subcategories || []) {
+      for (const kw of sub.keywords || []) {
+        subByKeyword.set(String(kw).toLowerCase().trim(), sub.id);
+      }
+    }
 
     const batch = await fetchProductOffersBatch({
       keywords,
@@ -602,7 +639,14 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
     if (batch.nodes?.length) {
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
       const rows = batch.nodes
-        .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || keywords[0], batch.listType))
+        .map((n) => {
+          const kw = kwById.get(String(n.itemId)) || keywords[0];
+          const forceSub = subByKeyword.get(String(kw).toLowerCase().trim()) || null;
+          return mapOfferToRow(n, kw, batch.listType, {
+            forceCategory: cat.id,
+            forceSubcategory: forceSub,
+          });
+        })
         .filter((r) => r.item_id && r.offer_link);
       if (rows.length) {
         const result = await upsertOfertas(rows);
@@ -856,6 +900,10 @@ app.post("/api/reset-vitrine", async (req, res) => {
 
 app.use(express.static(ROOT));
 app.use("/uploads", express.static(path.join(ROOT, "uploads")));
+
+app.get("/admin", (req, res) => {
+  res.redirect(302, "/?admin=1#dashboard");
+});
 
 app.get("/", (req, res) => {
   // Mantém ?admin=1 e outros parâmetros no redirect para a vitrine.

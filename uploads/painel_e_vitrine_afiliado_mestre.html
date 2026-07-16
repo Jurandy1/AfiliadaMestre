@@ -68,46 +68,97 @@
             color: #ee4d2d;
             background-color: rgba(238, 77, 45, 0.04);
         }
+        /* Admin panel */
+        body.admin-mode { background: #f1f5f9; }
+        body.admin-mode #main-storefront-section,
+        body.admin-mode > footer { display: none !important; }
+        #admin-panel-root { min-height: 100vh; }
+        #admin-sidebar {
+            width: 260px;
+            transition: transform 0.25s ease;
+        }
+        @media (max-width: 1023px) {
+            #admin-sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 50;
+                top: 0;
+                left: 0;
+                height: 100vh;
+            }
+            #admin-sidebar.open { transform: translateX(0); }
+        }
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.65rem;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: #94a3b8;
+            transition: all 0.15s;
+        }
+        .admin-nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .admin-nav-item.active {
+            color: #fff;
+            background: linear-gradient(90deg, rgba(238,77,45,0.25), rgba(238,77,45,0.08));
+            border-left: 3px solid #ee4d2d;
+        }
+        .admin-nav-group { margin-top: 0.25rem; }
+        .admin-nav-group-label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.85rem 0.25rem;
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+        .admin-nav-sub {
+            padding-left: 0.35rem;
+            margin-bottom: 0.35rem;
+        }
+        .admin-nav-item.sub {
+            padding: 0.5rem 0.85rem 0.5rem 1.85rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .admin-nav-item.sub.active {
+            border-left-width: 2px;
+        }
+        .admin-stat-card {
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .admin-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(15,23,42,0.08);
+        }
+        .admin-view { display: none; }
+        .admin-view.active { display: block; }
+        /* Shopee Explorer */
+        .shopee-preset {
+            border: 2px solid #e2e8f0;
+            border-radius: 0.75rem;
+            padding: 0.85rem;
+            text-align: left;
+            transition: all 0.15s;
+            background: #fff;
+        }
+        .shopee-preset:hover { border-color: #fdba74; background: #fffbf7; }
+        .shopee-preset.active {
+            border-color: #ee4d2d;
+            background: linear-gradient(135deg, #fff7f5, #fff);
+            box-shadow: 0 4px 14px rgba(238,77,45,0.12);
+        }
+        .shopee-result-row.selected { background: #fff7f5; border-color: #fdba74; }
     </style>
 </head>
 <body class="bg-shopee-grayBg text-shopee-textDark font-sans selection:bg-shopee-orange selection:text-white min-h-screen flex flex-col">
-
-    <!-- Admin bar: só aparece com ?admin=1 na URL -->
-    <header id="admin-top-bar" class="hidden bg-slate-900 text-white text-xs py-2 px-4 sticky top-0 z-50 shadow-md">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-            <p class="text-slate-300">Painel do afiliado — clientes não veem esta barra</p>
-            <div class="flex items-center bg-slate-800 rounded-full p-1 border border-slate-700">
-                <button 
-                    onclick="switchMainMode('storefront')" 
-                    id="btn-mode-storefront"
-                    class="px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white"
-                >
-                    <i class="fas fa-store mr-1.5"></i> Vitrine
-                </button>
-                <button 
-                    onclick="switchMainMode('console')" 
-                    id="btn-mode-console"
-                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
-                >
-                    <i class="fas fa-terminal mr-1.5"></i> Console Admin
-                </button>
-                <button
-                    onclick="switchMainMode('campaigns')"
-                    id="btn-mode-campaigns"
-                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
-                >
-                    <i class="fas fa-bullhorn mr-1.5"></i> Campanhas
-                </button>
-                <button
-                    onclick="switchMainMode('performance')"
-                    id="btn-mode-performance"
-                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
-                >
-                    <i class="fas fa-chart-line mr-1.5"></i> Desempenho
-                </button>
-            </div>
-        </div>
-    </header>
 
     <!-- SECTION 1: PUBLIC STOREFRONT MODE -->
     <div id="main-storefront-section" class="flex-1 flex flex-col">
@@ -288,60 +339,104 @@
         </div>
     </div>
 
-    <!-- SECTION 2: MASTER CONSOLE & API SIMULATOR MODE -->
-    <div id="main-console-section" class="hidden flex-1 max-w-7xl w-full mx-auto p-4 space-y-6">
-        
-        <!-- Header Console Summary -->
-        <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h2 class="text-xl font-bold flex items-center gap-2">
-                    <i class="fas fa-gauge-high text-shopee-orange"></i> Painel do Afiliado
-                </h2>
-                <p class="text-xs text-slate-400 mt-1">
-                    Gerencie as ofertas da vitrine. A alimentação roda sozinha em segundo plano.
-                </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button onclick="runAutoSyncNow()" id="btn-run-auto" class="bg-shopee-orange hover:bg-shopee-orangeHover text-white px-4 py-1.5 rounded-lg text-xs font-bold transition">
-                    <i class="fas fa-bolt mr-1"></i> Rodar sincronização agora
-                </button>
-                <button onclick="runTopPerformanceNow()" id="btn-top-perf" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                    <i class="fas fa-trophy mr-1"></i> Popular destaques
-                </button>
-                <button onclick="loadOffersFromSupabase({silent:false, reset:true})" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                    <i class="fas fa-rotate mr-1"></i> Recarregar cache
-                </button>
-                <button onclick="openNewProductForm()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                    <i class="fas fa-plus mr-1"></i> Produto manual
-                </button>
-            </div>
-        </div>
+    <!-- ADMIN PANEL — página dedicada (?admin=1) -->
+    <div id="admin-panel-root" class="hidden flex min-h-screen w-full">
+        <div id="admin-sidebar-backdrop" onclick="toggleAdminSidebar(false)" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden"></div>
 
-        <!-- STATS REAIS -->
+        <aside id="admin-sidebar" class="bg-slate-900 text-white flex flex-col shrink-0 w-[260px] shadow-xl">
+            <div class="p-5 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-10 w-auto bg-white rounded-lg p-1">
+                    <div>
+                        <p class="font-black text-sm leading-tight">Afiliada Mestre</p>
+                        <p class="text-[10px] text-slate-400">Painel administrativo</p>
+                    </div>
+                </div>
+            </div>
+            <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+                <button type="button" data-admin-view="dashboard" onclick="switchAdminView('dashboard')" class="admin-nav-item active" id="nav-dashboard">
+                    <i class="fas fa-gauge-high w-5 text-center"></i> Dashboard
+                </button>
+                <button type="button" data-admin-view="catalogo" onclick="switchAdminView('catalogo')" class="admin-nav-item" id="nav-catalogo">
+                    <i class="fas fa-cloud-arrow-down w-5 text-center"></i> Catálogo & Sync
+                </button>
+                <button type="button" data-admin-view="produtos" onclick="switchAdminView('produtos')" class="admin-nav-item" id="nav-produtos">
+                    <i class="fas fa-box-open w-5 text-center"></i> Produtos
+                </button>
+                <div class="admin-nav-group">
+                    <div class="admin-nav-group-label">
+                        <i class="fas fa-bullhorn w-5 text-center"></i> Campanhas
+                    </div>
+                    <div class="admin-nav-sub">
+                        <button type="button" data-admin-view="campanhas" onclick="switchAdminView('campanhas')" class="admin-nav-item sub" id="nav-campanhas">
+                            Criar / gerenciar
+                        </button>
+                        <button type="button" data-admin-view="campanha-desempenho" onclick="switchAdminView('campanha-desempenho')" class="admin-nav-item sub" id="nav-campanha-desempenho">
+                            Desempenho da campanha
+                        </button>
+                    </div>
+                </div>
+                <button type="button" data-admin-view="desempenho" onclick="switchAdminView('desempenho')" class="admin-nav-item" id="nav-desempenho">
+                    <i class="fas fa-chart-line w-5 text-center"></i> Desempenho geral
+                </button>
+            </nav>
+            <div class="p-3 border-t border-slate-800 space-y-2">
+                <a href="/" class="admin-nav-item !text-emerald-400 hover:!bg-emerald-500/10">
+                    <i class="fas fa-store w-5 text-center"></i> Ver vitrine pública
+                </a>
+                <p class="text-[9px] text-slate-500 px-2">Clientes não veem este painel</p>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+            <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3 sticky top-0 z-30 shadow-sm">
+                <div class="flex items-center gap-3 min-w-0">
+                    <button type="button" onclick="toggleAdminSidebar()" class="lg:hidden h-9 w-9 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="min-w-0">
+                        <h1 id="admin-page-title" class="font-black text-slate-800 text-base truncate">Dashboard</h1>
+                        <p id="admin-page-subtitle" class="text-[11px] text-slate-400 truncate">Visão geral do catálogo e vendas</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <span id="admin-api-badge" class="hidden text-[10px] font-bold px-2.5 py-1 rounded-full bg-orange-50 text-shopee-orange border border-orange-100">API…</span>
+                    <button onclick="loadAdminStats(); loadAutoStatus(); showToast('Dados atualizados','success');" class="h-9 w-9 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center" title="Atualizar">
+                        <i class="fas fa-rotate"></i>
+                    </button>
+                </div>
+            </header>
+
+            <main id="main-console-section" class="flex-1 p-4 md:p-6 space-y-6 overflow-y-auto max-w-7xl w-full mx-auto">
+
+        <!-- VIEW: Dashboard -->
+        <section id="admin-view-dashboard" class="admin-view active space-y-6">
+
+        <!-- STATS REAIS (clicáveis) -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+            <div onclick="switchAdminView('produtos')" class="admin-stat-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div class="space-y-1">
                     <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Produtos no banco</span>
                     <h3 class="text-2xl font-black text-slate-800" id="stat-db-products">—</h3>
-                    <p class="text-[10px] text-slate-400">Cache no Supabase</p>
+                    <p class="text-[10px] text-slate-400">Clique para gerenciar</p>
                 </div>
                 <div class="h-12 w-12 rounded-xl bg-orange-50 text-shopee-orange flex items-center justify-center text-xl">
                     <i class="fas fa-box"></i>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+            <div onclick="switchAdminView('catalogo')" class="admin-stat-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div class="space-y-1">
                     <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Categorias ativas</span>
                     <h3 class="text-2xl font-black text-slate-800" id="stat-db-categories">—</h3>
-                    <p class="text-[10px] text-slate-400">Com pelo menos 1 item</p>
+                    <p class="text-[10px] text-slate-400">Sincronizar catálogo</p>
                 </div>
                 <div class="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
                     <i class="fas fa-layer-group"></i>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+            <div onclick="switchAdminView('catalogo')" class="admin-stat-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div class="space-y-1">
                     <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Auto-sync</span>
                     <h3 class="text-lg font-black text-slate-800" id="stat-auto-state">—</h3>
@@ -352,7 +447,7 @@
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+            <div onclick="switchAdminView('desempenho')" class="admin-stat-card bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
                 <div class="space-y-1">
                     <span class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Última sincronização</span>
                     <h3 class="text-sm font-black text-slate-800" id="stat-auto-last">—</h3>
@@ -364,23 +459,56 @@
             </div>
         </div>
 
-        <!-- DOUBLE PANEL GRID -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            <!-- LEFT COLUMN: Catálogo & Sync (7 cols) -->
-            <div class="lg:col-span-7 space-y-6" id="admin-view-catalogo">
+        <!-- Ações rápidas -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <button onclick="runAutoSyncNow()" id="btn-run-auto" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-shopee-orange hover:shadow-md transition group">
+                <i class="fas fa-bolt text-shopee-orange text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Sync agora</p>
+            </button>
+            <button onclick="runTopPerformanceNow()" id="btn-top-perf" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-amber-400 hover:shadow-md transition group">
+                <i class="fas fa-trophy text-amber-500 text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Destaques</p>
+            </button>
+            <button onclick="loadOffersFromSupabase({silent:false, reset:true})" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-blue-400 hover:shadow-md transition group">
+                <i class="fas fa-rotate text-blue-500 text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Recarregar</p>
+            </button>
+            <button onclick="switchAdminView('produtos'); openNewProductForm();" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-emerald-400 hover:shadow-md transition group">
+                <i class="fas fa-plus text-emerald-500 text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Produto manual</p>
+            </button>
+            <button onclick="switchAdminView('campanhas')" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-purple-400 hover:shadow-md transition group">
+                <i class="fas fa-bullhorn text-purple-500 text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Campanhas</p>
+            </button>
+            <button onclick="switchAdminView('desempenho')" class="bg-white border border-slate-200 rounded-xl p-4 text-left hover:border-shopee-orange hover:shadow-md transition group">
+                <i class="fas fa-chart-line text-shopee-orange text-lg mb-2 group-hover:scale-110 transition-transform inline-block"></i>
+                <p class="text-[11px] font-bold text-slate-800">Vendas</p>
+            </button>
+        </div>
 
-                <!-- Section label -->
-                <div class="flex items-end justify-between gap-3 px-0.5">
-                    <div>
-                        <p class="text-[10px] font-black uppercase tracking-widest text-shopee-orange">Catálogo &amp; Sync</p>
-                        <h3 class="text-base font-black text-slate-800 leading-tight">Puxe ofertas da Shopee e alimente a vitrine</h3>
-                    </div>
-                    <button type="button" onclick="syncAllCategories({silent:false}).then(()=>{loadOffersFromSupabase({silent:true,reset:true}); loadCategoriesFromApi({silent:true}); loadAdminStats();})"
-                        class="shrink-0 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] font-bold hover:border-shopee-orange hover:text-shopee-orange flex items-center gap-1.5">
-                        <i class="fas fa-tower-broadcast"></i> Sync todas categorias
-                    </button>
+        <!-- Resumo vendas no dashboard -->
+        <div onclick="switchAdminView('desempenho')" class="admin-stat-card bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-5 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Desempenho Shopee</p>
+                <p class="text-sm text-slate-300 mt-1">Veja conversões, comissões e Sub IDs das vendas deste site.</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="text-center">
+                    <p class="text-[9px] text-slate-400 uppercase">Conversões</p>
+                    <p id="dash-conversion-total" class="text-xl font-black">—</p>
                 </div>
+                <div class="text-center">
+                    <p class="text-[9px] text-slate-400 uppercase">Comissão</p>
+                    <p id="dash-conversion-commission" class="text-lg font-black text-emerald-400">—</p>
+                </div>
+                <span class="bg-shopee-orange px-4 py-2 rounded-lg text-xs font-bold">Abrir relatório →</span>
+            </div>
+        </div>
+        </section>
+
+        <!-- VIEW: Catálogo & Sync -->
+        <section id="admin-view-catalogo" class="admin-view space-y-6">
 
                 <!-- Explorador Shopee -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -403,7 +531,7 @@
                     <div class="p-4 space-y-3 text-xs">
                         <div>
                             <label class="block text-slate-600 font-bold mb-1">Palavras-chave <span class="font-semibold text-slate-400">(vírgula ou uma por linha)</span></label>
-                            <textarea id="admin-keyword" rows="2" placeholder="ex: vestido longo, blusa cropped, tênis feminino" class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-shopee-orange focus:ring-1 focus:ring-shopee-orange/30 resize-y min-h-[64px]">fone bluetooth</textarea>
+                            <textarea id="admin-keyword" oninput="updateExplorerKwCount()" rows="2" placeholder="ex: vestido longo, blusa cropped, tênis feminino" class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-shopee-orange focus:ring-1 focus:ring-shopee-orange/30 resize-y min-h-[64px]">fone bluetooth</textarea>
                             <p class="text-[10px] text-slate-400 mt-1" id="explorer-kw-count">1 keyword</p>
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -580,94 +708,35 @@
                         <p class="text-[10px] text-slate-400 leading-relaxed">
                             Com <code class="text-[9px] bg-slate-100 px-1 rounded">AUTO_SYNC=0</code> o agendador fica pausado; os botões manuais acima continuam funcionando.
                         </p>
+                        <button type="button" onclick="resetVitrineAndRefill()"
+                            class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                            <i class="fas fa-broom mr-1"></i> Limpar e realimentar vitrine
+                        </button>
                     </div>
                 </div>
 
-                <!-- Sub IDs de rastreamento -->
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="bg-slate-50 p-4 border-b border-slate-200">
-                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-chart-simple text-slate-500"></i> Rastreamento de campanhas
-                        </h4>
-                    </div>
-                    <div class="p-4 space-y-3 text-xs">
-                        <p class="text-slate-500 leading-relaxed">
-                            Na <strong>puxada dos produtos</strong>, cada item já recebe Sub IDs no banco
-                            (<code class="text-[10px]">afiliada_mestre | organico | vitrine | categoria | pID</code>).
-                            Use o gerador abaixo só quando for divulgar em Facebook, Instagram etc. — aí o clique
-                            troca canal/campanha e identifica a origem.
-                        </p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">Canal</label>
-                                <select id="campaign-link-channel" onchange="updateCampaignLinkPreview()" class="w-full p-2 border rounded-lg outline-shopee-orange">
-                                    <option value="facebook">Facebook</option>
-                                    <option value="instagram">Instagram</option>
-                                    <option value="whatsapp">WhatsApp</option>
-                                    <option value="tiktok">TikTok</option>
-                                    <option value="stories">Stories</option>
-                                    <option value="google">Google</option>
-                                    <option value="email">E-mail</option>
-                                    <option value="organico">Orgânico / direto</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">Campanha</label>
-                                <input id="campaign-link-name" type="text" value="promo_vitrine" oninput="updateCampaignLinkPreview()"
-                                    placeholder="ex: ads_vestidos" class="w-full p-2 border rounded-lg outline-shopee-orange font-mono">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-slate-600 font-bold mb-1">Produtos da campanha</label>
-                            <div class="flex gap-2">
-                                <input id="campaign-product-search" type="text" oninput="renderCampaignProductPicker()"
-                                    placeholder="Buscar por nome ou ID…" class="flex-1 p-2 border rounded-lg outline-shopee-orange">
-                                <button type="button" onclick="addCampaignProductById()"
-                                    class="px-3 py-2 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 shrink-0">
-                                    + ID
-                                </button>
-                            </div>
-                            <div id="campaign-product-picker" class="mt-2 max-h-28 overflow-y-auto space-y-1 empty:hidden"></div>
-                            <div id="campaign-selected-products" class="mt-2 space-y-1.5"></div>
-                            <p class="text-[10px] text-slate-400 mt-1">Sem produtos = link geral da vitrine. Com produtos = um link por item (abre o produto certo).</p>
-                        </div>
-                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
-                            <p class="text-[9px] uppercase font-black text-slate-400">Links para divulgar</p>
-                            <div id="campaign-link-preview" class="space-y-2"></div>
-                            <button type="button" onclick="copyCampaignLink()"
-                                class="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
-                                <i class="fas fa-copy mr-1"></i> Copiar todos os links
-                            </button>
-                            <button type="button" onclick="saveCurrentCampaign()"
-                                class="px-3 py-1.5 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
-                                <i class="fas fa-save mr-1"></i> Salvar campanha
-                            </button>
-                        </div>
-                        <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 font-mono text-[10px] text-slate-700 space-y-1">
-                            <div><span class="text-shopee-orange font-bold">1</span> afiliada_mestre → marca do site</div>
-                            <div><span class="text-shopee-orange font-bold">2</span> canal → facebook / instagram / …</div>
-                            <div><span class="text-shopee-orange font-bold">3</span> campanha → nome da campanha</div>
-                            <div><span class="text-shopee-orange font-bold">4</span> categoria → no clique</div>
-                            <div><span class="text-shopee-orange font-bold">5</span> produto → p + ID no clique</div>
-                        </div>
-                        <p id="subid-preview" class="text-[10px] text-slate-400 font-mono break-all"></p>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="switchMainMode('performance')"
-                                class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
-                                <i class="fas fa-chart-line mr-1"></i> Abrir desempenho
-                            </button>
-                            <button onclick="resetVitrineAndRefill()"
-                                class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
-                                <i class="fas fa-broom mr-1"></i> Limpar e realimentar vitrine
-                            </button>
-                        </div>
-                    </div>
-                </div>
+        </section>
 
+        <!-- VIEW: Produtos -->
+        <section id="admin-view-produtos" class="admin-view space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="font-black text-slate-800 text-base">Catálogo de produtos</h2>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Filtre, selecione em massa e envie para campanhas.</p>
+                </div>
+                <div class="flex flex-wrap gap-2 shrink-0">
+                    <button type="button" id="btn-load-full-catalog" onclick="loadAdminCatalogFull({force:true})" class="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-[11px] font-bold hover:border-shopee-orange hover:text-shopee-orange">
+                        <i class="fas fa-cloud-arrow-down mr-1"></i> Carregar catálogo completo
+                    </button>
+                    <button onclick="openNewProductForm()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                        <i class="fas fa-plus mr-1"></i> Produto manual
+                    </button>
+                    <button onclick="switchAdminView('campanhas')" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
+                        <i class="fas fa-bullhorn mr-1"></i> Campanhas
+                    </button>
+                </div>
             </div>
 
-            <!-- RIGHT COLUMN: Active Database Manager (5 cols) -->
-            <div class="lg:col-span-5 space-y-6">
                 <!-- Add Custom Product Inline Form (collapsible/visible) -->
                 <div id="new-product-form-card" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
                     <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
@@ -739,21 +808,79 @@
                 <!-- Products Database Grid Manager -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="bg-slate-50 p-4 border-b border-slate-200 space-y-3">
-                        <div class="flex justify-between items-center">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
                             <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                                <i class="fas fa-list-check text-slate-500"></i> Produtos ativos (<span id="count-db-items">0</span>)
+                                <i class="fas fa-list-check text-slate-500"></i> Produtos no catálogo (<span id="count-db-items">0</span>)
                                 <span class="normal-case font-semibold text-slate-400 ml-1 text-[10px]" id="count-db-loaded"></span>
                             </h4>
+                            <span id="admin-filter-summary" class="text-[10px] text-slate-400 font-semibold"></span>
                         </div>
-                        <div class="relative">
-                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                            <input type="text" id="admin-search" oninput="onAdminSearch()" placeholder="Filtrar por nome ou categoria..." class="w-full pl-8 p-2 border rounded-lg text-xs focus:outline-shopee-orange">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 text-xs">
+                            <div class="relative sm:col-span-2 lg:col-span-2">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="text" id="admin-search" oninput="onAdminSearch()" placeholder="Buscar nome, ID, categoria, loja…" class="w-full pl-8 p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-shopee-orange">
+                            </div>
+                            <select id="admin-filter-category" onchange="onAdminFiltersChange()" class="p-2.5 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                <option value="">Todas as categorias</option>
+                            </select>
+                            <select id="admin-filter-type" onchange="onAdminFiltersChange()" class="p-2.5 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                <option value="">Todos os tipos</option>
+                                <option value="flash">Só relâmpago</option>
+                                <option value="normal">Só normal</option>
+                            </select>
+                            <select id="admin-filter-sort" onchange="onAdminFiltersChange()" class="p-2.5 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                <option value="recent">Mais recentes</option>
+                                <option value="name">Nome A–Z</option>
+                                <option value="price_asc">Menor preço</option>
+                                <option value="price_desc">Maior preço</option>
+                                <option value="discount">Maior desconto</option>
+                                <option value="commission">Maior comissão</option>
+                            </select>
+                            <select id="admin-page-size" onchange="onAdminPageSizeChange()" class="p-2.5 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                <option value="12">12 / página</option>
+                                <option value="24" selected>24 / página</option>
+                                <option value="48">48 / página</option>
+                                <option value="100">100 / página</option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                            <label class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 cursor-pointer font-bold text-slate-600 hover:border-shopee-orange">
+                                <input type="checkbox" id="admin-select-page" onchange="toggleSelectAdminPage(this.checked)" class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange">
+                                Página
+                            </label>
+                            <button type="button" onclick="selectAllFilteredProducts()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-bold text-slate-600 hover:border-shopee-orange">
+                                Selecionar todos filtrados
+                            </button>
+                            <button type="button" onclick="clearAdminProductSelection()" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 font-bold text-slate-500 hover:border-slate-300">
+                                Limpar seleção
+                            </button>
+                            <button type="button" onclick="clearAdminFilters()" class="px-2.5 py-1.5 rounded-lg text-slate-400 font-bold hover:text-slate-600">
+                                <i class="fas fa-filter-circle-xmark mr-1"></i> Limpar filtros
+                            </button>
                         </div>
                     </div>
-                    <div class="p-4 space-y-2.5" id="console-products-list">
+
+                    <!-- Barra de ações em massa -->
+                    <div id="admin-bulk-bar" class="hidden px-4 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3">
+                        <p class="text-xs font-bold">
+                            <span id="admin-selected-count">0</span> produto(s) selecionado(s)
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="addSelectedProductsToCampaign()" class="px-3 py-1.5 rounded-lg bg-shopee-orange hover:bg-shopee-orangeHover text-[11px] font-bold">
+                                <i class="fas fa-bullhorn mr-1"></i> Adicionar à campanha
+                            </button>
+                            <button type="button" onclick="clearAdminProductSelection()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-4 space-y-2" id="console-products-list">
                         <!-- Populated inside scripts -->
                     </div>
-                    <div class="p-3 border-t border-slate-100 flex items-center justify-between gap-2" id="console-pagination">
+                    <div class="p-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2" id="console-pagination">
                         <button onclick="adminPrevPage()" id="admin-prev" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
                             <i class="fas fa-chevron-left"></i> Anterior
                         </button>
@@ -763,12 +890,88 @@
                         </button>
                     </div>
                 </div>
-            </div>
+        </section>
 
-        </div>
+        <!-- VIEW: Campanhas -->
+        <section id="admin-view-campanhas" class="admin-view space-y-6">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200">
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-chart-simple text-slate-500"></i> Criar campanha de rastreamento
+                        </h4>
+                        <p class="text-[10px] text-slate-400 mt-1">Gere links com Sub IDs para Facebook, Instagram, WhatsApp etc.</p>
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <p class="text-slate-500 leading-relaxed">
+                            Na <strong>puxada dos produtos</strong>, cada item já recebe Sub IDs no banco
+                            (<code class="text-[10px]">afiliada_mestre | organico | vitrine | categoria | pID</code>).
+                            Use o gerador abaixo quando for divulgar — o clique troca canal/campanha e identifica a origem.
+                        </p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Canal</label>
+                                <select id="campaign-link-channel" onchange="updateCampaignLinkPreview()" class="w-full p-2 border rounded-lg outline-shopee-orange">
+                                    <option value="facebook">Facebook</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="stories">Stories</option>
+                                    <option value="google">Google</option>
+                                    <option value="email">E-mail</option>
+                                    <option value="organico">Orgânico / direto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Campanha</label>
+                                <input id="campaign-link-name" type="text" value="promo_vitrine" oninput="updateCampaignLinkPreview()"
+                                    placeholder="ex: ads_vestidos" class="w-full p-2 border rounded-lg outline-shopee-orange font-mono">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 font-bold mb-1">Produtos da campanha</label>
+                            <div class="flex gap-2">
+                                <input id="campaign-product-search" type="text" oninput="renderCampaignProductPicker()"
+                                    placeholder="Buscar por nome ou ID…" class="flex-1 p-2 border rounded-lg outline-shopee-orange">
+                                <button type="button" onclick="addCampaignProductById()"
+                                    class="px-3 py-2 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 shrink-0">
+                                    + ID
+                                </button>
+                                <button type="button" onclick="switchAdminView('produtos')"
+                                    class="px-3 py-2 rounded-lg bg-slate-100 text-[11px] font-bold text-slate-600 hover:bg-slate-200 shrink-0">
+                                    <i class="fas fa-box-open mr-1"></i> Escolher na lista
+                                </button>
+                            </div>
+                            <div id="campaign-product-picker" class="mt-2 max-h-28 overflow-y-auto space-y-1 empty:hidden"></div>
+                            <div id="campaign-selected-products" class="mt-2 space-y-1.5"></div>
+                            <p class="text-[10px] text-slate-400 mt-1">Sem produtos = link geral da vitrine. Com produtos = um link por item (abre o produto certo).</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                            <p class="text-[9px] uppercase font-black text-slate-400">Links para divulgar</p>
+                            <div id="campaign-link-preview" class="space-y-2"></div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="copyCampaignLink()"
+                                    class="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                                    <i class="fas fa-copy mr-1"></i> Copiar todos os links
+                                </button>
+                                <button type="button" onclick="saveCurrentCampaign()"
+                                    class="px-3 py-1.5 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
+                                    <i class="fas fa-save mr-1"></i> Salvar campanha
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 font-mono text-[10px] text-slate-700 space-y-1">
+                            <div><span class="text-shopee-orange font-bold">1</span> afiliada_mestre → marca do site</div>
+                            <div><span class="text-shopee-orange font-bold">2</span> canal → facebook / instagram / …</div>
+                            <div><span class="text-shopee-orange font-bold">3</span> campanha → nome da campanha</div>
+                            <div><span class="text-shopee-orange font-bold">4</span> categoria → no clique</div>
+                            <div><span class="text-shopee-orange font-bold">5</span> produto → p + ID no clique</div>
+                        </div>
+                        <p id="subid-preview" class="text-[10px] text-slate-400 font-mono break-all"></p>
+                    </div>
+                </div>
 
         <!-- Campanhas salvas -->
-        <section id="campaigns-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
+        <div id="campaigns-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
@@ -776,8 +979,8 @@
                     </h4>
                     <p class="text-[10px] text-slate-400 mt-1">Guarde links de Facebook, Instagram etc. e reabra quando for anunciar.</p>
                 </div>
-                <button onclick="switchMainMode('console')" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold">
-                    <i class="fas fa-plus mr-1"></i> Nova campanha
+                <button type="button" onclick="switchAdminView('campanha-desempenho')" class="px-3 py-2 rounded-lg border border-shopee-orange text-shopee-orange text-[11px] font-bold hover:bg-orange-50">
+                    <i class="fas fa-chart-pie mr-1"></i> Ver desempenho
                 </button>
             </div>
             <div class="p-4 grid md:grid-cols-2 gap-4 text-xs">
@@ -796,10 +999,100 @@
                     <p class="text-slate-400 text-center py-8">Nenhuma campanha salva ainda.</p>
                 </div>
             </div>
+        </div>
         </section>
 
-        <!-- Relatório de conversões e Sub IDs -->
-        <section id="performance-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- VIEW: Desempenho por campanha -->
+        <section id="admin-view-campanha-desempenho" class="admin-view space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-chart-pie text-shopee-orange"></i> Desempenho por campanha
+                        </h4>
+                        <p class="text-[10px] text-slate-400 mt-1">Agrupa vendas da API Shopee pelo Sub ID da campanha (slot 3 do utmContent).</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <select id="camp-perf-days" onchange="loadCampaignPerformance({reset:true})" class="p-2 border rounded-lg">
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="30" selected>Últimos 30 dias</option>
+                            <option value="60">Últimos 60 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                        </select>
+                        <select id="camp-perf-status" onchange="loadCampaignPerformance({reset:true})" class="p-2 border rounded-lg">
+                            <option value="">Todos os status</option>
+                            <option value="PENDING">Pendente</option>
+                            <option value="COMPLETED">Concluído</option>
+                            <option value="CANCELLED">Cancelado</option>
+                            <option value="UNPAID">Não pago</option>
+                        </select>
+                        <button onclick="loadCampaignPerformance({reset:true})" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold">
+                            <i class="fas fa-rotate mr-1"></i> Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 border-b border-slate-100">
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Campanhas</p>
+                        <p id="camp-perf-count" class="text-xl font-black text-slate-800">0</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Conversões</p>
+                        <p id="camp-perf-conversions" class="text-xl font-black text-slate-800">0</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Pedidos</p>
+                        <p id="camp-perf-orders" class="text-xl font-black text-slate-800">0</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Comissão</p>
+                        <p id="camp-perf-commission" class="text-lg font-black text-emerald-600">R$ 0,00</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3 col-span-2 md:col-span-1">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Itens vendidos</p>
+                        <p id="camp-perf-items" class="text-xl font-black text-shopee-orange">0</p>
+                    </div>
+                </div>
+
+                <div id="camp-perf-list" class="p-4 space-y-3">
+                    <div class="py-8 text-center text-slate-400 text-xs">Clique em Atualizar para carregar o desempenho.</div>
+                </div>
+            </div>
+
+            <!-- Detalhe de uma campanha -->
+            <div id="camp-perf-detail" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 text-white p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Detalhe da campanha</p>
+                        <h3 id="camp-perf-detail-title" class="font-black text-lg">—</h3>
+                        <p id="camp-perf-detail-meta" class="text-[11px] text-slate-400 mt-0.5"></p>
+                    </div>
+                    <button type="button" onclick="closeCampaignPerfDetail()" class="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-bold">
+                        <i class="fas fa-times mr-1"></i> Fechar
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-slate-100" id="camp-perf-detail-stats"></div>
+                <div class="p-4 grid lg:grid-cols-2 gap-4">
+                    <div>
+                        <h5 class="text-[10px] uppercase font-black text-slate-400 mb-2">Canais</h5>
+                        <div id="camp-perf-detail-channels" class="space-y-2 text-xs"></div>
+                    </div>
+                    <div>
+                        <h5 class="text-[10px] uppercase font-black text-slate-400 mb-2">Produtos mais vendidos</h5>
+                        <div id="camp-perf-detail-products" class="space-y-2 text-xs"></div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-slate-100">
+                    <h5 class="text-[10px] uppercase font-black text-slate-400 mb-3">Pedidos desta campanha</h5>
+                    <div id="camp-perf-detail-orders" class="space-y-3"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Desempenho -->
+        <section id="admin-view-desempenho" class="admin-view space-y-6">
+        <div id="performance-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
@@ -856,8 +1149,11 @@
                     Próxima <i class="fas fa-chevron-right ml-1"></i>
                 </button>
             </div>
+        </div>
         </section>
 
+            </main>
+        </div>
     </div>
 
     <!-- POPUP DE DETALHES DO PRODUTO (cliente) -->
@@ -1229,26 +1525,103 @@
         }
 
         function initAdminUi() {
-            const bar = document.getElementById("admin-top-bar");
-            if (!bar) return;
-            if (isAdminMode()) {
-                bar.classList.remove("hidden");
-                const badge = document.getElementById("api-status-badge");
-                if (badge) badge.classList.remove("hidden");
-                loadSubIdSettings();
-                const hash = (window.location.hash || "").replace(/^#/, "").toLowerCase();
-                const viewParam = new URLSearchParams(window.location.search).get("view");
-                const wantsPerformance = hash === "performance" || viewParam === "performance";
-                const wantsCampaigns = hash === "campanhas" || hash === "campaigns" || viewParam === "campaigns";
-                const wantsCatalogo = hash === "catalogo" || hash === "console"
-                    || viewParam === "catalogo" || viewParam === "console";
-                if (wantsPerformance || wantsCampaigns || wantsCatalogo) {
-                    setTimeout(() => {
-                        if (wantsPerformance) switchMainMode("performance");
-                        else if (wantsCampaigns) switchMainMode("campaigns");
-                        else switchAdminView("catalogo");
-                    }, 0);
+            const panel = document.getElementById("admin-panel-root");
+            if (!panel || !isAdminMode()) return;
+
+            document.body.classList.add("admin-mode");
+            panel.classList.remove("hidden");
+            panel.classList.add("flex");
+            document.title = "Admin — Afiliada Mestre";
+
+            const badge = document.getElementById("admin-api-badge");
+            if (badge) badge.classList.remove("hidden");
+
+            loadSubIdSettings();
+
+            const hash = (window.location.hash || "").replace("#", "");
+            const viewParam = new URLSearchParams(window.location.search).get("view");
+            const legacyMap = {
+                console: "produtos",
+                performance: "desempenho",
+                campaigns: "campanhas",
+                "campaign-perf": "campanha-desempenho",
+                "campanhas-desempenho": "campanha-desempenho",
+            };
+            let view = hash || viewParam || "dashboard";
+            if (legacyMap[view]) view = legacyMap[view];
+            if (!ADMIN_VIEWS[view]) view = "dashboard";
+
+            setTimeout(() => switchAdminView(view), 0);
+        }
+
+        const ADMIN_VIEWS = {
+            dashboard: { title: "Dashboard", subtitle: "Visão geral do catálogo e vendas" },
+            catalogo: { title: "Catálogo & Sync", subtitle: "Buscar ofertas, sincronizar categorias e alimentação automática" },
+            produtos: { title: "Produtos", subtitle: "Gerencie o catálogo e selecione itens para campanhas" },
+            campanhas: { title: "Campanhas", subtitle: "Links rastreáveis para Facebook, Instagram e outros canais" },
+            "campanha-desempenho": { title: "Desempenho da campanha", subtitle: "Vendas, comissões e pedidos agrupados por campanha (API Shopee)" },
+            desempenho: { title: "Desempenho geral", subtitle: "Conversões e comissões da API Shopee (Sub ID afiliada_mestre)" },
+        };
+
+        function toggleAdminSidebar(forceOpen) {
+            const sidebar = document.getElementById("admin-sidebar");
+            const backdrop = document.getElementById("admin-sidebar-backdrop");
+            if (!sidebar) return;
+            const open = forceOpen === undefined ? !sidebar.classList.contains("open") : !!forceOpen;
+            sidebar.classList.toggle("open", open);
+            if (backdrop) backdrop.classList.toggle("hidden", !open);
+        }
+
+        function switchAdminView(view) {
+            if (!isAdminMode()) return;
+            if (!ADMIN_VIEWS[view]) view = "dashboard";
+
+            document.querySelectorAll(".admin-view").forEach(el => el.classList.remove("active"));
+            const target = document.getElementById("admin-view-" + view);
+            if (target) target.classList.add("active");
+
+            document.querySelectorAll(".admin-nav-item[data-admin-view]").forEach(btn => {
+                btn.classList.toggle("active", btn.dataset.adminView === view);
+            });
+
+            const meta = ADMIN_VIEWS[view];
+            const titleEl = document.getElementById("admin-page-title");
+            const subEl = document.getElementById("admin-page-subtitle");
+            if (titleEl && meta) titleEl.textContent = meta.title;
+            if (subEl && meta) subEl.textContent = meta.subtitle;
+
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set("admin", "1");
+                url.hash = view;
+                history.replaceState(null, "", url.pathname + url.search + url.hash);
+            } catch (_) {}
+
+            toggleAdminSidebar(false);
+
+            if (view === "dashboard") {
+                loadAdminStats();
+                loadAutoStatus();
+            } else if (view === "catalogo") {
+                populateAdminCategorySelect();
+                loadAutoStatus();
+                applyExplorerPreset('bestsellers');
+            } else if (view === "produtos") {
+                adminPage = 1;
+                populateAdminProductCategoryFilter();
+                renderConsoleProducts();
+                populateAdminCategorySelect();
+                loadAdminStats();
+                if (!adminCatalogLoaded || productsDatabase.length <= PAGE_SIZE) {
+                    loadAdminCatalogFull({ silent: true });
                 }
+            } else if (view === "campanhas") {
+                renderSavedCampaigns();
+                updateCampaignLinkPreview();
+            } else if (view === "campanha-desempenho") {
+                loadCampaignPerformance({ reset: true });
+            } else if (view === "desempenho") {
+                loadConversions({ reset: true });
             }
         }
 
@@ -1277,37 +1650,35 @@
             renderPopularTerms();
             renderConsoleProducts();
             loadHeroProducts();
-            const kwEl = document.getElementById("admin-keyword");
-            if (kwEl) {
-                kwEl.addEventListener("input", updateExplorerKwCount);
-                updateExplorerKwCount();
-            }
-            updateExplorerModeHint();
-            window.addEventListener("hashchange", applyAdminHashRoute);
             if (isAdminMode()) {
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
                 loadConversions({ reset: true });
-                applyAdminHashRoute();
             }
             const health = await checkApiHealth();
 
             if (health && health.supabaseConfigured) {
                 await loadCategoriesFromApi({ silent: true });
-                await loadOffersFromSupabase({ silent: true, reset: true });
-                preloadCategoryCovers();
+                if (isAdminMode()) {
+                    await loadAdminCatalogFull({ silent: true });
+                } else {
+                    await loadOffersFromSupabase({ silent: true, reset: true });
+                    preloadCategoryCovers();
+                }
             } else if (isAdminMode()) {
                 showToast("Backend offline — rode: npm start", "error");
             }
             await applyCampaignLanding();
-            if (isAdminMode()) applyAdminHashRoute();
         };
 
         function setApiStatus(text, live) {
             apiLive = !!live;
-            const el = document.getElementById("api-status-badge");
-            if (el) el.textContent = text;
+            const short = live ? "API online" : "API offline";
+            for (const id of ["api-status-badge", "admin-api-badge"]) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = id === "admin-api-badge" ? short : text;
+            }
         }
 
         async function checkApiHealth() {
@@ -1340,7 +1711,7 @@
             }, 150);
         }
 
-        function applyProducts(list, source, { append = false, allowEmpty = false } = {}) {
+        function applyProducts(list, source, { append = false, allowEmpty = false, skipRender = false } = {}) {
             if (!Array.isArray(list)) return false;
             if (append) {
                 const map = new Map(productsDatabase.map(p => [String(p.id), p]));
@@ -1351,18 +1722,23 @@
                 productsDatabase = list;
             }
             lastApiSource = source || "api";
-            // Limita cache local para não estourar quota do localStorage (mobile).
-            if (productsDatabase.length > 400) {
+            // Limita cache local na vitrine pública (mobile/localStorage).
+            // No admin precisamos do catálogo completo para filtrar/selecionar.
+            if (!isAdminMode() && productsDatabase.length > 400) {
                 productsDatabase = productsDatabase.slice(-400);
             }
             try {
-                localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
+                if (productsDatabase.length <= 400) {
+                    localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
+                }
             } catch (_) {}
-            renderStoreProducts();
-            scheduleChromeRender();
-            if (isAdminMode()) {
-                renderConsoleProducts();
-                loadAdminStats();
+            if (!skipRender) {
+                renderStoreProducts();
+                scheduleChromeRender();
+                if (isAdminMode()) {
+                    renderConsoleProducts();
+                    loadAdminStats();
+                }
             }
             return allowEmpty || productsDatabase.length > 0;
         }
@@ -1392,12 +1768,7 @@
                 const res = await fetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        limit: 20,
-                        listType: Number(document.getElementById("admin-list-type")?.value) || 0,
-                        sortType: Number(document.getElementById("admin-sort-type")?.value) || 2,
-                        pages: 1,
-                    }),
+                    body: JSON.stringify({ limit: 20, listType: 0, sortType: 2 }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1419,7 +1790,7 @@
                 const minRating = document.getElementById("admin-min-rating")?.value;
                 const res = await fetch(
                     `${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25&listType=${listType}&sortType=${sortType}&pages=${pageCount}`
-                    + (minRating != null ? `&minRating=${encodeURIComponent(minRating)}` : "")
+                    + (minRating != null && minRating !== "" ? `&minRating=${encodeURIComponent(minRating)}` : "")
                 );
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1615,6 +1986,12 @@
                 const price = Number(p.newPrice || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                 const stars = Number(p.stars || 0).toFixed(1);
                 const commission = p.commissionRate || "—";
+                const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || "—";
+                const subLabel = ((categories.find(c => c.id === p.category) || {}).subcategories || [])
+                    .find(s => s.id === p.subcategory)?.label || p.subcategory || "";
+                const taxBadge = p.category && p.category !== "todos"
+                    ? `<span class="bg-orange-50 text-shopee-orange font-bold px-1.5 py-0.5 rounded">${escapeHtml(catLabel)}${subLabel ? " · " + escapeHtml(subLabel) : ""}</span>`
+                    : `<span class="bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded">Sem categoria</span>`;
                 return `
                 <label class="flex gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-shopee-orange/40 hover:bg-orange-50/30 cursor-pointer transition">
                     <input type="checkbox" class="explorer-item-cb mt-1 rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange"
@@ -1628,6 +2005,7 @@
                             <span><i class="fas fa-star text-amber-400"></i> ${stars}</span>
                             <span>${escapeHtml(String(p.sales || "—"))}</span>
                             <span class="text-emerald-700 font-bold">${escapeHtml(String(commission))}</span>
+                            ${taxBadge}
                             ${p.keyword ? `<span class="text-slate-400">· ${escapeHtml(p.keyword)}</span>` : ""}
                         </div>
                     </div>
@@ -1848,7 +2226,7 @@
             }
         }
 
-        async function loadOffersFromSupabase(opts = {}) {
+async function loadOffersFromSupabase(opts = {}) {
             const searchTerm = document.getElementById("store-search-input")?.value || "";
             const keyword = opts.keyword ?? searchTerm;
             const subcategory = opts.subcategory ?? (currentStoreSubcategory || "");
@@ -1877,6 +2255,87 @@
             } catch (err) {
                 if (!opts.silent) showToast(`Erro Supabase: ${err.message}`, "error");
                 return false;
+            }
+        }
+
+        let adminCatalogLoading = false;
+        let adminCatalogLoaded = false;
+
+        function updateAdminCatalogProgress(loaded, total) {
+            const loadedEl = document.getElementById('count-db-loaded');
+            if (!loadedEl) return;
+            if (adminCatalogLoading) {
+                loadedEl.textContent = total
+                    ? `· carregando ${loaded}/${total}…`
+                    : `· carregando ${loaded}…`;
+                return;
+            }
+            if (total > loaded) {
+                loadedEl.textContent = `· ${loaded} na memória (faltam ${total - loaded})`;
+            } else if (loaded > 0) {
+                loadedEl.textContent = `· ${loaded} carregados`;
+            } else {
+                loadedEl.textContent = '';
+            }
+        }
+
+        /** Carrega o catálogo inteiro do Supabase em lotes (só no admin). */
+        async function loadAdminCatalogFull({ silent = false, force = false } = {}) {
+            if (!isAdminMode()) return false;
+            if (adminCatalogLoading) return false;
+            if (adminCatalogLoaded && !force && productsDatabase.length > PAGE_SIZE) {
+                renderConsoleProducts();
+                return true;
+            }
+            adminCatalogLoading = true;
+            const BATCH = 200;
+            let offset = 0;
+            let all = [];
+            let knownTotal = Number((categories.find(c => c.id === 'todos') || {}).count) || 0;
+            const btn = document.getElementById('btn-load-full-catalog');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Carregando…';
+            }
+            updateAdminCatalogProgress(0, knownTotal);
+            try {
+                while (offset < 10000) {
+                    const url = `${API_BASE}/api/ofertas/db?limit=${BATCH}&offset=${offset}&sort=recent`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                    const batch = Array.isArray(data.products) ? data.products : [];
+                    all = all.concat(batch);
+                    updateAdminCatalogProgress(all.length, knownTotal || all.length);
+                    if (batch.length < BATCH) break;
+                    offset += BATCH;
+                }
+                const map = new Map(all.map(p => [String(p.id), p]));
+                productsDatabase = [...map.values()];
+                adminCatalogLoaded = true;
+                lastApiSource = 'supabase-full';
+                renderConsoleProducts();
+                populateAdminProductCategoryFilter();
+                loadAdminStats();
+                updateAdminCatalogProgress(productsDatabase.length, knownTotal || productsDatabase.length);
+                if (!silent) {
+                    showToast(`Catálogo completo: ${productsDatabase.length} produtos`, 'success');
+                }
+                return true;
+            } catch (err) {
+                if (!silent) showToast(`Erro ao carregar catálogo: ${err.message}`, 'error');
+                updateAdminCatalogProgress(productsDatabase.length, knownTotal);
+                return false;
+            } finally {
+                adminCatalogLoading = false;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-cloud-arrow-down mr-1"></i> Carregar catálogo completo';
+                }
+                updateAdminCatalogProgress(
+                    productsDatabase.length,
+                    Number((categories.find(c => c.id === 'todos') || {}).count) || productsDatabase.length
+                );
             }
         }
 
@@ -1951,73 +2410,14 @@
             }
         }
 
-        // Switch screen layout modes
+        // Compatibilidade com links antigos (#console, switchMainMode)
         function switchMainMode(mode) {
-            const storefront = document.getElementById('main-storefront-section');
-            const consoleSection = document.getElementById('main-console-section');
-            const btnStore = document.getElementById('btn-mode-storefront');
-            const btnConsole = document.getElementById('btn-mode-console');
-            const btnPerformance = document.getElementById('btn-mode-performance');
-            const btnCampaigns = document.getElementById('btn-mode-campaigns');
-            const performanceSection = document.getElementById('performance-section');
-            const campaignsSection = document.getElementById('campaigns-section');
-            const inactive = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
-            const active = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
-
-            if (mode === 'storefront') {
-                storefront.classList.remove('hidden');
-                consoleSection.classList.add('hidden');
-                btnStore.className = active;
-                btnConsole.className = inactive;
-                if (btnCampaigns) btnCampaigns.className = inactive;
-                btnPerformance.className = inactive;
-                renderStoreProducts();
-            } else if (mode === 'console') {
-                storefront.classList.add('hidden');
-                consoleSection.classList.remove('hidden');
-                Array.from(consoleSection.children).forEach(child => {
-                    if (child === performanceSection || child === campaignsSection) child.classList.add('hidden');
-                    else child.classList.remove('hidden');
-                });
-                btnStore.className = inactive;
-                btnConsole.className = active;
-                if (btnCampaigns) btnCampaigns.className = inactive;
-                btnPerformance.className = inactive;
-                adminPage = 1;
-                renderConsoleProducts();
-                populateAdminCategorySelect();
-                loadAdminStats();
-                loadAutoStatus();
-                updateExplorerKwCount();
-                updateExplorerModeHint();
-                try {
-                    if ((location.hash || '').replace(/^#/, '') !== 'catalogo') {
-                        history.replaceState(null, '', '#catalogo');
-                    }
-                } catch (_) {}
-            } else if (mode === 'campaigns') {
-                storefront.classList.add('hidden');
-                consoleSection.classList.remove('hidden');
-                Array.from(consoleSection.children).forEach(child => {
-                    child.classList.toggle('hidden', child !== campaignsSection);
-                });
-                btnStore.className = inactive;
-                btnConsole.className = inactive;
-                if (btnCampaigns) btnCampaigns.className = active;
-                btnPerformance.className = inactive;
-                renderSavedCampaigns();
-            } else {
-                storefront.classList.add('hidden');
-                consoleSection.classList.remove('hidden');
-                Array.from(consoleSection.children).forEach(child => {
-                    child.classList.toggle('hidden', child !== performanceSection);
-                });
-                btnStore.className = inactive;
-                btnConsole.className = inactive;
-                if (btnCampaigns) btnCampaigns.className = inactive;
-                btnPerformance.className = active;
-                loadConversions({ reset: true });
+            if (mode === "storefront") {
+                window.location.href = "/";
+                return;
             }
+            const map = { console: "produtos", campaigns: "campanhas", performance: "desempenho" };
+            switchAdminView(map[mode] || mode);
         }
 
         // Countdown baseado no próximo periodEnd real das ofertas relâmpago
@@ -3243,18 +3643,18 @@
             return campaignSelectedProducts;
         }
 
-        function addProductToCampaign(productOrId) {
+        function addProductToCampaign(productOrId, { silent = false } = {}) {
             const p = typeof productOrId === 'object'
                 ? productOrId
                 : productsDatabase.find(x => String(x.id) === String(productOrId));
             const id = p ? p.id : Number(productOrId);
             if (!id) {
-                showToast('Informe um ID de produto válido', 'error');
-                return;
+                if (!silent) showToast('Informe um ID de produto válido', 'error');
+                return false;
             }
             if (campaignSelectedProducts.some(x => String(x.id) === String(id))) {
-                showToast('Produto já está na campanha', 'error');
-                return;
+                if (!silent) showToast('Produto já está na campanha', 'error');
+                return false;
             }
             campaignSelectedProducts.push({
                 id,
@@ -3262,8 +3662,11 @@
                 category: p?.category || 'geral',
                 image: p?.image || '',
             });
-            renderCampaignSelectedProducts();
-            updateCampaignLinkPreview();
+            if (!silent) {
+                renderCampaignSelectedProducts();
+                updateCampaignLinkPreview();
+            }
+            return true;
         }
 
         function removeProductFromCampaign(id) {
@@ -3492,7 +3895,7 @@
             if (ch) ch.value = entry.channel || 'facebook';
             if (name) name.value = entry.campaign || 'promo_vitrine';
             campaignSelectedProducts = Array.isArray(entry.products) ? [...entry.products] : [];
-            switchMainMode('console');
+            switchAdminView('campanhas');
             renderCampaignSelectedProducts();
             updateCampaignLinkPreview();
             document.getElementById('campaign-link-name')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3523,7 +3926,7 @@
             } catch (_) {}
 
             if (!list.length) {
-                box.innerHTML = `<p class="text-slate-400 text-center py-8">Nenhuma campanha salva ainda.<br><button onclick="switchMainMode('console')" class="mt-3 text-shopee-orange font-bold">Criar no Console Admin</button></p>`;
+                box.innerHTML = `<p class="text-slate-400 text-center py-8">Nenhuma campanha salva ainda.<br><button onclick="switchAdminView('campanhas')" class="mt-3 text-shopee-orange font-bold">Criar campanha</button></p>`;
                 return;
             }
             box.innerHTML = list.map(c => {
@@ -3546,6 +3949,7 @@
                     </div>
                     <div class="flex flex-wrap gap-2 pt-1">
                         <button type="button" onclick="copySavedCampaignLinks('${c.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-[10px] font-bold">Copiar links</button>
+                        <button type="button" onclick="openCampaignPerfByName('${escapeAttr(c.campaign)}')" class="px-2.5 py-1.5 rounded-lg bg-shopee-orange text-white text-[10px] font-bold">Desempenho</button>
                         <button type="button" onclick="loadSavedCampaignIntoEditor('${c.id}')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-600">Editar</button>
                         <button type="button" onclick="deleteSavedCampaign('${c.id}')" class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-red-500">Apagar</button>
                     </div>
@@ -3665,9 +4069,13 @@
 
             document.getElementById('conversion-total').textContent = String(conversionRows.length);
             document.getElementById('conversion-orders').textContent = String(orders.length);
-            document.getElementById('conversion-commission').textContent =
-                commission.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            const commissionText = commission.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            document.getElementById('conversion-commission').textContent = commissionText;
             document.getElementById('conversion-subids').textContent = String(subIds.size);
+            const dashTotal = document.getElementById('dash-conversion-total');
+            const dashComm = document.getElementById('dash-conversion-commission');
+            if (dashTotal) dashTotal.textContent = String(conversionRows.length);
+            if (dashComm) dashComm.textContent = commissionText;
 
             if (!orders.length) {
                 document.getElementById('conversion-pagination')?.classList.add('hidden');
@@ -3754,6 +4162,324 @@
             if (pageInfo) {
                 pageInfo.textContent = `Página ${conversionPage} de ${totalLoadedPages}${conversionHasNextRemote ? '+' : ''}`;
             }
+        }
+
+        let campaignPerfRows = [];
+        let campaignPerfSelected = '';
+        let campaignPerfLoading = false;
+
+        function formatMoneyBRL(value) {
+            return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function normalizeCampaignKey(name) {
+            const raw = String(name || '').trim().toLowerCase();
+            return raw || 'sem_campanha';
+        }
+
+        function campaignDisplayName(key) {
+            if (!key || key === 'sem_campanha') return 'Sem campanha / orgânico';
+            return key;
+        }
+
+        function buildCampaignPerformanceMap(rows) {
+            const map = new Map();
+            for (const conversion of rows || []) {
+                const parsed = parseUtmContent(conversion.utmContent);
+                const key = normalizeCampaignKey(parsed.campaign);
+                if (!map.has(key)) {
+                    map.set(key, {
+                        key,
+                        name: campaignDisplayName(key),
+                        conversions: 0,
+                        orders: 0,
+                        itemsQty: 0,
+                        commission: 0,
+                        sellerCommission: 0,
+                        shopeeCommission: 0,
+                        channels: {},
+                        statuses: {},
+                        products: {},
+                        devices: {},
+                        buyerTypes: {},
+                        conversionsList: [],
+                        lastPurchase: 0,
+                    });
+                }
+                const bucket = map.get(key);
+                bucket.conversions += 1;
+                bucket.commission += commissionNumber(conversion.totalCommission);
+                bucket.sellerCommission += commissionNumber(conversion.sellerCommission);
+                bucket.shopeeCommission += commissionNumber(conversion.shopeeCommissionCapped);
+                bucket.conversionsList.push(conversion);
+                const purchase = Number(conversion.purchaseTime) || 0;
+                if (purchase > bucket.lastPurchase) bucket.lastPurchase = purchase;
+
+                const channel = sanitizeSubId(parsed.channel, 'desconhecido');
+                bucket.channels[channel] = (bucket.channels[channel] || 0) + 1;
+
+                if (conversion.device) {
+                    const d = String(conversion.device);
+                    bucket.devices[d] = (bucket.devices[d] || 0) + 1;
+                }
+                if (conversion.buyerType) {
+                    const b = String(conversion.buyerType);
+                    bucket.buyerTypes[b] = (bucket.buyerTypes[b] || 0) + 1;
+                }
+
+                for (const order of (conversion.orders || [])) {
+                    bucket.orders += 1;
+                    const st = String(order.orderStatus || 'UNKNOWN');
+                    bucket.statuses[st] = (bucket.statuses[st] || 0) + 1;
+                    for (const item of (order.items || [])) {
+                        const qty = Number(item.qty) || 1;
+                        bucket.itemsQty += qty;
+                        const pid = String(item.itemId || item.itemName || 'item');
+                        if (!bucket.products[pid]) {
+                            bucket.products[pid] = {
+                                id: item.itemId,
+                                name: item.itemName || `Item ${item.itemId || ''}`,
+                                image: item.imageUrl || '',
+                                shop: item.shopName || '',
+                                qty: 0,
+                                commission: 0,
+                                price: Number(item.itemPrice) || 0,
+                            };
+                        }
+                        bucket.products[pid].qty += qty;
+                        bucket.products[pid].commission += commissionNumber(item.itemTotalCommission);
+                    }
+                }
+            }
+            return [...map.values()].sort((a, b) => b.commission - a.commission || b.orders - a.orders);
+        }
+
+        async function fetchConversionBatch({ days, status, scrollId = '' }) {
+            const params = new URLSearchParams({ days: String(days), limit: '50', siteOnly: '1' });
+            if (status) params.set('status', status);
+            if (scrollId) params.set('scrollId', scrollId);
+            const res = await fetch(`${API_BASE}/api/conversions?${params}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Não foi possível consultar as conversões');
+            return data;
+        }
+
+        async function loadCampaignPerformance({ reset = false } = {}) {
+            const list = document.getElementById('camp-perf-list');
+            if (!list || !isAdminMode() || campaignPerfLoading) return;
+            campaignPerfLoading = true;
+            if (reset) {
+                campaignPerfRows = [];
+                campaignPerfSelected = '';
+                closeCampaignPerfDetail();
+            }
+            list.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs"><i class="fas fa-spinner fa-spin mr-2"></i>Consultando vendas na Shopee…</div>';
+            try {
+                const days = document.getElementById('camp-perf-days')?.value || '30';
+                const status = document.getElementById('camp-perf-status')?.value || '';
+                let scrollId = '';
+                let hasNext = true;
+                let pages = 0;
+                const maxPages = 6; // até ~300 conversões do site
+                const all = [];
+                while (hasNext && pages < maxPages) {
+                    const data = await fetchConversionBatch({ days, status, scrollId });
+                    const received = Array.isArray(data.conversions) ? data.conversions : [];
+                    all.push(...received);
+                    scrollId = data.pageInfo?.scrollId || '';
+                    hasNext = Boolean(data.pageInfo?.hasNextPage && scrollId && received.length);
+                    pages += 1;
+                    if (!received.length) break;
+                }
+                campaignPerfRows = all;
+                renderCampaignPerformance();
+                if (!all.length) {
+                    showToast('Nenhuma venda deste site no período', 'success');
+                } else if (hasNext) {
+                    showToast(`Carregadas ${all.length} conversões (há mais na Shopee — refine o período)`, 'success');
+                }
+            } catch (err) {
+                list.innerHTML = `
+                    <div class="py-8 text-center text-red-500 text-xs">
+                        <i class="fas fa-circle-exclamation mr-1"></i>${escapeHtml(err.message)}
+                    </div>`;
+            } finally {
+                campaignPerfLoading = false;
+            }
+        }
+
+        function renderCampaignPerformance() {
+            const list = document.getElementById('camp-perf-list');
+            if (!list) return;
+            const campaigns = buildCampaignPerformanceMap(campaignPerfRows);
+            const totalOrders = campaigns.reduce((s, c) => s + c.orders, 0);
+            const totalItems = campaigns.reduce((s, c) => s + c.itemsQty, 0);
+            const totalCommission = campaigns.reduce((s, c) => s + c.commission, 0);
+
+            document.getElementById('camp-perf-count').textContent = String(campaigns.length);
+            document.getElementById('camp-perf-conversions').textContent = String(campaignPerfRows.length);
+            document.getElementById('camp-perf-orders').textContent = String(totalOrders);
+            document.getElementById('camp-perf-items').textContent = String(totalItems);
+            document.getElementById('camp-perf-commission').textContent = formatMoneyBRL(totalCommission);
+
+            if (!campaigns.length) {
+                list.innerHTML = `
+                    <div class="py-10 text-center text-slate-400 text-xs space-y-2">
+                        <i class="fas fa-chart-pie text-2xl block mb-2"></i>
+                        <p class="font-bold text-slate-600">Nenhuma venda por campanha ainda</p>
+                        <p>Quando alguém comprar por um link com Sub ID de campanha, o desempenho aparece aqui.</p>
+                        <button onclick="switchAdminView('campanhas')" class="mt-2 text-shopee-orange font-bold">Criar campanha</button>
+                    </div>`;
+                return;
+            }
+
+            list.innerHTML = campaigns.map(c => {
+                const topChannels = Object.entries(c.channels)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 3)
+                    .map(([ch, n]) => `${escapeHtml(ch)} (${n})`)
+                    .join(' · ') || '—';
+                const statusBits = Object.entries(c.statuses)
+                    .map(([st, n]) => `${escapeHtml(conversionStatusLabel(st))}: ${n}`)
+                    .join(' · ');
+                const selected = campaignPerfSelected === c.key ? 'ring-2 ring-shopee-orange border-shopee-orange' : 'border-slate-200';
+                return `
+                <article onclick="openCampaignPerfDetail('${escapeAttr(c.key)}')"
+                    class="admin-stat-card border ${selected} rounded-xl p-4 text-xs bg-white hover:bg-orange-50/40">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="font-black text-slate-800 text-sm truncate">${escapeHtml(c.name)}</p>
+                            <p class="text-[10px] text-slate-400 mt-1">Canais: ${topChannels}</p>
+                            <p class="text-[10px] text-slate-400">${escapeHtml(statusBits || 'Sem pedidos')}</p>
+                            ${c.lastPurchase ? `<p class="text-[10px] text-slate-400 mt-1">Última venda: ${escapeHtml(conversionDate(c.lastPurchase))}</p>` : ''}
+                        </div>
+                        <div class="text-right shrink-0 space-y-1">
+                            <p class="text-lg font-black text-emerald-600">${formatMoneyBRL(c.commission)}</p>
+                            <p class="text-[10px] text-slate-500">${c.orders} pedido(s) · ${c.conversions} conv. · ${c.itemsQty} item(ns)</p>
+                            <span class="inline-block text-[9px] font-bold uppercase text-shopee-orange">Ver detalhes →</span>
+                        </div>
+                    </div>
+                </article>`;
+            }).join('');
+        }
+
+        function openCampaignPerfByName(campaignName) {
+            switchAdminView('campanha-desempenho');
+            const key = normalizeCampaignKey(campaignName);
+            // Aguarda o load e abre o detalhe
+            const tryOpen = () => {
+                if (campaignPerfLoading) {
+                    setTimeout(tryOpen, 200);
+                    return;
+                }
+                openCampaignPerfDetail(key);
+            };
+            setTimeout(tryOpen, 100);
+        }
+
+        function openCampaignPerfDetail(key) {
+            const campaigns = buildCampaignPerformanceMap(campaignPerfRows);
+            const c = campaigns.find(x => x.key === key);
+            const detail = document.getElementById('camp-perf-detail');
+            if (!c || !detail) {
+                showToast('Campanha sem vendas no período carregado', 'error');
+                return;
+            }
+            campaignPerfSelected = key;
+            renderCampaignPerformance();
+
+            document.getElementById('camp-perf-detail-title').textContent = c.name;
+            document.getElementById('camp-perf-detail-meta').textContent =
+                `${c.conversions} conversões · ${c.orders} pedidos · ${Object.keys(c.channels).length} canal(is)`;
+
+            document.getElementById('camp-perf-detail-stats').innerHTML = `
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Comissão total</p>
+                    <p class="text-lg font-black text-emerald-600">${formatMoneyBRL(c.commission)}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Comissão loja</p>
+                    <p class="text-sm font-black text-slate-800">${formatMoneyBRL(c.sellerCommission)}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Comissão Shopee</p>
+                    <p class="text-sm font-black text-slate-800">${formatMoneyBRL(c.shopeeCommission)}</p>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">Itens / pedidos</p>
+                    <p class="text-lg font-black text-shopee-orange">${c.itemsQty} / ${c.orders}</p>
+                </div>`;
+
+            const channelsEl = document.getElementById('camp-perf-detail-channels');
+            const channelEntries = Object.entries(c.channels).sort((a, b) => b[1] - a[1]);
+            channelsEl.innerHTML = channelEntries.length
+                ? channelEntries.map(([ch, n]) => `
+                    <div class="flex justify-between items-center border border-slate-100 rounded-lg px-3 py-2">
+                        <span class="font-bold text-slate-700">${escapeHtml(ch)}</span>
+                        <span class="text-slate-500">${n} venda(s)</span>
+                    </div>`).join('')
+                : '<p class="text-slate-400">Sem canais</p>';
+
+            const productsEl = document.getElementById('camp-perf-detail-products');
+            const products = Object.values(c.products).sort((a, b) => b.qty - a.qty || b.commission - a.commission).slice(0, 12);
+            productsEl.innerHTML = products.length
+                ? products.map(p => `
+                    <div class="flex items-center gap-2 border border-slate-100 rounded-lg p-2">
+                        <img src="${escapeAttr(p.image || 'https://placehold.co/64x64/ffebd7/ee4d2d?text=S')}" alt=""
+                            class="w-10 h-10 rounded-lg object-cover bg-slate-100 shrink-0"
+                            onerror="this.onerror=null;this.src='https://placehold.co/64x64/ffebd7/ee4d2d?text=S'">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-slate-700 line-clamp-1">${escapeHtml(p.name)}</p>
+                            <p class="text-[10px] text-slate-400">${p.qty} un. · ${formatMoneyBRL(p.commission)}${p.shop ? ' · ' + escapeHtml(p.shop) : ''}</p>
+                        </div>
+                    </div>`).join('')
+                : '<p class="text-slate-400">Sem produtos</p>';
+
+            const ordersEl = document.getElementById('camp-perf-detail-orders');
+            const orderRows = c.conversionsList.flatMap(conv =>
+                (conv.orders || []).map(order => ({ conv, order }))
+            );
+            ordersEl.innerHTML = orderRows.length
+                ? orderRows.map(({ conv, order }) => {
+                    const parsed = parseUtmContent(conv.utmContent);
+                    const status = conversionStatusLabel(order.orderStatus);
+                    const statusClass = order.orderStatus === 'COMPLETED'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : order.orderStatus === 'CANCELLED'
+                            ? 'bg-red-50 text-red-600'
+                            : 'bg-amber-50 text-amber-700';
+                    const items = (order.items || []).map(item =>
+                        `<p class="text-[10px] text-slate-600">${escapeHtml(String(item.itemName || item.itemId))} · qtd ${item.qty || 1} · ${formatMoneyBRL(item.itemTotalCommission)}</p>`
+                    ).join('');
+                    return `
+                    <article class="border border-slate-200 rounded-xl p-3 text-xs">
+                        <div class="flex flex-wrap justify-between gap-2 mb-2">
+                            <div>
+                                <p class="font-bold text-slate-800">Pedido ${escapeHtml(String(order.orderId || '—'))}</p>
+                                <p class="text-[10px] text-slate-400">${escapeHtml(conversionDate(conv.purchaseTime))} · canal ${escapeHtml(parsed.channel || '—')}</p>
+                            </div>
+                            <span class="self-start px-2 py-1 rounded-md text-[9px] font-bold ${statusClass}">${escapeHtml(status)}</span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] mb-2 bg-slate-50 rounded-lg p-2">
+                            <div><span class="text-slate-400">Device</span><br><strong>${escapeHtml(String(conv.device || '—'))}</strong></div>
+                            <div><span class="text-slate-400">Buyer</span><br><strong>${escapeHtml(String(conv.buyerType || '—'))}</strong></div>
+                            <div><span class="text-slate-400">Clique</span><br><strong>${escapeHtml(conversionDate(conv.clickTime))}</strong></div>
+                            <div><span class="text-slate-400">Comissão</span><br><strong class="text-emerald-600">${formatMoneyBRL(conv.totalCommission)}</strong></div>
+                        </div>
+                        ${items}
+                        <p class="font-mono text-[9px] text-slate-400 mt-2 break-all">${escapeHtml(String(conv.utmContent || ''))}</p>
+                    </article>`;
+                }).join('')
+                : '<p class="text-slate-400 text-xs text-center py-4">Nenhum pedido</p>';
+
+            detail.classList.remove('hidden');
+            detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function closeCampaignPerfDetail() {
+            campaignPerfSelected = '';
+            document.getElementById('camp-perf-detail')?.classList.add('hidden');
+            renderCampaignPerformance();
         }
 
         async function loadConversions({ reset = false, advance = false } = {}) {
@@ -3885,24 +4611,205 @@
             btn.classList.toggle('flex', show);
         }, { passive: true });
 
-        // ---- Gerenciador de produtos (paginado + busca) ----
+        // ---- Gerenciador de produtos (filtros + seleção em massa) ----
         let adminPage = 1;
-        const ADMIN_PAGE_SIZE = 8;
+        let adminPageSize = 24;
         let adminSearchTerm = '';
+        let adminFilterCategory = '';
+        let adminFilterType = '';
+        let adminFilterSort = 'recent';
+        let adminSelectedIds = new Set();
+        let adminSearchTimer = null;
+
+        function parseCommissionPct(value) {
+            const n = parseFloat(String(value || '').replace('%', '').replace(',', '.'));
+            return Number.isFinite(n) ? n : 0;
+        }
 
         function getAdminFiltered() {
             const term = adminSearchTerm.toLowerCase().trim();
-            if (!term) return productsDatabase;
-            return productsDatabase.filter(p =>
-                (p.title || '').toLowerCase().includes(term) ||
-                (p.category || '').toLowerCase().includes(term)
-            );
+            let list = productsDatabase.slice();
+
+            if (adminFilterCategory) {
+                list = list.filter(p => String(p.category || '') === adminFilterCategory);
+            }
+            if (adminFilterType === 'flash') {
+                list = list.filter(p => !!p.isFlashSale);
+            } else if (adminFilterType === 'normal') {
+                list = list.filter(p => !p.isFlashSale);
+            }
+            if (term) {
+                list = list.filter(p => {
+                    const hay = [
+                        p.title,
+                        p.category,
+                        p.subcategory,
+                        p.shopName,
+                        p.id,
+                        p.itemId,
+                        p.keyword,
+                    ].map(v => String(v || '').toLowerCase()).join(' ');
+                    return hay.includes(term);
+                });
+            }
+
+            switch (adminFilterSort) {
+                case 'name':
+                    list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'pt-BR'));
+                    break;
+                case 'price_asc':
+                    list.sort((a, b) => Number(a.newPrice || 0) - Number(b.newPrice || 0));
+                    break;
+                case 'price_desc':
+                    list.sort((a, b) => Number(b.newPrice || 0) - Number(a.newPrice || 0));
+                    break;
+                case 'discount':
+                    list.sort((a, b) => Number(b.discountPct || 0) - Number(a.discountPct || 0));
+                    break;
+                case 'commission':
+                    list.sort((a, b) => parseCommissionPct(b.commissionRate) - parseCommissionPct(a.commissionRate));
+                    break;
+                default:
+                    list.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+            }
+            return list;
+        }
+
+        function syncAdminFilterControls() {
+            const search = document.getElementById('admin-search');
+            const cat = document.getElementById('admin-filter-category');
+            const type = document.getElementById('admin-filter-type');
+            const sort = document.getElementById('admin-filter-sort');
+            const size = document.getElementById('admin-page-size');
+            if (search && search.value !== adminSearchTerm) search.value = adminSearchTerm;
+            if (cat) cat.value = adminFilterCategory;
+            if (type) type.value = adminFilterType;
+            if (sort) sort.value = adminFilterSort;
+            if (size) size.value = String(adminPageSize);
+        }
+
+        function populateAdminProductCategoryFilter() {
+            const sel = document.getElementById('admin-filter-category');
+            if (!sel) return;
+            const current = adminFilterCategory || sel.value;
+            const opts = categories
+                .filter(c => c.id !== 'todos')
+                .map(c => {
+                    const count = productsDatabase.filter(p => p.category === c.id).length;
+                    return `<option value="${escapeAttr(c.id)}">${escapeHtml(c.label)}${count ? ` (${count})` : ''}</option>`;
+                })
+                .join('');
+            sel.innerHTML = `<option value="">Todas as categorias</option>${opts}`;
+            if (current && [...sel.options].some(o => o.value === current)) sel.value = current;
         }
 
         function onAdminSearch() {
-            adminSearchTerm = document.getElementById('admin-search')?.value || '';
+            clearTimeout(adminSearchTimer);
+            adminSearchTimer = setTimeout(() => {
+                adminSearchTerm = document.getElementById('admin-search')?.value || '';
+                adminPage = 1;
+                renderConsoleProducts();
+            }, 180);
+        }
+
+        function onAdminFiltersChange() {
+            adminFilterCategory = document.getElementById('admin-filter-category')?.value || '';
+            adminFilterType = document.getElementById('admin-filter-type')?.value || '';
+            adminFilterSort = document.getElementById('admin-filter-sort')?.value || 'recent';
             adminPage = 1;
             renderConsoleProducts();
+        }
+
+        function onAdminPageSizeChange() {
+            adminPageSize = Math.min(100, Math.max(8, Number(document.getElementById('admin-page-size')?.value) || 24));
+            adminPage = 1;
+            renderConsoleProducts();
+        }
+
+        function clearAdminFilters() {
+            adminSearchTerm = '';
+            adminFilterCategory = '';
+            adminFilterType = '';
+            adminFilterSort = 'recent';
+            adminPage = 1;
+            syncAdminFilterControls();
+            renderConsoleProducts();
+        }
+
+        function updateAdminBulkBar() {
+            const bar = document.getElementById('admin-bulk-bar');
+            const countEl = document.getElementById('admin-selected-count');
+            const n = adminSelectedIds.size;
+            if (countEl) countEl.textContent = String(n);
+            if (bar) bar.classList.toggle('hidden', n === 0);
+        }
+
+        function toggleAdminProductSelect(id, checked) {
+            const key = String(id);
+            if (checked) adminSelectedIds.add(key);
+            else adminSelectedIds.delete(key);
+            updateAdminBulkBar();
+            const pageCb = document.getElementById('admin-select-page');
+            if (pageCb) {
+                const filtered = getAdminFiltered();
+                const start = (adminPage - 1) * adminPageSize;
+                const pageItems = filtered.slice(start, start + adminPageSize);
+                const allOnPage = pageItems.length > 0 && pageItems.every(p => adminSelectedIds.has(String(p.id)));
+                pageCb.checked = allOnPage;
+                pageCb.indeterminate = !allOnPage && pageItems.some(p => adminSelectedIds.has(String(p.id)));
+            }
+        }
+
+        function toggleSelectAdminPage(checked) {
+            const filtered = getAdminFiltered();
+            const start = (adminPage - 1) * adminPageSize;
+            const pageItems = filtered.slice(start, start + adminPageSize);
+            pageItems.forEach(p => {
+                if (checked) adminSelectedIds.add(String(p.id));
+                else adminSelectedIds.delete(String(p.id));
+            });
+            renderConsoleProducts();
+        }
+
+        function selectAllFilteredProducts() {
+            const filtered = getAdminFiltered();
+            if (!filtered.length) {
+                showToast('Nenhum produto no filtro atual', 'error');
+                return;
+            }
+            filtered.forEach(p => adminSelectedIds.add(String(p.id)));
+            renderConsoleProducts();
+            showToast(`${filtered.length} produto(s) selecionado(s)`, 'success');
+        }
+
+        function clearAdminProductSelection() {
+            adminSelectedIds.clear();
+            renderConsoleProducts();
+        }
+
+        function addSelectedProductsToCampaign() {
+            if (!adminSelectedIds.size) {
+                showToast('Selecione ao menos um produto', 'error');
+                return;
+            }
+            let added = 0;
+            let skipped = 0;
+            for (const id of adminSelectedIds) {
+                const ok = addProductToCampaign(id, { silent: true });
+                if (ok) added += 1;
+                else skipped += 1;
+            }
+            renderCampaignSelectedProducts();
+            updateCampaignLinkPreview();
+            adminSelectedIds.clear();
+            renderConsoleProducts();
+            showToast(
+                added
+                    ? `${added} produto(s) adicionados à campanha${skipped ? ` (${skipped} já estavam)` : ''}`
+                    : 'Nenhum produto novo para adicionar',
+                added ? 'success' : 'error'
+            );
+            if (added) switchAdminView('campanhas');
         }
 
         function adminPrevPage() {
@@ -3911,79 +4818,135 @@
 
         function adminNextPage() {
             const total = getAdminFiltered().length;
-            const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+            const maxPage = Math.max(1, Math.ceil(total / adminPageSize));
             if (adminPage < maxPage) { adminPage++; renderConsoleProducts(); }
         }
 
         function renderConsoleProducts() {
             const container = document.getElementById('console-products-list');
             if (!container) return;
-            container.innerHTML = '';
+
+            populateAdminProductCategoryFilter();
+            syncAdminFilterControls();
 
             const countEl = document.getElementById('count-db-items');
             const loadedEl = document.getElementById('count-db-loaded');
+            const summaryEl = document.getElementById('admin-filter-summary');
             const dbTotal = Number((categories.find(c => c.id === 'todos') || {}).count) || 0;
             if (countEl) countEl.innerText = dbTotal > 0 ? dbTotal : productsDatabase.length;
-            if (loadedEl) {
-                loadedEl.textContent = dbTotal > productsDatabase.length
-                    ? `· ${productsDatabase.length} carregados nesta página`
-                    : '';
+            if (loadedEl && !adminCatalogLoading) {
+                if (dbTotal > productsDatabase.length) {
+                    loadedEl.textContent = `· ${productsDatabase.length} na memória (faltam ${dbTotal - productsDatabase.length})`;
+                } else if (productsDatabase.length) {
+                    loadedEl.textContent = `· ${productsDatabase.length} carregados`;
+                } else {
+                    loadedEl.textContent = '';
+                }
             }
 
             const filtered = getAdminFiltered();
             const total = filtered.length;
-            const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+            const maxPage = Math.max(1, Math.ceil(total / adminPageSize));
             if (adminPage > maxPage) adminPage = maxPage;
-            const start = (adminPage - 1) * ADMIN_PAGE_SIZE;
-            const pageItems = filtered.slice(start, start + ADMIN_PAGE_SIZE);
+            const start = (adminPage - 1) * adminPageSize;
+            const pageItems = filtered.slice(start, start + adminPageSize);
+
+            if (summaryEl) {
+                const bits = [];
+                if (adminSearchTerm) bits.push(`busca “${adminSearchTerm}”`);
+                if (adminFilterCategory) {
+                    const lab = (categories.find(c => c.id === adminFilterCategory) || {}).label || adminFilterCategory;
+                    bits.push(lab);
+                }
+                if (adminFilterType === 'flash') bits.push('relâmpago');
+                if (adminFilterType === 'normal') bits.push('normal');
+                summaryEl.textContent = bits.length
+                    ? `${total} resultado(s) · ${bits.join(' · ')}`
+                    : `${total} produto(s) listados`;
+            }
+
+            const pageCb = document.getElementById('admin-select-page');
+            if (pageCb) {
+                const allOnPage = pageItems.length > 0 && pageItems.every(p => adminSelectedIds.has(String(p.id)));
+                pageCb.checked = allOnPage;
+                pageCb.indeterminate = !allOnPage && pageItems.some(p => adminSelectedIds.has(String(p.id)));
+            }
 
             if (!pageItems.length) {
-                container.innerHTML = `<div class="py-8 text-center text-slate-400 text-xs">Nenhum produto encontrado.</div>`;
+                container.innerHTML = `
+                    <div class="py-12 text-center text-slate-400 text-xs space-y-2">
+                        <i class="fas fa-box-open text-2xl block"></i>
+                        <p class="font-bold text-slate-600">Nenhum produto encontrado</p>
+                        <p>Ajuste os filtros ou limpe a busca.</p>
+                        <button type="button" onclick="clearAdminFilters()" class="text-shopee-orange font-bold">Limpar filtros</button>
+                    </div>`;
             } else {
-                pageItems.forEach(p => {
-                    const labelFlash = p.isFlashSale ? `<span class="bg-red-500 text-white font-bold text-[8px] px-1.5 py-0.5 rounded">RELÂMPAGO</span>` : ``;
+                container.innerHTML = pageItems.map(p => {
+                    const selected = adminSelectedIds.has(String(p.id));
+                    const labelFlash = p.isFlashSale
+                        ? `<span class="bg-red-500 text-white font-bold text-[8px] px-1.5 py-0.5 rounded">RELÂMPAGO</span>`
+                        : '';
                     const rate = p.commissionRate && p.commissionRate !== '0.0%' ? p.commissionRate : '—';
-                    container.innerHTML += `
-                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center gap-3">
-                            <img src="${p.image}" class="w-11 h-11 object-cover rounded-lg border bg-white shrink-0" onerror="this.onerror=null; this.src='https://placehold.co/100x100/ffebd7/ee4d2d?text=Icon'">
+                    const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || '';
+                    const border = selected ? 'border-shopee-orange bg-orange-50/60 ring-1 ring-orange-200' : 'border-slate-200 bg-slate-50';
+                    return `
+                        <div class="p-3 rounded-xl border ${border} text-xs flex items-start gap-3 transition">
+                            <label class="pt-3 shrink-0 cursor-pointer">
+                                <input type="checkbox" class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange"
+                                    ${selected ? 'checked' : ''}
+                                    onchange="toggleAdminProductSelect('${String(p.id).replace(/'/g, '')}', this.checked)">
+                            </label>
+                            <img src="${escapeAttr(p.image || '')}" alt="" class="w-12 h-12 object-cover rounded-lg border bg-white shrink-0"
+                                onerror="this.onerror=null; this.src='https://placehold.co/100x100/ffebd7/ee4d2d?text=Icon'">
                             <div class="min-w-0 flex-1">
-                                <h5 class="font-bold text-slate-800 truncate">${escapeHtml(p.title)}</h5>
-                                <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
-                                    <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-600">${escapeHtml(String(p.category || ''))}</span>
+                                <h5 class="font-bold text-slate-800 line-clamp-2 leading-snug">${escapeHtml(p.title)}</h5>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                                    <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-600">${escapeHtml(String(catLabel))}</span>
                                     ${labelFlash}
-                                    <span class="text-shopee-orange font-bold text-[10px]">R$ ${Number(p.newPrice).toFixed(2)}</span>
-                                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
+                                    <span class="text-shopee-orange font-bold text-[10px]">R$ ${Number(p.newPrice || 0).toFixed(2)}</span>
+                                    ${p.discountPct ? `<span class="text-emerald-600 text-[9px] font-bold">-${p.discountPct}%</span>` : ''}
+                                    <span class="text-slate-400 text-[9px]">comissão ${escapeHtml(String(rate))}</span>
+                                    <span class="text-slate-300 text-[9px] font-mono">#${escapeHtml(String(p.id))}</span>
                                 </div>
-                                <p class="font-mono text-[9px] text-slate-400 mt-1 truncate" title="${escapeAttr(productSubIdsLabel(p))}">Sub ID: ${escapeHtml(productSubIdsLabel(p))}</p>
+                                ${p.shopName ? `<p class="text-[10px] text-slate-400 mt-0.5 truncate">${escapeHtml(p.shopName)}</p>` : ''}
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <button onclick="addProductToCampaign('${String(p.id).replace(/'/g, '')}'); showToast('Produto adicionado à campanha','success'); switchMainMode('console');"
-                                    class="text-slate-400 hover:text-shopee-orange" title="Adicionar à campanha">
+                            <div class="flex items-center gap-2 shrink-0 pt-1">
+                                <button type="button" onclick="addProductToCampaign('${String(p.id).replace(/'/g, '')}'); showToast('Produto adicionado à campanha','success'); switchAdminView('campanhas');"
+                                    class="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-shopee-orange hover:border-shopee-orange flex items-center justify-center" title="Adicionar à campanha">
                                     <i class="fas fa-bullhorn"></i>
                                 </button>
-                                <a href="${escapeAttr(p.affiliateLink || '#')}" target="_blank" rel="noopener" class="text-slate-400 hover:text-shopee-orange" title="Abrir link">
+                                <a href="${escapeAttr(p.affiliateLink || '#')}" target="_blank" rel="noopener"
+                                    class="h-8 w-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-shopee-orange hover:border-shopee-orange flex items-center justify-center" title="Abrir link">
                                     <i class="fas fa-arrow-up-right-from-square"></i>
                                 </a>
-                                <button onclick="removeProductFromDatabase(${p.id})" class="text-red-400 hover:text-red-600" title="Excluir">
+                                <button type="button" onclick="removeProductFromDatabase(${JSON.stringify(String(p.id))})"
+                                    class="h-8 w-8 rounded-lg bg-white border border-slate-200 text-red-400 hover:text-red-600 hover:border-red-200 flex items-center justify-center" title="Excluir">
                                     <i class="fas fa-trash-can"></i>
                                 </button>
                             </div>
-                        </div>
-                    `;
-                });
+                        </div>`;
+                }).join('');
             }
 
             const info = document.getElementById('admin-page-info');
-            if (info) info.textContent = `Página ${adminPage} de ${maxPage} · ${total} itens`;
+            if (info) {
+                const from = total ? start + 1 : 0;
+                const to = Math.min(start + adminPageSize, total);
+                info.textContent = total
+                    ? `Página ${adminPage} de ${maxPage} · ${from}–${to} de ${total}`
+                    : 'Sem resultados';
+            }
             const prev = document.getElementById('admin-prev');
             const next = document.getElementById('admin-next');
             if (prev) prev.disabled = adminPage <= 1;
             if (next) next.disabled = adminPage >= maxPage;
+            updateAdminBulkBar();
         }
 
         // Remove product
         function removeProductFromDatabase(id) {
-            productsDatabase = productsDatabase.filter(p => p.id !== id);
+            productsDatabase = productsDatabase.filter(p => String(p.id) !== String(id));
+            adminSelectedIds.delete(String(id));
             localStorage.setItem('afiliado_mestre_db_v1', JSON.stringify(productsDatabase));
             renderConsoleProducts();
             renderStoreProducts();
@@ -4122,10 +5085,14 @@
                 const countEl = document.getElementById('count-db-items');
                 const loadedEl = document.getElementById('count-db-loaded');
                 if (countEl) countEl.innerText = total.toLocaleString('pt-BR');
-                if (loadedEl) {
-                    loadedEl.textContent = total > productsDatabase.length
-                        ? `· ${productsDatabase.length} carregados nesta página`
-                        : '';
+                if (loadedEl && !adminCatalogLoading) {
+                    if (total > productsDatabase.length) {
+                        loadedEl.textContent = `· ${productsDatabase.length} na memória (faltam ${total - productsDatabase.length})`;
+                    } else if (productsDatabase.length) {
+                        loadedEl.textContent = `· ${productsDatabase.length} carregados`;
+                    } else {
+                        loadedEl.textContent = '';
+                    }
                 }
             } catch (err) {
                 if (prodEl) prodEl.innerText = productsDatabase.length;
@@ -4163,16 +5130,16 @@
                 const modes = (s.modes || []).map(m => m.label || `${m.listType}/${m.sortType}`).join(' → ');
                 if (box) {
                     box.innerHTML = [
-                        `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado (pausado)'}`,
+                        `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado'}`,
                         `lote..........: ${s.batch} keyword(s) / execução`,
                         `foco feminino.: ${s.femalePercentTarget || 90}% das buscas`,
                         `intervalo.....: ${s.intervalMin} min`,
                         `itens/keyword.: ${s.limit}`,
                         `keywords total: ${s.keywordsTotal} (posição ${s.cursor})`,
-                        `rotação.......: ${modes || '—'}`,
+                        `modos.........: ${modes || '—'}`,
                         `execuções.....: ${s.runs}`,
                         `última........: ${fmtDateTime(s.lastRunAt)}`,
-                        `próxima.......: ${s.enabled ? fmtDateTime(s.nextRunAt) : '— (agendador off)'}`,
+                        `próxima.......: ${fmtDateTime(s.nextRunAt)}`,
                         `limpeza.......: ${s.pruneDays ? s.pruneDays + ' dias' : 'desligada'}`,
                         s.lastError ? `último erro...: ${escapeHtml(s.lastError)}` : ``,
                     ].filter(Boolean).map(l => `<div>${l}</div>`).join('');
@@ -4180,7 +5147,7 @@
             } catch (err) {
                 if (box) box.innerHTML = `<div class="text-red-500">Não foi possível ler o status (${escapeHtml(err.message)}).</div>`;
                 if (badge) {
-                    badge.textContent = 'Indisponível';
+                    badge.textContent = 'Erro';
                     badge.className = 'text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-red-50 text-red-600 border-red-200';
                 }
             }
@@ -4256,37 +5223,12 @@
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
+                if (isAdminMode()) loadAdminCatalogFull({ silent: true, force: true });
             } else if (status) {
                 status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-red-50 border-red-200 text-red-700';
                 status.textContent = 'Falha ao sincronizar a categoria.';
             }
             if (btn) { btn.disabled = false; btn.innerHTML = original; }
-        }
-
-        /** Alias estável para views do painel (hash #catalogo etc.). */
-        function switchAdminView(view) {
-            const v = String(view || '').replace(/^#/, '').toLowerCase();
-            if (v === 'catalogo' || v === 'console' || v === 'admin') {
-                if (location.hash !== '#catalogo') {
-                    try { history.replaceState(null, '', '#catalogo'); } catch (_) {}
-                }
-                switchMainMode('console');
-                const el = document.getElementById('admin-view-catalogo');
-                if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                return;
-            }
-            if (v === 'campanhas' || v === 'campaigns') return switchMainMode('campaigns');
-            if (v === 'desempenho' || v === 'performance') return switchMainMode('performance');
-            if (v === 'vitrine' || v === 'storefront') return switchMainMode('storefront');
-            switchMainMode('console');
-        }
-
-        function applyAdminHashRoute() {
-            const hash = (location.hash || '').replace(/^#/, '').toLowerCase();
-            if (!hash) return;
-            if (hash === 'catalogo' || hash === 'console') switchAdminView('catalogo');
-            else if (hash === 'campanhas' || hash === 'campaigns') switchAdminView('campaigns');
-            else if (hash === 'desempenho' || hash === 'performance') switchAdminView('performance');
         }
 
         // Unified compatibility clipboard copier helper

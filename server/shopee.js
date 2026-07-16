@@ -1,8 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
-const { categoryForKeyword } = require("./categorias");
-const { inferSubcategory, extractProductOptions } = require("./productMeta");
+const { extractProductOptions, resolveTaxonomy } = require("./productMeta");
 const { buildProductSubIds } = require("./tracking");
 
 const SHOPEE_API_URL = "https://open-api.affiliate.shopee.com.br/graphql";
@@ -570,7 +569,7 @@ async function generateShortLink(originUrl, subIds = ["afiliada_mestre", "site",
   return data?.generateShortLink?.shortLink || null;
 }
 
-function mapOfferToProduct(node, keyword = "", listType = null) {
+function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = null) {
   const priceMin = Number(node.priceMin) || 0;
   const priceMax = Number(node.priceMax) || priceMin;
   const discountPct = parseDiscountPct(node.priceDiscountRate, priceMin, priceMax);
@@ -583,7 +582,9 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
   const salesLabel = sales && !/vendid/i.test(sales) ? `${sales} vendidos` : sales;
 
   const shop = node.shopName ? String(node.shopName).trim() : "";
-  const catId = categoryForKeyword(keyword);
+  const tax = resolveTaxonomy(keyword, node.productName, taxonomyOpts || {});
+  const catId = tax.category;
+  const subId = tax.subcategory;
   const options = extractProductOptions(node.productName, priceMin, priceMax);
   const descParts = [];
   descParts.push(discountPct > 0 ? `Oferta com ${discountPct}% de desconto` : "Oferta selecionada");
@@ -600,7 +601,7 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
     itemId: node.itemId,
     title: node.productName || "Produto Shopee",
     category: catId,
-    subcategory: inferSubcategory(catId, keyword, node.productName),
+    subcategory: subId,
     options,
     oldPrice: priceMax || priceMin,
     newPrice: priceMin,
@@ -627,14 +628,16 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
     shopName: node.shopName || "",
     shopId: node.shopId,
     keyword: keyword || "",
+    taxonomySource: tax.source || null,
     desc,
   };
 }
 
-function mapOfferToRow(node, keyword = "", listType = null) {
+function mapOfferToRow(node, keyword = "", listType = null, taxonomyOpts = null) {
   const priceMin = Number(node.priceMin) || 0;
   const priceMax = Number(node.priceMax) || priceMin;
-  const catId = categoryForKeyword(keyword);
+  const tax = resolveTaxonomy(keyword, node.productName, taxonomyOpts || {});
+  const catId = tax.category;
   const itemId = Number(node.itemId);
   return {
     item_id: itemId,
@@ -656,7 +659,7 @@ function mapOfferToRow(node, keyword = "", listType = null) {
     shop_type: node.shopType != null ? Number(node.shopType) : null,
     keyword: keyword || null,
     category: catId,
-    subcategory: inferSubcategory(catId, keyword, node.productName),
+    subcategory: tax.subcategory,
     product_options: extractProductOptions(node.productName, priceMin, priceMax),
     period_start: toUnixSec(node.periodStartTime),
     period_end: toUnixSec(node.periodEndTime),
