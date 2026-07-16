@@ -9,6 +9,7 @@ dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const {
   fetchProductOffers,
+  fetchProductOffersBatch,
   fetchProductDetailsByIds,
   fetchShopeeOffers,
   generateShortLink,
@@ -16,6 +17,12 @@ const {
   mapOfferToRow,
   mapCampaignNode,
   fetchConversionReport,
+  listTypeLabel,
+  sortTypeLabel,
+  LIST_TYPE_LABELS,
+  SORT_TYPE_LABELS,
+  MIN_RATING,
+  DEFAULT_BATCH_GAP_MS,
 } = require("./shopee");
 const {
   upsertOfertas,
@@ -86,7 +93,8 @@ app.get("/api/health", (_req, res) => {
 
 /**
  * Busca ao vivo na Shopee (productOfferV2).
- * Query: keyword, limit, page, listType, sortType, sync=1
+ * Query: keyword, limit, page, listType, sortType, sync=1,
+ *        minRating, minSales, requireCommission
  */
 app.get("/api/ofertas", async (req, res) => {
   try {
@@ -96,36 +104,239 @@ app.get("/api/ofertas", async (req, res) => {
     const listType = req.query.listType != null ? Number(req.query.listType) : 0;
     const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
     const sync = req.query.sync === "1" || req.query.sync === "true";
+    const minRating = req.query.minRating != null ? Number(req.query.minRating) : MIN_RATING;
+    const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
+    const requireCommission = req.query.requireCommission === "1" || req.query.requireCommission === "true";
 
-    const offer = await fetchProductOffers({ keyword, limit, page, listType, sortType });
+    const offer = await fetchProductOffers({
+      keyword,
+      limit,
+      page,
+      listType,
+      sortType,
+      minRating,
+      minSales,
+      requireCommission,
+    });
     const nodes = offer.nodes || [];
-    const products = nodes.map((n) => mapOfferToProduct(n, keyword, listType));
+    const products = nodes.map((n) => mapOfferToProduct(n, keyword, offer.listType));
 
     let saved = 0;
     if (sync && nodes.length) {
-      const rows = nodes.map((n) => mapOfferToRow(n, keyword, listType)).filter((r) => r.item_id && r.offer_link);
+      const rows = nodes.map((n) => mapOfferToRow(n, keyword, offer.listType)).filter((r) => r.item_id && r.offer_link);
       const result = await upsertOfertas(rows);
       saved = Array.isArray(result) ? result.length : rows.length;
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
     }
 
     res.json({
       source: "shopee",
       keyword,
-      listType,
-      sortType,
+      listType: offer.listType,
+      sortType: offer.sortType,
+      listTypeLabel: offer.listTypeLabel || listTypeLabel(offer.listType),
+      sortTypeLabel: offer.sortTypeLabel || sortTypeLabel(offer.sortType),
       count: products.length,
+      rawCount: offer.rawCount ?? products.length,
+      filteredOut: offer.filteredOut || 0,
       saved,
+      hasNextPage: !!offer.hasNextPage,
       pageInfo: offer.pageInfo || {},
+      filters: offer.filters || { minRating, minSales, requireCommission },
       products,
     });
   } catch (err) {
     console.error("[/api/ofertas]", err.message);
+    const status = err.status || 500;
+    const rateLimited = status === 429 || /rate|limit|too many/i.test(err.message || "");
+    res.status(status).json({
+      error: err.message,
+      code: err.code || (rateLimited ? "RATE_LIMITED" : null),
+      rateLimited,
+      details: err.payload || null,
+    });
+  }
+});
+
+/**
+ * Busca em lote: várias keywords × várias páginas.
+ * Body: { keywords: string[]|string, pages?, pageStart?, limit?, listType?, sortType?,
+ *         minRating?, minSales?, requireCommission?, sync?, gapMs? }
+ */
+app.post("/api/ofertas/batch", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const keywordsRaw = body.keywords ?? body.keyword ?? "";
+    const keywords = Array.isArray(keywordsRaw)
+      ? keywordsRaw
+      : String(keywordsRaw).split(/[\n,;]+/);
+    const pages = Math.min(Math.max(Number(body.pages) || 1, 1), 10);
+    const pageStart = Math.max(Number(body.pageStart) || 1, 1);
+    const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 50);
+    const listType = body.listType != null ? Number(body.listType) : 0;
+    const sortType = body.sortType != null ? Number(body.sortType) : 2;
+    const minRating = body.minRating != null ? Number(body.minRating) : MIN_RATING;
+    const minSales = body.minSales != null ? Number(body.minSales) : 0;
+    const requireCommission = !!body.requireCommission;
+    const sync = body.sync === true || body.sync === 1 || body.sync === "1";
+    const gapMs = body.gapMs != null ? Number(body.gapMs) : DEFAULT_BATCH_GAP_MS;
+
+    const cleaned = keywords.map((k) => String(k || "").trim()).filter(Boolean);
+    if (!cleaned.length) {
+      return res.status(400).json({ error: "Informe ao menos uma keyword", code: "NO_KEYWORDS" });
+    }
+
+    const batch = await fetchProductOffersBatch({
+      keywords: cleaned,
+      pages,
+      pageStart,
+      limit,
+      listType,
+      sortType,
+      minRating,
+      minSales,
+      requireCommission,
+      gapMs,
+    });
+
+    let saved = 0;
+    if (sync && batch.nodes?.length) {
+      const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
+      const rows = batch.nodes
+        .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || cleaned[0], batch.listType))
+        .filter((r) => r.item_id && r.offer_link);
+      const result = await upsertOfertas(rows);
+      saved = Array.isArray(result) ? result.length : rows.length;
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
+    }
+
+    const failures = (batch.report || []).filter((r) => !r.ok);
+    const rateLimited = failures.some((r) => r.status === 429 || /rate|limit|too many/i.test(r.error || ""));
+
+    res.json({
+      ok: true,
+      source: "shopee",
+      keywords: batch.keywords,
+      pages: batch.pages,
+      listType: batch.listType,
+      sortType: batch.sortType,
+      listTypeLabel: batch.listTypeLabel,
+      sortTypeLabel: batch.sortTypeLabel,
+      count: batch.count,
+      filteredOut: batch.filteredOut,
+      hasNextPage: batch.hasNextPage,
+      saved,
+      rateLimited,
+      empty: batch.count === 0,
+      report: batch.report,
+      products: batch.products,
+    });
+  } catch (err) {
+    console.error("[/api/ofertas/batch]", err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      error: err.message,
+      code: err.code || null,
+      rateLimited: status === 429,
+      details: err.payload || null,
+    });
+  }
+});
+
+/**
+ * Salva produtos já pré-visualizados (seleção do Explorador).
+ * Body: { products: [...] } — usa itemId/offerLink/productName etc.
+ *   OU { itemIds: [], keyword? } — rebusca na API (não preferido)
+ */
+app.post("/api/ofertas/save-bulk", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const products = Array.isArray(body.products) ? body.products : [];
+    if (!products.length) {
+      return res.status(400).json({ error: "Nenhum produto para salvar", code: "NO_PRODUCTS" });
+    }
+
+    const byId = new Map();
+    for (const p of products) {
+      const itemId = Number(p.itemId ?? p.item_id ?? p.id);
+      if (!Number.isSafeInteger(itemId) || itemId <= 0) continue;
+      const offerLink = p.affiliateLink || p.offer_link || p.offerLink || p.productLink || "";
+      if (!offerLink) continue;
+      if (byId.has(String(itemId))) continue;
+
+      // Preferir mapOfferToRow a partir de um "node-like" para manter schema consistente
+      const node = {
+        itemId,
+        productName: p.title || p.productName || p.product_name || "",
+        imageUrl: p.image || p.imageUrl || p.image_url || "",
+        priceMin: p.newPrice ?? p.price_min ?? p.priceMin,
+        priceMax: p.oldPrice ?? p.price_max ?? p.priceMax,
+        priceDiscountRate: p.discountPct ?? p.price_discount_rate,
+        sales: p.salesRaw || p.sales || null,
+        ratingStar: p.stars ?? p.rating_star ?? p.ratingStar,
+        commissionRate: p.commissionRate || p.commission_rate,
+        sellerCommissionRate: p.sellerCommission || p.seller_commission_rate,
+        shopeeCommissionRate: p.shopeeCommission || p.shopee_commission_rate,
+        commission: p.totalCommission || p.commission,
+        offerLink,
+        productLink: p.productLink || p.product_link || "",
+        shopId: p.shopId || p.shop_id,
+        shopName: p.shopName || p.shop_name || "",
+        shopType: p.shopType || p.shop_type,
+        periodStartTime: p.periodStart || p.period_start,
+        periodEndTime: p.periodEnd || p.period_end,
+      };
+      const keyword = p.keyword || body.keyword || "";
+      const listType = p.listType != null ? Number(p.listType) : (body.listType != null ? Number(body.listType) : null);
+      byId.set(String(itemId), mapOfferToRow(node, keyword, listType));
+    }
+
+    const rows = [...byId.values()].filter((r) => r.item_id && r.offer_link);
+    if (!rows.length) {
+      return res.status(400).json({ error: "Nenhum produto válido (itemId + offerLink)", code: "INVALID_PRODUCTS" });
+    }
+
+    const result = await upsertOfertas(rows);
+    const saved = Array.isArray(result) ? result.length : rows.length;
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+
+    res.json({
+      ok: true,
+      requested: products.length,
+      unique: rows.length,
+      saved,
+    });
+  } catch (err) {
+    console.error("[/api/ofertas/save-bulk]", err.message);
     res.status(err.status || 500).json({
       error: err.message,
       code: err.code || null,
       details: err.payload || null,
     });
   }
+});
+
+/** Metadados de listType/sortType para o painel. */
+app.get("/api/ofertas/meta", (_req, res) => {
+  res.json({
+    listTypes: Object.entries(LIST_TYPE_LABELS).map(([value, label]) => ({
+      value: Number(value),
+      label,
+    })),
+    sortTypes: Object.entries(SORT_TYPE_LABELS).map(([value, label]) => ({
+      value: Number(value),
+      label,
+    })),
+    defaults: {
+      listType: 0,
+      sortType: 2,
+      minRating: MIN_RATING,
+      gapMs: DEFAULT_BATCH_GAP_MS,
+    },
+  });
 });
 
 /**
@@ -288,6 +499,10 @@ app.post("/api/sync", async (req, res) => {
     const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 5), 50);
     const listType = req.body?.listType != null ? Number(req.body.listType) : 0;
     const sortType = req.body?.sortType != null ? Number(req.body.sortType) : 2;
+    const minRating = req.body?.minRating != null ? Number(req.body.minRating) : MIN_RATING;
+    const minSales = req.body?.minSales != null ? Number(req.body.minSales) : 0;
+    const requireCommission = !!req.body?.requireCommission;
+    const pages = Math.min(Math.max(Number(req.body?.pages) || 1, 1), 5);
     let plano;
 
     if (Array.isArray(req.body?.keywords) && req.body.keywords.length) {
@@ -307,37 +522,48 @@ app.post("/api/sync", async (req, res) => {
       return res.status(400).json({ error: "Nenhuma keyword para sincronizar" });
     }
 
-    const allProducts = [];
-    const report = [];
+    const keywords = plano.map((p) => p.keyword);
+    const batch = await fetchProductOffersBatch({
+      keywords,
+      pages,
+      pageStart: 1,
+      limit,
+      listType,
+      sortType,
+      minRating,
+      minSales,
+      requireCommission,
+      gapMs: DEFAULT_BATCH_GAP_MS,
+    });
 
-    for (const { keyword, category } of plano) {
-      try {
-        const offer = await fetchProductOffers({ keyword, limit, page: 1, listType, sortType });
-        const nodes = offer.nodes || [];
-        const rows = nodes.map((n) => mapOfferToRow(n, keyword, listType)).filter((r) => r.item_id && r.offer_link);
-        if (rows.length) await upsertOfertas(rows);
-        const products = nodes.map((n) => mapOfferToProduct(n, keyword, listType));
-        allProducts.push(...products);
-        categoriasCache = { at: 0, data: null };
-        ofertasCache.clear();
-        report.push({ keyword, category, ok: true, count: nodes.length, listType, sortType });
-        await new Promise((r) => setTimeout(r, 350));
-      } catch (e) {
-        report.push({ keyword, category, ok: false, error: e.message });
+    let saved = 0;
+    if (batch.nodes?.length) {
+      const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
+      const rows = batch.nodes
+        .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || keywords[0], batch.listType))
+        .filter((r) => r.item_id && r.offer_link);
+      if (rows.length) {
+        const result = await upsertOfertas(rows);
+        saved = Array.isArray(result) ? result.length : rows.length;
       }
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
     }
-
-    const map = new Map();
-    for (const p of allProducts) map.set(String(p.id), p);
 
     res.json({
       ok: true,
-      keywordsRun: plano.length,
-      listType,
-      sortType,
-      report,
-      count: map.size,
-      products: [...map.values()],
+      keywordsRun: keywords.length,
+      pages,
+      listType: batch.listType,
+      sortType: batch.sortType,
+      listTypeLabel: batch.listTypeLabel,
+      sortTypeLabel: batch.sortTypeLabel,
+      filteredOut: batch.filteredOut,
+      hasNextPage: batch.hasNextPage,
+      saved,
+      report: batch.report,
+      count: batch.count,
+      products: batch.products,
     });
   } catch (err) {
     console.error("[/api/sync]", err.message);
@@ -353,33 +579,54 @@ app.get("/api/sync/categoria/:id", async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 5), 50);
     const listType = req.query.listType != null ? Number(req.query.listType) : 0;
     const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
-    const all = [];
-    const report = [];
+    const pages = Math.min(Math.max(Number(req.query.pages) || 1, 1), 5);
+    const minRating = req.query.minRating != null ? Number(req.query.minRating) : MIN_RATING;
+    const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
+    const requireCommission = req.query.requireCommission === "1" || req.query.requireCommission === "true";
     const keywords = (cat.subcategories || []).flatMap((sub) => sub.keywords);
-    for (const kw of keywords) {
-      try {
-        const offer = await fetchProductOffers({ keyword: kw, limit, page: 1, listType, sortType });
-        const nodes = offer.nodes || [];
-        const rows = nodes.map((n) => mapOfferToRow(n, kw, listType)).filter((r) => r.item_id && r.offer_link);
-        if (rows.length) await upsertOfertas(rows);
-        all.push(...nodes.map((n) => mapOfferToProduct(n, kw, listType)));
-        report.push({ keyword: kw, ok: true, count: nodes.length });
-        await new Promise((r) => setTimeout(r, 300));
-      } catch (e) {
-        report.push({ keyword: kw, ok: false, error: e.message });
+
+    const batch = await fetchProductOffersBatch({
+      keywords,
+      pages,
+      pageStart: 1,
+      limit,
+      listType,
+      sortType,
+      minRating,
+      minSales,
+      requireCommission,
+      gapMs: DEFAULT_BATCH_GAP_MS,
+    });
+
+    let saved = 0;
+    if (batch.nodes?.length) {
+      const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
+      const rows = batch.nodes
+        .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || keywords[0], batch.listType))
+        .filter((r) => r.item_id && r.offer_link);
+      if (rows.length) {
+        const result = await upsertOfertas(rows);
+        saved = Array.isArray(result) ? result.length : rows.length;
       }
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
     }
-    const map = new Map();
-    for (const p of all) map.set(String(p.id), p);
+
     res.json({
       ok: true,
       category: cat.id,
       keywordsRun: keywords.length,
-      listType,
-      sortType,
-      count: map.size,
-      report,
-      products: [...map.values()],
+      pages,
+      listType: batch.listType,
+      sortType: batch.sortType,
+      listTypeLabel: batch.listTypeLabel,
+      sortTypeLabel: batch.sortTypeLabel,
+      filteredOut: batch.filteredOut,
+      hasNextPage: batch.hasNextPage,
+      saved,
+      count: batch.count,
+      report: batch.report,
+      products: batch.products,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

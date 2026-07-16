@@ -9,13 +9,72 @@ const SHOPEE_API_URL = "https://open-api.affiliate.shopee.com.br/graphql";
 
 /** listType: 0=Recomendados, 1=Maior comissão, 2=Top performance */
 /** sortType: 1=Relevância, 2=Vendidos, 3=Maior preço, 4=Menor preço, 5=Comissão */
+const LIST_TYPE_LABELS = {
+  0: "Recomendados",
+  1: "Maior comissão",
+  2: "Top performance",
+};
+
+const SORT_TYPE_LABELS = {
+  1: "Relevância",
+  2: "Mais vendidos",
+  3: "Maior preço",
+  4: "Menor preço",
+  5: "Maior comissão",
+};
+
 const SYNC_ROTATION = [
-  { listType: 0, sortType: 2, label: "recomendados_vendidos" },
-  { listType: 2, sortType: 2, label: "top_performance" },
-  { listType: 1, sortType: 5, label: "maior_comissao" },
+  { listType: 0, sortType: 2, label: "recomendados_vendidos", listTypeLabel: LIST_TYPE_LABELS[0], sortTypeLabel: SORT_TYPE_LABELS[2] },
+  { listType: 2, sortType: 2, label: "top_performance", listTypeLabel: LIST_TYPE_LABELS[2], sortTypeLabel: SORT_TYPE_LABELS[2] },
+  { listType: 1, sortType: 5, label: "maior_comissao", listTypeLabel: LIST_TYPE_LABELS[1], sortTypeLabel: SORT_TYPE_LABELS[5] },
 ];
 
 const MIN_RATING = Number(process.env.SYNC_MIN_RATING) || 4.0;
+const DEFAULT_BATCH_GAP_MS = clampNum(process.env.SHOPEE_BATCH_GAP_MS, 350, 100, 5000);
+
+function clampNum(v, def, min, max) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(n, min), max);
+}
+
+function listTypeLabel(listType) {
+  const n = Number(listType);
+  return LIST_TYPE_LABELS[n] || LIST_TYPE_LABELS[0];
+}
+
+function sortTypeLabel(sortType) {
+  const n = Number(sortType);
+  return SORT_TYPE_LABELS[n] || SORT_TYPE_LABELS[2];
+}
+
+/** Converte "1.2k", "12 mil", "1.234", "500+" em número aproximado. */
+function parseSalesCount(raw) {
+  if (raw == null || raw === "") return 0;
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, raw);
+  let s = String(raw).trim().toLowerCase();
+  s = s.replace(/vendid[oa]s?/g, "").replace(/\+/g, "").trim();
+  const milMatch = s.match(/^([\d.,]+)\s*mil\b/);
+  if (milMatch) {
+    const n = Number(milMatch[1].replace(/\./g, "").replace(",", "."));
+    return Number.isFinite(n) ? Math.round(n * 1000) : 0;
+  }
+  const kMatch = s.match(/^([\d.,]+)\s*k\b/);
+  if (kMatch) {
+    const n = Number(kMatch[1].replace(",", "."));
+    return Number.isFinite(n) ? Math.round(n * 1000) : 0;
+  }
+  const mMatch = s.match(/^([\d.,]+)\s*m\b/);
+  if (mMatch) {
+    const n = Number(mMatch[1].replace(",", "."));
+    return Number.isFinite(n) ? Math.round(n * 1_000_000) : 0;
+  }
+  const digits = s.replace(/[^\d]/g, "");
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : 0;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function getCreds() {
   const appId = (process.env.SHOPEE_APP_ID || "").trim();
@@ -95,20 +154,44 @@ function isFlashActive(periodEnd) {
   return end > now && end - now < 72 * 3600;
 }
 
-function isQualityOffer(node) {
+function normalizeQualityFilters({
+  minRating = MIN_RATING,
+  minSales = 0,
+  requireCommission = false,
+} = {}) {
+  const rating = Number(minRating);
+  const sales = Number(minSales);
+  return {
+    minRating: Number.isFinite(rating) && rating > 0 ? rating : MIN_RATING,
+    minSales: Number.isFinite(sales) && sales > 0 ? sales : 0,
+    requireCommission: !!requireCommission,
+  };
+}
+
+function isQualityOffer(node, filters = {}) {
   if (!node || !node.offerLink) return false;
   if (!node.itemId) return false;
+  const { minRating, minSales, requireCommission } = normalizeQualityFilters(filters);
   const rating = Number(node.ratingStar);
-  if (Number.isFinite(rating) && rating > 0 && rating < MIN_RATING) return false;
+  if (Number.isFinite(rating) && rating > 0 && rating < minRating) return false;
+  if (minSales > 0 && parseSalesCount(node.sales) < minSales) return false;
+  if (requireCommission) {
+    const rate = parseCommissionPct(node.commissionRate);
+    const commissionVal = Number(node.commission);
+    if (!(rate > 0 || (Number.isFinite(commissionVal) && commissionVal > 0))) return false;
+  }
   return true;
 }
 
-function filterQualityNodes(nodes) {
-  return (nodes || []).filter((n) => isQualityOffer(n));
+function filterQualityNodes(nodes, filters = {}) {
+  const list = nodes || [];
+  const kept = list.filter((n) => isQualityOffer(n, filters));
+  return { nodes: kept, filteredOut: Math.max(0, list.length - kept.length) };
 }
 
 /**
  * productOfferV2 — listType 0 é válido (não usar || 1).
+ * filters: { minRating, minSales, requireCommission }
  */
 async function fetchProductOffers({
   keyword = "",
@@ -116,12 +199,16 @@ async function fetchProductOffers({
   page = 1,
   sortType = 2,
   listType = 0,
+  minRating,
+  minSales,
+  requireCommission,
 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
   const safeList = [0, 1, 2].includes(Number(listType)) ? Number(listType) : 0;
   const safeSort = [1, 2, 3, 4, 5].includes(Number(sortType)) ? Number(sortType) : 2;
   const kw = String(keyword || "").trim();
+  const filters = normalizeQualityFilters({ minRating, minSales, requireCommission });
 
   const args = [
     `listType: ${safeList}`,
@@ -160,11 +247,151 @@ async function fetchProductOffers({
 
   const data = await shopeeGraphql(query);
   const result = data?.productOfferV2 || { nodes: [], pageInfo: {} };
+  const { nodes, filteredOut } = filterQualityNodes(result.nodes, filters);
+  const pageInfo = result.pageInfo || {};
   return {
     ...result,
-    nodes: filterQualityNodes(result.nodes),
+    nodes,
+    filteredOut,
+    rawCount: (result.nodes || []).length,
+    pageInfo,
+    hasNextPage: !!pageInfo.hasNextPage,
     listType: safeList,
     sortType: safeSort,
+    listTypeLabel: listTypeLabel(safeList),
+    sortTypeLabel: sortTypeLabel(safeSort),
+    filters,
+  };
+}
+
+/**
+ * Busca várias keywords × páginas com delay entre chamadas (rate-limit friendly).
+ * Deduplica por itemId. onProgress({ done, total, keyword, page, count }) opcional.
+ */
+async function fetchProductOffersBatch({
+  keywords = [],
+  pages = 1,
+  pageStart = 1,
+  limit = 20,
+  listType = 0,
+  sortType = 2,
+  minRating,
+  minSales,
+  requireCommission,
+  gapMs = DEFAULT_BATCH_GAP_MS,
+  onProgress,
+  signal,
+} = {}) {
+  const kws = [...new Set(
+    (Array.isArray(keywords) ? keywords : String(keywords || "").split(/[\n,;]+/))
+      .map((k) => String(k || "").trim())
+      .filter(Boolean)
+  )].slice(0, 40);
+  const start = Math.max(1, Number(pageStart) || 1);
+  const pageCount = Math.min(Math.max(Number(pages) || 1, 1), 10);
+  const pageNums = Array.from({ length: pageCount }, (_, i) => start + i);
+  const total = Math.max(1, kws.length * pageNums.length);
+  const byId = new Map();
+  const report = [];
+  let filteredOut = 0;
+  let done = 0;
+  let hasNextPage = false;
+  let lastListType = listType;
+  let lastSortType = sortType;
+
+  for (const keyword of kws) {
+    for (const page of pageNums) {
+      if (signal?.aborted) {
+        return {
+          aborted: true,
+          keywords: kws,
+          pages: pageNums,
+          count: byId.size,
+          filteredOut,
+          hasNextPage,
+          listType: lastListType,
+          sortType: lastSortType,
+          listTypeLabel: listTypeLabel(lastListType),
+          sortTypeLabel: sortTypeLabel(lastSortType),
+          report,
+          products: [...byId.values()],
+          nodes: [...byId.values()].map((p) => p._node).filter(Boolean),
+        };
+      }
+      try {
+        const offer = await fetchProductOffers({
+          keyword,
+          limit,
+          page,
+          listType,
+          sortType,
+          minRating,
+          minSales,
+          requireCommission,
+        });
+        lastListType = offer.listType;
+        lastSortType = offer.sortType;
+        filteredOut += offer.filteredOut || 0;
+        if (offer.hasNextPage) hasNextPage = true;
+        const nodes = offer.nodes || [];
+        let added = 0;
+        for (const n of nodes) {
+          const id = String(n.itemId);
+          if (!id || byId.has(id)) continue;
+          const product = mapOfferToProduct(n, keyword, offer.listType);
+          product._node = n;
+          byId.set(id, product);
+          added += 1;
+        }
+        report.push({
+          keyword,
+          page,
+          ok: true,
+          count: nodes.length,
+          added,
+          filteredOut: offer.filteredOut || 0,
+          hasNextPage: !!offer.hasNextPage,
+        });
+      } catch (e) {
+        report.push({
+          keyword,
+          page,
+          ok: false,
+          error: e.message,
+          code: e.code || null,
+          status: e.status || null,
+        });
+      }
+      done += 1;
+      if (typeof onProgress === "function") {
+        try {
+          onProgress({ done, total, keyword, page, count: byId.size, filteredOut });
+        } catch (_) {}
+      }
+      if (done < total) await sleep(gapMs);
+    }
+  }
+
+  const products = [...byId.values()].map((p) => {
+    const { _node, ...rest } = p;
+    return rest;
+  });
+  const nodes = [...byId.values()].map((p) => p._node).filter(Boolean);
+
+  return {
+    aborted: false,
+    keywords: kws,
+    pages: pageNums,
+    count: products.length,
+    filteredOut,
+    hasNextPage,
+    listType: Number(lastListType),
+    sortType: Number(lastSortType),
+    listTypeLabel: listTypeLabel(lastListType),
+    sortTypeLabel: sortTypeLabel(lastSortType),
+    report,
+    products,
+    nodes,
   };
 }
 
@@ -442,6 +669,7 @@ function mapOfferToRow(node, keyword = "", listType = null) {
 
 module.exports = {
   fetchProductOffers,
+  fetchProductOffersBatch,
   fetchProductDetailsByIds,
   fetchShopeeOffers,
   fetchConversionReport,
@@ -454,7 +682,14 @@ module.exports = {
   isQualityOffer,
   isFlashActive,
   toUnixSec,
+  parseSalesCount,
+  parseCommissionPct,
+  listTypeLabel,
+  sortTypeLabel,
   getCreds,
   SYNC_ROTATION,
+  LIST_TYPE_LABELS,
+  SORT_TYPE_LABELS,
   MIN_RATING,
+  DEFAULT_BATCH_GAP_MS,
 };
