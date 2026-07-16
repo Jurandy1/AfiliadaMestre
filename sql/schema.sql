@@ -1,5 +1,5 @@
--- Rode no SQL Editor do Supabase
--- Tabela de ofertas da vitrine (cache da productOfferV2)
+-- Rode este arquivo INTEIRO no SQL Editor do Supabase
+-- (cria a tabela ofertas do zero + todos os campos atuais)
 
 create table if not exists public.ofertas (
   item_id bigint primary key,
@@ -24,16 +24,21 @@ create table if not exists public.ofertas (
   updated_at timestamptz not null default now()
 );
 
--- Campos extras para conversão / tracking (idempotente)
+-- Campos extras (idempotente — pode rodar várias vezes)
 alter table public.ofertas add column if not exists period_start bigint;
 alter table public.ofertas add column if not exists period_end bigint;
 alter table public.ofertas add column if not exists list_type int;
 alter table public.ofertas add column if not exists short_link text;
+alter table public.ofertas add column if not exists subcategory text;
+alter table public.ofertas add column if not exists product_options jsonb;
+alter table public.ofertas add column if not exists sub_ids text[];
 
 create index if not exists ofertas_updated_at_idx on public.ofertas (updated_at desc);
 create index if not exists ofertas_keyword_idx on public.ofertas (keyword);
 create index if not exists ofertas_category_idx on public.ofertas (category);
 create index if not exists ofertas_period_end_idx on public.ofertas (period_end);
+create index if not exists ofertas_subcategory_idx on public.ofertas (category, subcategory);
+create index if not exists ofertas_sub_ids_idx on public.ofertas using gin (sub_ids);
 
 alter table public.ofertas enable row level security;
 
@@ -46,3 +51,20 @@ create policy "ofertas_public_read"
   using (true);
 
 -- Escrita só via service role (backend) — sem policy de insert/update para anon
+
+-- Campanhas de rastreio (Facebook, Instagram, etc.)
+create table if not exists public.campanhas_rastreio (
+  id text primary key,
+  channel text not null default 'facebook',
+  campaign text not null,
+  products jsonb not null default '[]'::jsonb,
+  links jsonb not null default '[]'::jsonb,
+  example_sub_ids text[] default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists campanhas_rastreio_created_at_idx
+  on public.campanhas_rastreio (created_at desc);
+
+alter table public.campanhas_rastreio enable row level security;

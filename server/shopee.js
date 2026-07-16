@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { categoryForKeyword } = require("./categorias");
 const { inferSubcategory, extractProductOptions } = require("./productMeta");
+const { buildProductSubIds } = require("./tracking");
 
 const SHOPEE_API_URL = "https://open-api.affiliate.shopee.com.br/graphql";
 
@@ -386,6 +387,7 @@ function mapOfferToProduct(node, keyword = "", listType = null) {
     affiliateLink: node.offerLink || node.productLink || "#",
     productLink: node.productLink || "",
     shortLink: node.shortLink || node.short_link || null,
+    subIds: buildProductSubIds(catId, Number(node.itemId)),
     isFlashSale: flash,
     flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (72 * 3600)) * 100))) : 0,
     periodStart,
@@ -406,8 +408,9 @@ function mapOfferToRow(node, keyword = "", listType = null) {
   const priceMin = Number(node.priceMin) || 0;
   const priceMax = Number(node.priceMax) || priceMin;
   const catId = categoryForKeyword(keyword);
+  const itemId = Number(node.itemId);
   return {
-    item_id: Number(node.itemId),
+    item_id: itemId,
     product_name: node.productName || "",
     image_url: node.imageUrl || null,
     price_min: node.priceMin != null ? Number(node.priceMin) : null,
@@ -431,6 +434,8 @@ function mapOfferToRow(node, keyword = "", listType = null) {
     period_start: toUnixSec(node.periodStartTime),
     period_end: toUnixSec(node.periodEndTime),
     list_type: listType != null ? Number(listType) : null,
+    // Identidade de rastreio do produto — gerada no sync, sem depender do clique
+    sub_ids: buildProductSubIds(catId, itemId),
     updated_at: new Date().toISOString(),
   };
 }

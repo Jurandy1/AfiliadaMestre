@@ -26,6 +26,9 @@ const {
   countBySubcategory,
   rowToProduct,
   getConfig,
+  listCampanhasRastreio,
+  upsertCampanhaRastreio,
+  deleteCampanhaRastreio,
 } = require("./supabase");
 const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
 const { refillVitrine } = require("./refillVitrine");
@@ -134,9 +137,29 @@ app.get("/api/ofertas/db", async (req, res) => {
     const keyword = String(req.query.keyword || "").trim();
     const category = String(req.query.category || "").trim();
     const subcategory = String(req.query.subcategory || "").trim();
+    const itemId = String(req.query.itemId || req.query.produto || "").trim();
+    const itemIdsRaw = String(req.query.itemIds || req.query.produtos || "").trim();
     const limit = Number(req.query.limit) || 60;
     const offset = Number(req.query.offset) || 0;
     const sort = String(req.query.sort || "recent").trim();
+
+    const multiIds = itemIdsRaw
+      ? itemIdsRaw.split(/[,|]+/).map((s) => s.trim()).filter(Boolean)
+      : (itemId ? [itemId] : []);
+
+    if (multiIds.length) {
+      const rows = await getOffersByItemIds(multiIds, { full: true });
+      const list = Array.isArray(rows) ? rows : [];
+      setCacheHeaders(res, { maxAge: 30, sMaxAge: 60, swr: 300 });
+      return res.json({
+        source: "supabase",
+        count: list.length,
+        offset: 0,
+        limit: list.length,
+        sort,
+        products: list.map(rowToProduct),
+      });
+    }
 
     const cacheKey = `${keyword}|${category}|${subcategory}|${limit}|${offset}|${sort}`;
     const cached = ofertasCache.get(cacheKey);
@@ -395,6 +418,50 @@ app.get("/api/cron/sync", async (_req, res) => {
     res.json({ ok: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/** Campanhas de rastreio salvas no Supabase */
+app.get("/api/campanhas-rastreio", async (_req, res) => {
+  try {
+    const rows = await listCampanhasRastreio();
+    const campaigns = (Array.isArray(rows) ? rows : []).map((r) => ({
+      id: r.id,
+      channel: r.channel,
+      campaign: r.campaign,
+      products: r.products || [],
+      links: r.links || [],
+      exampleSubIds: r.example_sub_ids || [],
+      createdAt: r.created_at,
+    }));
+    res.json({ campaigns, count: campaigns.length });
+  } catch (err) {
+    console.error("[/api/campanhas-rastreio]", err.message);
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
+app.post("/api/campanhas-rastreio", async (req, res) => {
+  try {
+    const body = req.body || {};
+    if (!body.id || !body.campaign) {
+      return res.status(400).json({ error: "id e campaign obrigatórios" });
+    }
+    const saved = await upsertCampanhaRastreio(body);
+    res.json({ ok: true, campaign: Array.isArray(saved) ? saved[0] : saved });
+  } catch (err) {
+    console.error("[/api/campanhas-rastreio POST]", err.message);
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
+app.delete("/api/campanhas-rastreio/:id", async (req, res) => {
+  try {
+    await deleteCampanhaRastreio(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[/api/campanhas-rastreio DELETE]", err.message);
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
   }
 });
 

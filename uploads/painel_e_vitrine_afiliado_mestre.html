@@ -92,6 +92,13 @@
                     <i class="fas fa-terminal mr-1.5"></i> Console Admin
                 </button>
                 <button
+                    onclick="switchMainMode('campaigns')"
+                    id="btn-mode-campaigns"
+                    class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
+                >
+                    <i class="fas fa-bullhorn mr-1.5"></i> Campanhas
+                </button>
+                <button
                     onclick="switchMainMode('performance')"
                     id="btn-mode-performance"
                     class="px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white"
@@ -437,19 +444,68 @@
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="bg-slate-50 p-4 border-b border-slate-200">
                         <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-chart-simple text-slate-500"></i> Rastreamento automático do site
+                            <i class="fas fa-chart-simple text-slate-500"></i> Rastreamento de campanhas
                         </h4>
                     </div>
                     <div class="p-4 space-y-3 text-xs">
                         <p class="text-slate-500 leading-relaxed">
-                            Os Sub IDs são criados automaticamente quando o cliente clica em <strong>Comprar</strong>.
-                            Eles servem para medir se a divulgação do site está gerando vendas — não vêm do sync de produtos.
+                            Na <strong>puxada dos produtos</strong>, cada item já recebe Sub IDs no banco
+                            (<code class="text-[10px]">afiliada_mestre | organico | vitrine | categoria | pID</code>).
+                            Use o gerador abaixo só quando for divulgar em Facebook, Instagram etc. — aí o clique
+                            troca canal/campanha e identifica a origem.
                         </p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Canal</label>
+                                <select id="campaign-link-channel" onchange="updateCampaignLinkPreview()" class="w-full p-2 border rounded-lg outline-shopee-orange">
+                                    <option value="facebook">Facebook</option>
+                                    <option value="instagram">Instagram</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="tiktok">TikTok</option>
+                                    <option value="stories">Stories</option>
+                                    <option value="google">Google</option>
+                                    <option value="email">E-mail</option>
+                                    <option value="organico">Orgânico / direto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Campanha</label>
+                                <input id="campaign-link-name" type="text" value="promo_vitrine" oninput="updateCampaignLinkPreview()"
+                                    placeholder="ex: ads_vestidos" class="w-full p-2 border rounded-lg outline-shopee-orange font-mono">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 font-bold mb-1">Produtos da campanha</label>
+                            <div class="flex gap-2">
+                                <input id="campaign-product-search" type="text" oninput="renderCampaignProductPicker()"
+                                    placeholder="Buscar por nome ou ID…" class="flex-1 p-2 border rounded-lg outline-shopee-orange">
+                                <button type="button" onclick="addCampaignProductById()"
+                                    class="px-3 py-2 rounded-lg border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 shrink-0">
+                                    + ID
+                                </button>
+                            </div>
+                            <div id="campaign-product-picker" class="mt-2 max-h-28 overflow-y-auto space-y-1 empty:hidden"></div>
+                            <div id="campaign-selected-products" class="mt-2 space-y-1.5"></div>
+                            <p class="text-[10px] text-slate-400 mt-1">Sem produtos = link geral da vitrine. Com produtos = um link por item (abre o produto certo).</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                            <p class="text-[9px] uppercase font-black text-slate-400">Links para divulgar</p>
+                            <div id="campaign-link-preview" class="space-y-2"></div>
+                            <button type="button" onclick="copyCampaignLink()"
+                                class="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                                <i class="fas fa-copy mr-1"></i> Copiar todos os links
+                            </button>
+                            <button type="button" onclick="saveCurrentCampaign()"
+                                class="px-3 py-1.5 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover">
+                                <i class="fas fa-save mr-1"></i> Salvar campanha
+                            </button>
+                        </div>
                         <div class="bg-orange-50 border border-orange-100 rounded-lg p-3 font-mono text-[10px] text-slate-700 space-y-1">
-                            <div><span class="text-shopee-orange font-bold">site</span> → afiliada_mestre</div>
-                            <div><span class="text-shopee-orange font-bold">canal</span> → site</div>
-                            <div><span class="text-shopee-orange font-bold">campanha</span> → vitrine</div>
-                            <div><span class="text-shopee-orange font-bold">+ categoria e produto</span> → gerados no clique</div>
+                            <div><span class="text-shopee-orange font-bold">1</span> afiliada_mestre → marca do site</div>
+                            <div><span class="text-shopee-orange font-bold">2</span> canal → facebook / instagram / …</div>
+                            <div><span class="text-shopee-orange font-bold">3</span> campanha → nome da campanha</div>
+                            <div><span class="text-shopee-orange font-bold">4</span> categoria → no clique</div>
+                            <div><span class="text-shopee-orange font-bold">5</span> produto → p + ID no clique</div>
                         </div>
                         <p id="subid-preview" class="text-[10px] text-slate-400 font-mono break-all"></p>
                         <div class="flex flex-wrap gap-2">
@@ -543,6 +599,7 @@
                         <div class="flex justify-between items-center">
                             <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
                                 <i class="fas fa-list-check text-slate-500"></i> Produtos ativos (<span id="count-db-items">0</span>)
+                                <span class="normal-case font-semibold text-slate-400 ml-1 text-[10px]" id="count-db-loaded"></span>
                             </h4>
                         </div>
                         <div class="relative">
@@ -566,6 +623,37 @@
             </div>
 
         </div>
+
+        <!-- Campanhas salvas -->
+        <section id="campaigns-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
+            <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                        <i class="fas fa-bullhorn text-shopee-orange"></i> Campanhas salvas
+                    </h4>
+                    <p class="text-[10px] text-slate-400 mt-1">Guarde links de Facebook, Instagram etc. e reabra quando for anunciar.</p>
+                </div>
+                <button onclick="switchMainMode('console')" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold">
+                    <i class="fas fa-plus mr-1"></i> Nova campanha
+                </button>
+            </div>
+            <div class="p-4 grid md:grid-cols-2 gap-4 text-xs">
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-2">
+                    <h5 class="font-bold text-slate-800 flex items-center gap-1.5"><i class="fab fa-meta text-blue-600"></i> Como anunciar no Facebook / Meta</h5>
+                    <ol class="list-decimal pl-4 text-slate-600 space-y-1.5 leading-relaxed">
+                        <li>Crie a campanha aqui, escolha canal <strong>Facebook</strong> e os produtos.</li>
+                        <li>Clique em <strong>Salvar campanha</strong> e copie o link.</li>
+                        <li>No <strong>Gerenciador de Anúncios Meta</strong> → criar anúncio → destino = <strong>Tráfego / site</strong>.</li>
+                        <li>Cole o link gerado no campo <strong>URL do site</strong> (não use o link cru da Shopee).</li>
+                        <li>Publique. Quem clicar e comprar leva seus Sub IDs.</li>
+                    </ol>
+                    <p class="text-[10px] text-slate-500 pt-1">O Sub ID aparece no relatório oficial da Shopee (campo utmContent / Sub IDs), desde que a pessoa use o botão Comprar da vitrine.</p>
+                </div>
+                <div id="saved-campaigns-list" class="space-y-3 md:col-span-1">
+                    <p class="text-slate-400 text-center py-8">Nenhuma campanha salva ainda.</p>
+                </div>
+            </div>
+        </section>
 
         <!-- Relatório de conversões e Sub IDs -->
         <section id="performance-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1031,6 +1119,7 @@
         }
 
         window.onload = async function() {
+            captureTrafficAttribution();
             initAdminUi();
             initDatabase();
             initCountdown();
@@ -1055,6 +1144,7 @@
             } else if (isAdminMode()) {
                 showToast("Backend offline — rode: npm start", "error");
             }
+            await applyCampaignLanding();
         };
 
         function setApiStatus(text, live) {
@@ -1309,7 +1399,9 @@
             const btnStore = document.getElementById('btn-mode-storefront');
             const btnConsole = document.getElementById('btn-mode-console');
             const btnPerformance = document.getElementById('btn-mode-performance');
+            const btnCampaigns = document.getElementById('btn-mode-campaigns');
             const performanceSection = document.getElementById('performance-section');
+            const campaignsSection = document.getElementById('campaigns-section');
             const inactive = "px-4 py-1 rounded-full text-xs font-bold transition-all text-slate-400 hover:text-white";
             const active = "px-4 py-1 rounded-full text-xs font-bold transition-all bg-shopee-orange text-white";
 
@@ -1318,20 +1410,36 @@
                 consoleSection.classList.add('hidden');
                 btnStore.className = active;
                 btnConsole.className = inactive;
+                if (btnCampaigns) btnCampaigns.className = inactive;
                 btnPerformance.className = inactive;
                 renderStoreProducts();
             } else if (mode === 'console') {
                 storefront.classList.add('hidden');
                 consoleSection.classList.remove('hidden');
-                Array.from(consoleSection.children).forEach(child => child.classList.remove('hidden'));
+                Array.from(consoleSection.children).forEach(child => {
+                    if (child === performanceSection || child === campaignsSection) child.classList.add('hidden');
+                    else child.classList.remove('hidden');
+                });
                 btnStore.className = inactive;
                 btnConsole.className = active;
+                if (btnCampaigns) btnCampaigns.className = inactive;
                 btnPerformance.className = inactive;
                 adminPage = 1;
                 renderConsoleProducts();
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+            } else if (mode === 'campaigns') {
+                storefront.classList.add('hidden');
+                consoleSection.classList.remove('hidden');
+                Array.from(consoleSection.children).forEach(child => {
+                    child.classList.toggle('hidden', child !== campaignsSection);
+                });
+                btnStore.className = inactive;
+                btnConsole.className = inactive;
+                if (btnCampaigns) btnCampaigns.className = active;
+                btnPerformance.className = inactive;
+                renderSavedCampaigns();
             } else {
                 storefront.classList.add('hidden');
                 consoleSection.classList.remove('hidden');
@@ -1340,6 +1448,7 @@
                 });
                 btnStore.className = inactive;
                 btnConsole.className = inactive;
+                if (btnCampaigns) btnCampaigns.className = inactive;
                 btnPerformance.className = active;
                 loadConversions({ reset: true });
             }
@@ -2379,44 +2488,167 @@
         }
 
         const SITE_SUBID = 'afiliada_mestre';
+        const TRACKING_STORAGE_KEY = 'afiliada_mestre_traffic_v1';
+        const TRACKED_LINKS_KEY = 'afiliada_mestre_tracked_links';
 
         function sanitizeSubId(value, fallback) {
             const clean = String(value || '')
                 .trim()
+                .toLowerCase()
                 .replace(/[^a-zA-Z0-9_-]/g, '_')
                 .replace(/_+/g, '_')
+                .replace(/^_+|_+$/g, '')
                 .slice(0, 40);
             return clean || fallback;
         }
 
-        function getSubIdSettings() {
-            return {
-                channel: 'site',
+        function normalizeChannel(raw) {
+            const v = sanitizeSubId(raw, 'organico');
+            const aliases = {
+                fb: 'facebook',
+                face: 'facebook',
+                ig: 'instagram',
+                insta: 'instagram',
+                wa: 'whatsapp',
+                wpp: 'whatsapp',
+                zap: 'whatsapp',
+                tt: 'tiktok',
+                googleads: 'google',
+                ads: 'google',
+                direct: 'organico',
+                organic: 'organico',
+                none: 'organico',
+                site: 'organico',
+            };
+            return aliases[v] || v;
+        }
+
+        function readStoredAttribution() {
+            try {
+                return JSON.parse(sessionStorage.getItem(TRACKING_STORAGE_KEY) || 'null')
+                    || JSON.parse(localStorage.getItem(TRACKING_STORAGE_KEY) || 'null')
+                    || null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function persistAttribution(attr) {
+            try {
+                sessionStorage.setItem(TRACKING_STORAGE_KEY, JSON.stringify(attr));
+                localStorage.setItem(TRACKING_STORAGE_KEY, JSON.stringify(attr));
+            } catch (_) {}
+        }
+
+        // Captura origem da visita (Facebook Ads, Instagram, WhatsApp, etc.)
+        // e guarda até o clique em Comprar — assim o Sub ID identifica a campanha.
+        function captureTrafficAttribution() {
+            const params = new URLSearchParams(location.search);
+            const channelRaw = params.get('utm_source')
+                || params.get('canal')
+                || params.get('source')
+                || params.get('ref')
+                || '';
+            const campaignRaw = params.get('utm_campaign')
+                || params.get('campanha')
+                || params.get('campaign')
+                || '';
+            const mediumRaw = params.get('utm_medium') || params.get('medium') || '';
+
+            if (channelRaw || campaignRaw) {
+                const attr = {
+                    channel: normalizeChannel(channelRaw || 'organico'),
+                    campaign: sanitizeSubId(campaignRaw || 'vitrine', 'vitrine'),
+                    medium: sanitizeSubId(mediumRaw, ''),
+                    capturedAt: Date.now(),
+                };
+                persistAttribution(attr);
+                return attr;
+            }
+
+            const existing = readStoredAttribution();
+            if (existing?.channel) return existing;
+
+            const fallback = {
+                channel: 'organico',
                 campaign: 'vitrine',
+                medium: '',
+                capturedAt: Date.now(),
+            };
+            persistAttribution(fallback);
+            return fallback;
+        }
+
+        function getSubIdSettings() {
+            const attr = readStoredAttribution() || captureTrafficAttribution();
+            return {
                 source: SITE_SUBID,
+                channel: normalizeChannel(attr.channel || 'organico'),
+                campaign: sanitizeSubId(attr.campaign || 'vitrine', 'vitrine'),
+                medium: sanitizeSubId(attr.medium || '', ''),
             };
         }
 
-        function getTrackingSubIds(category, itemId = '') {
+        function getTrackingSubIds(category, itemId = '', product = null) {
             const s = getSubIdSettings();
+            const base = Array.isArray(product?.subIds) && product.subIds.length
+                ? product.subIds
+                : [
+                    SITE_SUBID,
+                    'organico',
+                    'vitrine',
+                    sanitizeSubId(category, 'geral'),
+                    sanitizeSubId(itemId ? `p${itemId}` : 'produto', 'produto'),
+                ];
+            // Slot 2: se houver medium (ex: cpc), junta no canal → facebook_cpc
+            const channelSlot = s.medium && s.medium !== s.channel
+                ? sanitizeSubId(`${s.channel}_${s.medium}`, s.channel)
+                : s.channel;
+            // Produto já tem Sub IDs do sync; no clique sobrescreve canal/campanha da visita
             return [
-                s.source,
-                s.channel,
+                SITE_SUBID,
+                channelSlot,
                 s.campaign,
-                sanitizeSubId(category, 'geral'),
-                sanitizeSubId(itemId ? `p${itemId}` : 'produto', 'produto'),
+                sanitizeSubId(base[3] || category, 'geral'),
+                sanitizeSubId(base[4] || (itemId ? `p${itemId}` : 'produto'), 'produto'),
             ].slice(0, 5);
         }
 
-        function getSubIdSignature(category, itemId) {
-            return getTrackingSubIds(category, itemId).join('|');
+        function productSubIdsLabel(p) {
+            if (Array.isArray(p?.subIds) && p.subIds.length) return p.subIds.join(' | ');
+            return [
+                SITE_SUBID,
+                'organico',
+                'vitrine',
+                sanitizeSubId(p?.category, 'geral'),
+                sanitizeSubId(p?.id ? `p${p.id}` : 'produto', 'produto'),
+            ].join(' | ');
+        }
+
+        function parseUtmContent(utm) {
+            const parts = String(utm || '')
+                .split(/[|,;/]+/)
+                .map(s => s.trim())
+                .filter(Boolean);
+            return {
+                site: parts[0] || '',
+                channel: parts[1] || '',
+                campaign: parts[2] || '',
+                category: parts[3] || '',
+                product: parts[4] || '',
+                raw: parts,
+            };
+        }
+
+        function getSubIdSignature(category, itemId, product = null) {
+            return getTrackingSubIds(category, itemId, product).join('|');
         }
 
         function hasMatchingTrackedLink(p) {
             if (!p?.shortLink) return false;
             try {
-                const map = JSON.parse(sessionStorage.getItem('afiliada_mestre_tracked_links') || '{}');
-                return map[String(p.id)] === getSubIdSignature(p.category, p.id);
+                const map = JSON.parse(sessionStorage.getItem(TRACKED_LINKS_KEY) || '{}');
+                return map[String(p.id)] === getSubIdSignature(p.category, p.id, p);
             } catch (_) {
                 return false;
             }
@@ -2424,23 +2656,382 @@
 
         function rememberTrackedLink(p) {
             try {
-                const map = JSON.parse(sessionStorage.getItem('afiliada_mestre_tracked_links') || '{}');
-                map[String(p.id)] = getSubIdSignature(p.category, p.id);
-                sessionStorage.setItem('afiliada_mestre_tracked_links', JSON.stringify(map));
+                const map = JSON.parse(sessionStorage.getItem(TRACKED_LINKS_KEY) || '{}');
+                map[String(p.id)] = getSubIdSignature(p.category, p.id, p);
+                sessionStorage.setItem(TRACKED_LINKS_KEY, JSON.stringify(map));
             } catch (_) {}
         }
 
-        function updateSubIdPreview() {
+        function buildCampaignShareUrl(channel, campaign, productId = '') {
+            const url = new URL(location.origin + '/');
+            url.searchParams.set('utm_source', sanitizeSubId(channel, 'organico'));
+            url.searchParams.set('utm_campaign', sanitizeSubId(campaign, 'vitrine'));
+            url.searchParams.set('utm_medium', 'social');
+            if (productId) url.searchParams.set('produto', String(productId));
+            return url.toString();
+        }
+
+        let campaignSelectedProducts = [];
+
+        function getCampaignSelectedProducts() {
+            return campaignSelectedProducts;
+        }
+
+        function addProductToCampaign(productOrId) {
+            const p = typeof productOrId === 'object'
+                ? productOrId
+                : productsDatabase.find(x => String(x.id) === String(productOrId));
+            const id = p ? p.id : Number(productOrId);
+            if (!id) {
+                showToast('Informe um ID de produto válido', 'error');
+                return;
+            }
+            if (campaignSelectedProducts.some(x => String(x.id) === String(id))) {
+                showToast('Produto já está na campanha', 'error');
+                return;
+            }
+            campaignSelectedProducts.push({
+                id,
+                title: p?.title || `Produto ${id}`,
+                category: p?.category || 'geral',
+                image: p?.image || '',
+            });
+            renderCampaignSelectedProducts();
+            updateCampaignLinkPreview();
+        }
+
+        function removeProductFromCampaign(id) {
+            campaignSelectedProducts = campaignSelectedProducts.filter(x => String(x.id) !== String(id));
+            renderCampaignSelectedProducts();
+            updateCampaignLinkPreview();
+        }
+
+        function addCampaignProductById() {
+            const raw = prompt('Cole o ID do produto Shopee (número do item):');
+            if (!raw) return;
+            const id = String(raw).replace(/\D/g, '');
+            if (!id) {
+                showToast('ID inválido', 'error');
+                return;
+            }
+            addProductToCampaign(id);
+        }
+
+        function renderCampaignProductPicker() {
+            const box = document.getElementById('campaign-product-picker');
+            const q = (document.getElementById('campaign-product-search')?.value || '').trim().toLowerCase();
+            if (!box) return;
+            if (!q || q.length < 2) {
+                box.innerHTML = '';
+                return;
+            }
+            const hits = productsDatabase
+                .filter(p =>
+                    String(p.id).includes(q)
+                    || String(p.title || '').toLowerCase().includes(q)
+                )
+                .slice(0, 8);
+            if (!hits.length) {
+                box.innerHTML = `<p class="text-[10px] text-slate-400 px-1">Nenhum produto carregado com esse termo. Use "+ ID".</p>`;
+                return;
+            }
+            box.innerHTML = hits.map(p => `
+                <button type="button" onclick="addProductToCampaign('${String(p.id).replace(/'/g, '')}')"
+                    class="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-orange-50 text-left border border-transparent hover:border-orange-100">
+                    <img src="${escapeAttr(thumbUrl(p.image) || p.image || '')}" class="w-8 h-8 rounded object-cover bg-slate-100 shrink-0" alt=""
+                        onerror="this.style.display='none'">
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-[11px] font-semibold text-slate-700 truncate">${escapeHtml(p.title)}</span>
+                        <span class="block text-[9px] text-slate-400 font-mono">ID ${escapeHtml(String(p.id))}</span>
+                    </span>
+                    <i class="fas fa-plus text-shopee-orange text-[10px]"></i>
+                </button>
+            `).join('');
+        }
+
+        function renderCampaignSelectedProducts() {
+            const box = document.getElementById('campaign-selected-products');
+            if (!box) return;
+            if (!campaignSelectedProducts.length) {
+                box.innerHTML = `<p class="text-[10px] text-slate-400">Nenhum produto selecionado (campanha geral).</p>`;
+                return;
+            }
+            box.innerHTML = campaignSelectedProducts.map(p => `
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2">
+                    <img src="${escapeAttr(thumbUrl(p.image) || p.image || '')}" class="w-8 h-8 rounded object-cover bg-slate-100 shrink-0" alt=""
+                        onerror="this.style.display='none'">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold text-slate-700 truncate">${escapeHtml(p.title)}</p>
+                        <p class="text-[9px] font-mono text-slate-400">p${escapeHtml(String(p.id))}</p>
+                    </div>
+                    <button type="button" onclick="removeProductFromCampaign('${String(p.id).replace(/'/g, '')}')"
+                        class="text-red-400 hover:text-red-600 px-2" title="Remover"><i class="fas fa-times"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function updateCampaignLinkPreview() {
+            const channel = document.getElementById('campaign-link-channel')?.value || 'facebook';
+            const campaign = document.getElementById('campaign-link-name')?.value || 'promo_vitrine';
+            const el = document.getElementById('campaign-link-preview');
+            const selected = getCampaignSelectedProducts();
+            if (!el) return;
+
+            if (!selected.length) {
+                const url = buildCampaignShareUrl(channel, campaign);
+                el.innerHTML = `
+                    <div class="space-y-1">
+                        <p class="text-[9px] font-bold text-slate-500">Vitrine geral</p>
+                        <p class="font-mono text-[10px] text-slate-700 break-all select-all" data-campaign-url="${escapeAttr(url)}">${escapeHtml(url)}</p>
+                    </div>`;
+                updateSubIdPreview(channel, campaign, null);
+                return;
+            }
+
+            el.innerHTML = selected.map(p => {
+                const url = buildCampaignShareUrl(channel, campaign, p.id);
+                return `
+                <div class="border border-slate-200 rounded-lg p-2 bg-white space-y-1">
+                    <p class="text-[10px] font-bold text-slate-700 truncate">${escapeHtml(p.title)}</p>
+                    <p class="font-mono text-[9px] text-slate-600 break-all select-all" data-campaign-url="${escapeAttr(url)}">${escapeHtml(url)}</p>
+                    <button type="button" onclick="navigator.clipboard.writeText(this.previousElementSibling.dataset.campaignUrl||this.previousElementSibling.textContent).then(()=>showToast('Link copiado!','success'))"
+                        class="text-[10px] font-bold text-shopee-orange">Copiar este link</button>
+                </div>`;
+            }).join('');
+            updateSubIdPreview(channel, campaign, selected[0]);
+        }
+
+        function copyCampaignLink() {
+            const nodes = document.querySelectorAll('#campaign-link-preview [data-campaign-url]');
+            const urls = [...nodes].map(n => n.getAttribute('data-campaign-url') || n.textContent.trim()).filter(Boolean);
+            if (!urls.length) return;
+            navigator.clipboard?.writeText(urls.join('\n')).then(() => {
+                showToast(urls.length > 1 ? `${urls.length} links copiados!` : 'Link de campanha copiado!', 'success');
+            }).catch(() => {
+                showToast('Copie o link manualmente', 'error');
+            });
+        }
+
+        function updateSubIdPreview(channel, campaign, product) {
             const preview = document.getElementById('subid-preview');
             if (!preview) return;
-            const ids = getTrackingSubIds('moda', '123456');
-            preview.textContent = `Exemplo no clique Comprar: ${ids.join(' | ')}`;
+            const ch = sanitizeSubId(channel || document.getElementById('campaign-link-channel')?.value || 'facebook', 'facebook');
+            const camp = sanitizeSubId(campaign || document.getElementById('campaign-link-name')?.value || 'promo_vitrine', 'vitrine');
+            const cat = product?.category || 'moda';
+            const pid = product?.id ? `p${product.id}` : 'p123456';
+            const ids = [SITE_SUBID, `${ch}_social`, camp, sanitizeSubId(cat, 'geral'), sanitizeSubId(pid, 'produto')];
+            preview.textContent = `No clique Comprar (exemplo): ${ids.join(' | ')}`;
         }
 
         function loadSubIdSettings() {
-            // Sub IDs são fixos do site — sem edição manual.
             localStorage.removeItem('afiliada_mestre_subids');
-            updateSubIdPreview();
+            captureTrafficAttribution();
+            renderCampaignSelectedProducts();
+            updateCampaignLinkPreview();
+        }
+
+        const SAVED_CAMPAIGNS_KEY = 'afiliada_mestre_campanhas_v1';
+
+        function readSavedCampaigns() {
+            try {
+                const list = JSON.parse(localStorage.getItem(SAVED_CAMPAIGNS_KEY) || '[]');
+                return Array.isArray(list) ? list : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function writeSavedCampaigns(list) {
+            try {
+                localStorage.setItem(SAVED_CAMPAIGNS_KEY, JSON.stringify(list.slice(0, 50)));
+            } catch (_) {
+                showToast('Não foi possível salvar (armazenamento cheio)', 'error');
+            }
+        }
+
+        async function saveCurrentCampaign() {
+            const channel = document.getElementById('campaign-link-channel')?.value || 'facebook';
+            const campaign = sanitizeSubId(
+                document.getElementById('campaign-link-name')?.value || 'promo_vitrine',
+                'vitrine'
+            );
+            const products = getCampaignSelectedProducts().map(p => ({
+                id: p.id,
+                title: p.title,
+                category: p.category,
+                image: p.image,
+            }));
+            const links = products.length
+                ? products.map(p => ({
+                    productId: p.id,
+                    title: p.title,
+                    url: buildCampaignShareUrl(channel, campaign, p.id),
+                }))
+                : [{ productId: null, title: 'Vitrine geral', url: buildCampaignShareUrl(channel, campaign) }];
+
+            const entry = {
+                id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                channel,
+                campaign,
+                products,
+                links,
+                createdAt: new Date().toISOString(),
+                exampleSubIds: [
+                    SITE_SUBID,
+                    `${sanitizeSubId(channel, 'facebook')}_social`,
+                    campaign,
+                    sanitizeSubId(products[0]?.category || 'geral', 'geral'),
+                    products[0]?.id ? `p${products[0].id}` : 'pID',
+                ],
+            };
+
+            const list = readSavedCampaigns();
+            list.unshift(entry);
+            writeSavedCampaigns(list);
+            renderSavedCampaigns();
+
+            try {
+                const res = await fetch(`${API_BASE}/api/campanhas-rastreio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(entry),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast('Campanha salva no banco (Supabase)!', 'success');
+            } catch (err) {
+                showToast(`Salva no navegador. Banco: rode sql/migration_campanhas.sql`, 'error');
+            }
+        }
+
+        async function deleteSavedCampaign(id) {
+            if (!confirm('Apagar esta campanha salva?')) return;
+            writeSavedCampaigns(readSavedCampaigns().filter(c => c.id !== id));
+            renderSavedCampaigns();
+            try {
+                const res = await fetch(`${API_BASE}/api/campanhas-rastreio/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast('Campanha removida do banco', 'success');
+            } catch (err) {
+                showToast('Removida localmente (rode a migration se o banco falhar)', 'error');
+            }
+        }
+
+        function loadSavedCampaignIntoEditor(id) {
+            const entry = readSavedCampaigns().find(c => c.id === id);
+            if (!entry) return;
+            const ch = document.getElementById('campaign-link-channel');
+            const name = document.getElementById('campaign-link-name');
+            if (ch) ch.value = entry.channel || 'facebook';
+            if (name) name.value = entry.campaign || 'promo_vitrine';
+            campaignSelectedProducts = Array.isArray(entry.products) ? [...entry.products] : [];
+            switchMainMode('console');
+            renderCampaignSelectedProducts();
+            updateCampaignLinkPreview();
+            document.getElementById('campaign-link-name')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast('Campanha carregada no editor', 'success');
+        }
+
+        function copySavedCampaignLinks(id) {
+            const entry = readSavedCampaigns().find(c => c.id === id);
+            if (!entry?.links?.length) return;
+            const text = entry.links.map(l => l.url).join('\n');
+            navigator.clipboard?.writeText(text).then(() => {
+                showToast(entry.links.length > 1 ? `${entry.links.length} links copiados!` : 'Link copiado!', 'success');
+            }).catch(() => showToast('Copie manualmente', 'error'));
+        }
+
+        async function renderSavedCampaigns() {
+            const box = document.getElementById('saved-campaigns-list');
+            if (!box) return;
+
+            let list = readSavedCampaigns();
+            try {
+                const res = await fetch(`${API_BASE}/api/campanhas-rastreio`);
+                const data = await res.json();
+                if (res.ok && Array.isArray(data.campaigns)) {
+                    list = data.campaigns;
+                    writeSavedCampaigns(list);
+                }
+            } catch (_) {}
+
+            if (!list.length) {
+                box.innerHTML = `<p class="text-slate-400 text-center py-8">Nenhuma campanha salva ainda.<br><button onclick="switchMainMode('console')" class="mt-3 text-shopee-orange font-bold">Criar no Console Admin</button></p>`;
+                return;
+            }
+            box.innerHTML = list.map(c => {
+                const when = c.createdAt ? new Date(c.createdAt).toLocaleString('pt-BR') : '';
+                const nProd = (c.products || []).length;
+                return `
+                <article class="border border-slate-200 rounded-xl p-3 space-y-2">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <p class="font-bold text-slate-800">${escapeHtml(c.campaign)}</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(c.channel)} · ${nProd ? nProd + ' produto(s)' : 'vitrine geral'} · ${escapeHtml(when)}</p>
+                        </div>
+                        <span class="text-[9px] font-bold uppercase bg-orange-50 text-shopee-orange px-2 py-1 rounded">${escapeHtml(c.channel)}</span>
+                    </div>
+                    <p class="font-mono text-[9px] text-slate-500 break-all">${escapeHtml((c.exampleSubIds || []).join(' | '))}</p>
+                    <div class="space-y-1 max-h-24 overflow-y-auto">
+                        ${(c.links || []).map(l => `
+                            <p class="font-mono text-[9px] text-slate-600 break-all bg-slate-50 rounded px-2 py-1">${escapeHtml(l.url)}</p>
+                        `).join('')}
+                    </div>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button type="button" onclick="copySavedCampaignLinks('${c.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-800 text-white text-[10px] font-bold">Copiar links</button>
+                        <button type="button" onclick="loadSavedCampaignIntoEditor('${c.id}')" class="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-600">Editar</button>
+                        <button type="button" onclick="deleteSavedCampaign('${c.id}')" class="px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-red-500">Apagar</button>
+                    </div>
+                </article>`;
+            }).join('');
+        }
+
+        async function ensureProductLoaded(itemId) {
+            let p = productsDatabase.find(x => String(x.id) === String(itemId));
+            if (p) return p;
+            try {
+                const res = await fetch(`${API_BASE}/api/ofertas/db?itemId=${encodeURIComponent(String(itemId))}`);
+                const data = await res.json();
+                if (res.ok && Array.isArray(data.products) && data.products.length) {
+                    applyProducts(data.products, 'campaign', { append: true });
+                    return productsDatabase.find(x => String(x.id) === String(itemId)) || data.products[0];
+                }
+            } catch (_) {}
+            return null;
+        }
+
+        async function applyCampaignLanding() {
+            const params = new URLSearchParams(location.search);
+            const productId = params.get('produto') || params.get('product') || params.get('item');
+            const multi = (params.get('produtos') || '')
+                .split(/[,|]+/)
+                .map(s => s.trim())
+                .filter(Boolean);
+
+            if (multi.length > 1 && !productId) {
+                // Destaca só os produtos da campanha na grade
+                const loaded = [];
+                for (const id of multi.slice(0, 24)) {
+                    const p = await ensureProductLoaded(id);
+                    if (p) loaded.push(p);
+                }
+                if (loaded.length) {
+                    applyProducts(loaded, 'campaign', { append: false, allowEmpty: false });
+                    showToast(`${loaded.length} produtos desta campanha`, 'success');
+                    scrollToStoreGrid();
+                }
+                return;
+            }
+
+            if (!productId) return;
+            const p = await ensureProductLoaded(productId);
+            if (!p) {
+                showToast('Produto da campanha não encontrado na vitrine', 'error');
+                return;
+            }
+            scrollToStoreGrid();
+            setTimeout(() => openProductModal(p.id), 400);
         }
 
         async function resetVitrineAndRefill() {
@@ -2454,7 +3045,9 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                sessionStorage.removeItem('afiliada_mestre_tracked_links');
+                sessionStorage.removeItem(TRACKED_LINKS_KEY);
+                sessionStorage.removeItem(TRACKING_STORAGE_KEY);
+                localStorage.removeItem(TRACKING_STORAGE_KEY);
                 localStorage.removeItem('afiliado_mestre_db_v1');
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
@@ -2541,8 +3134,22 @@
                             <span class="self-start px-2 py-1 rounded-md text-[9px] font-bold ${statusClass}">${escapeHtml(status)}</span>
                         </div>
                         <div class="bg-orange-50 border border-orange-100 rounded-lg p-2 mb-3">
-                            <p class="text-[9px] uppercase font-black text-shopee-orange mb-1">Sub IDs / utmContent</p>
-                            <p class="font-mono text-[10px] text-slate-700 break-all">${escapeHtml(String(conversion.utmContent || 'Sem Sub ID informado'))}</p>
+                            <p class="text-[9px] uppercase font-black text-shopee-orange mb-1">Rastreio da venda</p>
+                            ${(() => {
+                                const parsed = parseUtmContent(conversion.utmContent);
+                                if (!parsed.raw.length) {
+                                    return `<p class="font-mono text-[10px] text-slate-500">Sem Sub ID informado</p>`;
+                                }
+                                return `
+                                <div class="grid grid-cols-2 gap-1.5 text-[10px]">
+                                    <div><span class="text-slate-400">Site</span><br><span class="font-bold text-slate-800">${escapeHtml(parsed.site || '—')}</span></div>
+                                    <div><span class="text-slate-400">Canal</span><br><span class="font-bold text-slate-800">${escapeHtml(parsed.channel || '—')}</span></div>
+                                    <div><span class="text-slate-400">Campanha</span><br><span class="font-bold text-slate-800">${escapeHtml(parsed.campaign || '—')}</span></div>
+                                    <div><span class="text-slate-400">Categoria</span><br><span class="font-bold text-slate-800">${escapeHtml(parsed.category || '—')}</span></div>
+                                    <div class="col-span-2"><span class="text-slate-400">Produto</span><br><span class="font-bold text-slate-800">${escapeHtml(parsed.product || '—')}</span></div>
+                                </div>
+                                <p class="font-mono text-[9px] text-slate-400 mt-2 break-all">${escapeHtml(String(conversion.utmContent))}</p>`;
+                            })()}
                         </div>
                         <div class="space-y-2">
                             ${items.map(item => {
@@ -2655,7 +3262,7 @@
                     body: JSON.stringify({
                         originUrl: origin,
                         itemId: p.id,
-                        subIds: getTrackingSubIds(p.category, p.id),
+                        subIds: getTrackingSubIds(p.category, p.id, p),
                     }),
                 });
                 const data = await res.json();
@@ -2748,7 +3355,14 @@
             container.innerHTML = '';
 
             const countEl = document.getElementById('count-db-items');
-            if (countEl) countEl.innerText = productsDatabase.length;
+            const loadedEl = document.getElementById('count-db-loaded');
+            const dbTotal = Number((categories.find(c => c.id === 'todos') || {}).count) || 0;
+            if (countEl) countEl.innerText = dbTotal > 0 ? dbTotal : productsDatabase.length;
+            if (loadedEl) {
+                loadedEl.textContent = dbTotal > productsDatabase.length
+                    ? `· ${productsDatabase.length} carregados nesta página`
+                    : '';
+            }
 
             const filtered = getAdminFiltered();
             const total = filtered.length;
@@ -2772,10 +3386,15 @@
                                     <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold text-slate-600">${escapeHtml(String(p.category || ''))}</span>
                                     ${labelFlash}
                                     <span class="text-shopee-orange font-bold text-[10px]">R$ ${Number(p.newPrice).toFixed(2)}</span>
-                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
+                                    <span class="text-slate-400 text-[9px]">comissão ${rate}</span>
                                 </div>
+                                <p class="font-mono text-[9px] text-slate-400 mt-1 truncate" title="${escapeAttr(productSubIdsLabel(p))}">Sub ID: ${escapeHtml(productSubIdsLabel(p))}</p>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
+                                <button onclick="addProductToCampaign('${String(p.id).replace(/'/g, '')}'); showToast('Produto adicionado à campanha','success'); switchMainMode('console');"
+                                    class="text-slate-400 hover:text-shopee-orange" title="Adicionar à campanha">
+                                    <i class="fas fa-bullhorn"></i>
+                                </button>
                                 <a href="${escapeAttr(p.affiliateLink || '#')}" target="_blank" rel="noopener" class="text-slate-400 hover:text-shopee-orange" title="Abrir link">
                                     <i class="fas fa-arrow-up-right-from-square"></i>
                                 </a>
@@ -2934,6 +3553,14 @@
                 const active = cats.filter(c => c.id !== 'todos' && Number(c.count) > 0).length;
                 if (prodEl) prodEl.innerText = total.toLocaleString('pt-BR');
                 if (catEl) catEl.innerText = active;
+                const countEl = document.getElementById('count-db-items');
+                const loadedEl = document.getElementById('count-db-loaded');
+                if (countEl) countEl.innerText = total.toLocaleString('pt-BR');
+                if (loadedEl) {
+                    loadedEl.textContent = total > productsDatabase.length
+                        ? `· ${productsDatabase.length} carregados nesta página`
+                        : '';
+                }
             } catch (err) {
                 if (prodEl) prodEl.innerText = productsDatabase.length;
                 if (catEl) catEl.innerText = new Set(productsDatabase.map(p => p.category)).size;

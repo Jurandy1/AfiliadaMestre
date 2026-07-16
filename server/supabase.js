@@ -2,6 +2,7 @@
 
 const { isFlashActive, toUnixSec } = require("./shopee");
 const { extractProductOptions } = require("./productMeta");
+const { buildProductSubIds } = require("./tracking");
 
 function quoteInFilter(values = []) {
   return values
@@ -96,6 +97,9 @@ async function upsertOfertas(rows) {
     if (copy.short_link == null) delete copy.short_link;
     if (copy.subcategory == null) delete copy.subcategory;
     if (copy.product_options == null) delete copy.product_options;
+    if (!Array.isArray(copy.sub_ids) || !copy.sub_ids.length) {
+      copy.sub_ids = buildProductSubIds(copy.category, copy.item_id);
+    }
     return copy;
   });
   try {
@@ -106,12 +110,12 @@ async function upsertOfertas(rows) {
       useService: true,
     });
   } catch (err) {
-    // Schema antigo (sem period_*/list_type/short_link) — grava o essencial.
+    // Schema antigo (sem period_*/list_type/short_link/sub_ids) — grava o essencial.
     const msg = String(err.message || "");
-    if (/period_start|period_end|list_type|short_link|subcategory|product_options|schema cache|PGRST/i.test(msg)) {
+    if (/period_start|period_end|list_type|short_link|subcategory|product_options|sub_ids|schema cache|PGRST/i.test(msg)) {
       const legacy = cleaned.map((r) => {
         const {
-          period_start, period_end, list_type, short_link, subcategory, product_options, ...rest
+          period_start, period_end, list_type, short_link, subcategory, product_options, sub_ids, ...rest
         } = r;
         return rest;
       });
@@ -178,14 +182,15 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
   }
 }
 
-async function getOffersByItemIds(itemIds = []) {
+async function getOffersByItemIds(itemIds = [], { full = false } = {}) {
   const ids = [...new Set(
     itemIds.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0)
   )].slice(0, 100);
   if (!ids.length) return [];
   const filter = encodeURIComponent(`(${ids.join(",")})`);
+  const select = full ? "*" : "item_id,image_url,category,product_name";
   return supabaseRequest(
-    `/ofertas?select=item_id,image_url,category,product_name&item_id=in.${filter}`,
+    `/ofertas?select=${select}&item_id=in.${filter}`,
     { method: "GET", useService: true }
   );
 }
@@ -305,6 +310,9 @@ function rowToProduct(row) {
     affiliateLink: row.offer_link || row.product_link || "#",
     productLink: row.product_link || "",
     shortLink: row.short_link || null,
+    subIds: Array.isArray(row.sub_ids) && row.sub_ids.length
+      ? row.sub_ids
+      : buildProductSubIds(row.category, row.item_id),
     isFlashSale: flash,
     flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (72 * 3600)) * 100))) : 0,
     periodStart,
@@ -334,4 +342,43 @@ module.exports = {
   pruneOlderThan,
   clearAllOfertas,
   rowToProduct,
+  listCampanhasRastreio,
+  upsertCampanhaRastreio,
+  deleteCampanhaRastreio,
 };
+
+async function listCampanhasRastreio() {
+  return supabaseRequest(
+    "/campanhas_rastreio?select=*&order=created_at.desc&limit=50",
+    { method: "GET", useService: true }
+  );
+}
+
+async function upsertCampanhaRastreio(row) {
+  if (!row?.id) throw new Error("id obrigatório");
+  return supabaseRequest("/campanhas_rastreio", {
+    method: "POST",
+    body: [{
+      id: String(row.id),
+      channel: String(row.channel || "facebook"),
+      campaign: String(row.campaign || "vitrine"),
+      products: Array.isArray(row.products) ? row.products : [],
+      links: Array.isArray(row.links) ? row.links : [],
+      example_sub_ids: Array.isArray(row.exampleSubIds)
+        ? row.exampleSubIds
+        : (Array.isArray(row.example_sub_ids) ? row.example_sub_ids : []),
+      created_at: row.createdAt || row.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }],
+    prefer: "resolution=merge-duplicates,return=representation",
+    useService: true,
+  });
+}
+
+async function deleteCampanhaRastreio(id) {
+  if (!id) return null;
+  return supabaseRequest(
+    `/campanhas_rastreio?id=eq.${encodeURIComponent(String(id))}`,
+    { method: "DELETE", prefer: "return=minimal", useService: true }
+  );
+}
