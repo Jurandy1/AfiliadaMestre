@@ -367,75 +367,218 @@
         <!-- DOUBLE PANEL GRID -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- LEFT COLUMN: Busca e sincronização (7 cols) -->
-            <div class="lg:col-span-7 space-y-6">
+            <!-- LEFT COLUMN: Catálogo & Sync (7 cols) -->
+            <div class="lg:col-span-7 space-y-6" id="admin-view-catalogo">
 
-                <!-- Busca manual na Shopee -->
+                <!-- Section label -->
+                <div class="flex items-end justify-between gap-3 px-0.5">
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-shopee-orange">Catálogo &amp; Sync</p>
+                        <h3 class="text-base font-black text-slate-800 leading-tight">Puxe ofertas da Shopee e alimente a vitrine</h3>
+                    </div>
+                    <button type="button" onclick="syncAllCategories({silent:false}).then(()=>{loadOffersFromSupabase({silent:true,reset:true}); loadCategoriesFromApi({silent:true}); loadAdminStats();})"
+                        class="shrink-0 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] font-bold hover:border-shopee-orange hover:text-shopee-orange flex items-center gap-1.5">
+                        <i class="fas fa-tower-broadcast"></i> Sync todas categorias
+                    </button>
+                </div>
+
+                <!-- Explorador Shopee -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="bg-slate-50 p-4 border-b border-slate-200">
-                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-magnifying-glass text-slate-500"></i> Buscar ofertas e salvar no banco
-                        </h4>
+                    <div class="bg-gradient-to-r from-slate-800 to-slate-700 p-4 border-b border-slate-600 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h4 class="font-bold text-xs text-white uppercase flex items-center gap-1.5 tracking-wide">
+                                <i class="fas fa-compass text-shopee-orange"></i> Explorador Shopee
+                            </h4>
+                            <p class="text-[10px] text-slate-300 mt-1">Presets · multi-keyword · multi-página · filtros de qualidade · salvar seleção</p>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5" id="explorer-presets">
+                            <button type="button" data-preset="bestsellers" onclick="applyExplorerPreset('bestsellers')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Mais vendidos</button>
+                            <button type="button" data-preset="topperf" onclick="applyExplorerPreset('topperf')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Top performance</button>
+                            <button type="button" data-preset="commission" onclick="applyExplorerPreset('commission')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Maior comissão</button>
+                            <button type="button" data-preset="rated" onclick="applyExplorerPreset('rated')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Bem avaliados</button>
+                            <button type="button" data-preset="popular" onclick="applyExplorerPreset('popular')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Populares</button>
+                            <button type="button" data-preset="budget" onclick="applyExplorerPreset('budget')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Custo-benefício</button>
+                        </div>
                     </div>
                     <div class="p-4 space-y-3 text-xs">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div class="sm:col-span-2">
-                                <label class="block text-slate-600 font-bold mb-1">Palavra-chave</label>
-                                <input type="text" id="admin-keyword" value="fone bluetooth" placeholder="ex: smartwatch, air fryer..." class="w-full p-2 border rounded-lg focus:outline-shopee-orange">
+                        <div>
+                            <label class="block text-slate-600 font-bold mb-1">Palavras-chave <span class="font-semibold text-slate-400">(vírgula ou uma por linha)</span></label>
+                            <textarea id="admin-keyword" rows="2" placeholder="ex: vestido longo, blusa cropped, tênis feminino" class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-shopee-orange focus:ring-1 focus:ring-shopee-orange/30 resize-y min-h-[64px]">fone bluetooth</textarea>
+                            <p class="text-[10px] text-slate-400 mt-1" id="explorer-kw-count">1 keyword</p>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Tipo de lista</label>
+                                <select id="admin-list-type" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" onchange="updateExplorerModeHint()">
+                                    <option value="0" selected>0 — Recomendados</option>
+                                    <option value="1">1 — Maior comissão</option>
+                                    <option value="2">2 — Top performance</option>
+                                </select>
                             </div>
                             <div>
-                                <label class="block text-slate-600 font-bold mb-1">Qtd. de itens</label>
-                                <select id="admin-limit" class="w-full p-2 border rounded-lg focus:outline-shopee-orange">
+                                <label class="block text-slate-600 font-bold mb-1">Ordenação</label>
+                                <select id="admin-sort-type" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" onchange="updateExplorerModeHint()">
+                                    <option value="1">1 — Relevância</option>
+                                    <option value="2" selected>2 — Mais vendidos</option>
+                                    <option value="3">3 — Maior preço</option>
+                                    <option value="4">4 — Menor preço</option>
+                                    <option value="5">5 — Maior comissão</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Itens / página</label>
+                                <select id="admin-limit" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
                                     <option value="10">10</option>
                                     <option value="20" selected>20</option>
                                     <option value="30">30</option>
                                     <option value="50">50</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Páginas (1–N)</label>
+                                <select id="admin-pages" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                    <option value="1" selected>1 página</option>
+                                    <option value="2">2 páginas</option>
+                                    <option value="3">3 páginas</option>
+                                    <option value="5">5 páginas</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button onclick="fetchLiveOffers(true)" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover flex items-center gap-1.5">
-                                <i class="fas fa-cloud-arrow-down"></i> Buscar na Shopee e salvar
-                            </button>
-                            <button onclick="syncAllCategories({silent:false}).then(()=>{loadOffersFromSupabase({silent:true,reset:true}); loadCategoriesFromApi({silent:true}); loadAdminStats();})" class="px-3 py-2 rounded-lg border border-shopee-orange text-shopee-orange text-[11px] font-bold hover:bg-orange-50 flex items-center gap-1.5">
-                                <i class="fas fa-tower-broadcast"></i> Sincronizar todas as categorias
-                            </button>
+                        <p class="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2" id="explorer-mode-hint">
+                            Modo: <strong class="text-slate-700">Recomendados</strong> · ordenado por <strong class="text-slate-700">Mais vendidos</strong>
+                        </p>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Nota mínima</label>
+                                <input type="number" id="admin-min-rating" min="0" max="5" step="0.1" value="4.0" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Vendas mín.</label>
+                                <input type="number" id="admin-min-sales" min="0" step="1" value="0" placeholder="0" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                            </div>
+                            <div class="flex items-end">
+                                <label class="flex items-center gap-2 p-2 border border-slate-200 rounded-lg w-full cursor-pointer hover:bg-slate-50">
+                                    <input type="checkbox" id="admin-require-commission" class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange">
+                                    <span class="font-bold text-slate-600 leading-tight">Exigir comissão</span>
+                                </label>
+                            </div>
+                            <div class="flex items-end gap-2">
+                                <button type="button" id="btn-explorer-search" onclick="runExplorerSearch({sync:false})" class="flex-1 px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover flex items-center justify-center gap-1.5">
+                                    <i class="fas fa-magnifying-glass"></i> Pré-visualizar
+                                </button>
+                                <button type="button" id="btn-explorer-cancel" onclick="cancelExplorerSearch()" class="hidden px-3 py-2 rounded-lg bg-slate-200 text-slate-700 text-[11px] font-bold hover:bg-slate-300">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Progress -->
+                        <div id="explorer-progress" class="hidden space-y-1.5">
+                            <div class="flex justify-between text-[10px] font-bold text-slate-500">
+                                <span id="explorer-progress-label">Buscando…</span>
+                                <span id="explorer-progress-pct">0%</span>
+                            </div>
+                            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div id="explorer-progress-bar" class="h-full bg-shopee-orange rounded-full transition-all duration-300" style="width:0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Preview toolbar -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-1.5 font-bold text-slate-600 cursor-pointer">
+                                    <input type="checkbox" id="explorer-select-all" onchange="toggleExplorerSelectAll(this.checked)" class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange">
+                                    Selecionar todos
+                                </label>
+                                <span class="text-[10px] text-slate-400" id="explorer-selection-meta">0 selecionados</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="runExplorerSearch({sync:true})" class="px-3 py-2 rounded-lg border border-shopee-orange text-shopee-orange text-[11px] font-bold hover:bg-orange-50 flex items-center gap-1.5">
+                                    <i class="fas fa-cloud-arrow-down"></i> Buscar e salvar tudo
+                                </button>
+                                <button type="button" id="btn-explorer-save" onclick="saveExplorerSelection()" disabled class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+                                    <i class="fas fa-floppy-disk"></i> Salvar selecionados
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="explorer-status" class="hidden text-[11px] rounded-lg px-3 py-2 border"></div>
+                        <div id="explorer-preview" class="max-h-80 overflow-y-auto space-y-2 empty:hidden">
+                            <div class="text-center py-8 text-slate-400 text-[11px]">
+                                <i class="fas fa-box-open text-2xl text-slate-300 mb-2 block"></i>
+                                Escolha um preset ou digite keywords e clique em <strong>Pré-visualizar</strong>.
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Sync por categoria -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="bg-slate-50 p-4 border-b border-slate-200">
-                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-layer-group text-slate-500"></i> Sincronizar uma categoria
-                        </h4>
-                    </div>
-                    <div class="p-4 flex flex-wrap items-end gap-3 text-xs">
-                        <div class="flex-1 min-w-[160px]">
-                            <label class="block text-slate-600 font-bold mb-1">Categoria</label>
-                            <select id="admin-cat-sync" class="w-full p-2 border rounded-lg focus:outline-shopee-orange"></select>
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                                <i class="fas fa-layer-group text-shopee-orange"></i> Sync por categoria
+                            </h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Puxa todas as keywords da categoria escolhida e grava no Supabase</p>
                         </div>
-                        <button onclick="adminSyncCategory()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700 flex items-center gap-1.5">
-                            <i class="fas fa-rotate"></i> Sincronizar categoria
-                        </button>
+                        <span class="text-[9px] font-black uppercase tracking-wider text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded-md">Lote por keywords</span>
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                            <div class="sm:col-span-2">
+                                <label class="block text-slate-600 font-bold mb-1">Categoria</label>
+                                <select id="admin-cat-sync" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange"></select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Páginas</label>
+                                <select id="admin-cat-pages" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" id="btn-sync-cat" onclick="adminSyncCategory()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700 flex items-center gap-1.5">
+                                <i class="fas fa-rotate"></i> Sincronizar categoria
+                            </button>
+                            <button type="button" onclick="applyExplorerPreset('bestsellers'); const sel=document.getElementById('admin-cat-sync'); if(sel?.value){ const opt=sel.options[sel.selectedIndex]; document.getElementById('admin-keyword').value = (opt?.text||'').replace(/\s*\(\d+\)\s*$/,'').trim(); }"
+                                class="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-[11px] font-bold hover:bg-slate-50 flex items-center gap-1.5">
+                                <i class="fas fa-wand-magic-sparkles"></i> Usar no Explorador
+                            </button>
+                        </div>
+                        <div id="cat-sync-status" class="hidden text-[11px] rounded-lg px-3 py-2 border"></div>
                     </div>
                 </div>
 
                 <!-- Status do auto-sync -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
-                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-robot text-slate-500"></i> Alimentação automática
-                        </h4>
-                        <button onclick="loadAutoStatus()" class="text-[10px] text-shopee-orange font-bold hover:underline">Atualizar</button>
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                                <i class="fas fa-robot text-shopee-orange"></i> Alimentação automática
+                            </h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Lotes leves em segundo plano — respeita AUTO_SYNC do .env</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span id="auto-enabled-badge" class="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-slate-100 text-slate-500 border-slate-200">—</span>
+                            <button type="button" onclick="loadAutoStatus()" class="text-[10px] text-shopee-orange font-bold hover:underline">Atualizar</button>
+                        </div>
                     </div>
-                    <div class="p-4">
+                    <div class="p-4 space-y-3">
                         <div id="auto-status-box" class="text-[11px] text-slate-600 space-y-1 font-mono bg-slate-50 border border-slate-100 rounded-lg p-3">
                             Carregando status…
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-2">
-                            O servidor sincroniza um pequeno lote por vez, de tempos em tempos, para manter tudo no plano gratuito do Supabase.
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="runAutoSyncNow()" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-shopee-orangeHover flex items-center gap-1.5">
+                                <i class="fas fa-bolt"></i> Rodar lote agora
+                            </button>
+                            <button type="button" onclick="runTopPerformanceNow()" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 flex items-center gap-1.5">
+                                <i class="fas fa-trophy"></i> Popular destaques
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400 leading-relaxed">
+                            Com <code class="text-[9px] bg-slate-100 px-1 rounded">AUTO_SYNC=0</code> o agendador fica pausado; os botões manuais acima continuam funcionando.
                         </p>
                     </div>
                 </div>
@@ -1093,13 +1236,18 @@
                 const badge = document.getElementById("api-status-badge");
                 if (badge) badge.classList.remove("hidden");
                 loadSubIdSettings();
-                const wantsPerformance = window.location.hash === "#performance"
-                    || new URLSearchParams(window.location.search).get("view") === "performance";
-                const wantsConsole = window.location.hash === "#console"
-                    || new URLSearchParams(window.location.search).get("view") === "console";
-                if (wantsPerformance || wantsConsole) {
-                    // Garante troca após o DOM/handlers estarem prontos
-                    setTimeout(() => switchMainMode(wantsPerformance ? "performance" : "console"), 0);
+                const hash = (window.location.hash || "").replace(/^#/, "").toLowerCase();
+                const viewParam = new URLSearchParams(window.location.search).get("view");
+                const wantsPerformance = hash === "performance" || viewParam === "performance";
+                const wantsCampaigns = hash === "campanhas" || hash === "campaigns" || viewParam === "campaigns";
+                const wantsCatalogo = hash === "catalogo" || hash === "console"
+                    || viewParam === "catalogo" || viewParam === "console";
+                if (wantsPerformance || wantsCampaigns || wantsCatalogo) {
+                    setTimeout(() => {
+                        if (wantsPerformance) switchMainMode("performance");
+                        else if (wantsCampaigns) switchMainMode("campaigns");
+                        else switchAdminView("catalogo");
+                    }, 0);
                 }
             }
         }
@@ -1129,11 +1277,19 @@
             renderPopularTerms();
             renderConsoleProducts();
             loadHeroProducts();
+            const kwEl = document.getElementById("admin-keyword");
+            if (kwEl) {
+                kwEl.addEventListener("input", updateExplorerKwCount);
+                updateExplorerKwCount();
+            }
+            updateExplorerModeHint();
+            window.addEventListener("hashchange", applyAdminHashRoute);
             if (isAdminMode()) {
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
                 loadConversions({ reset: true });
+                applyAdminHashRoute();
             }
             const health = await checkApiHealth();
 
@@ -1145,6 +1301,7 @@
                 showToast("Backend offline — rode: npm start", "error");
             }
             await applyCampaignLanding();
+            if (isAdminMode()) applyAdminHashRoute();
         };
 
         function setApiStatus(text, live) {
@@ -1235,7 +1392,12 @@
                 const res = await fetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ limit: 20, listType: 0, sortType: 2 }),
+                    body: JSON.stringify({
+                        limit: 20,
+                        listType: Number(document.getElementById("admin-list-type")?.value) || 0,
+                        sortType: Number(document.getElementById("admin-sort-type")?.value) || 2,
+                        pages: 1,
+                    }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1247,14 +1409,24 @@
             }
         }
 
-        async function syncCategory(catId, { silent = false } = {}) {
+        async function syncCategory(catId, { silent = false, pages } = {}) {
             if (!catId || catId === "todos") return syncAllCategories({ silent });
             try {
                 showToast(`Buscando ofertas de "${catId}" na Shopee…`, "success");
-                const res = await fetch(`${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25&listType=0&sortType=2`);
+                const pageCount = pages || Number(document.getElementById("admin-cat-pages")?.value) || 1;
+                const listType = Number(document.getElementById("admin-list-type")?.value) || 0;
+                const sortType = Number(document.getElementById("admin-sort-type")?.value) || 2;
+                const minRating = document.getElementById("admin-min-rating")?.value;
+                const res = await fetch(
+                    `${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25&listType=${listType}&sortType=${sortType}&pages=${pageCount}`
+                    + (minRating != null ? `&minRating=${encodeURIComponent(minRating)}` : "")
+                );
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                if (!silent) showToast(`✓ ${data.count} produtos em "${catId}"`, "success");
+                if (!silent) {
+                    const filtered = data.filteredOut ? ` · ${data.filteredOut} filtrados` : "";
+                    showToast(`✓ ${data.count} produtos em "${catId}"${filtered}`, "success");
+                }
                 return data;
             } catch (err) {
                 if (!silent) showToast(`Sync ${catId} falhou: ${err.message}`, "error");
@@ -1262,18 +1434,404 @@
             }
         }
 
+        // ---- Explorador Shopee (Catálogo & Sync) ----
+        const EXPLORER_PRESETS = {
+            bestsellers: {
+                listType: 0, sortType: 2, minRating: 4.0, minSales: 50, requireCommission: false,
+                keywords: "vestido longo, blusa feminina, tênis feminino, kit skincare",
+            },
+            topperf: {
+                listType: 2, sortType: 2, minRating: 4.2, minSales: 20, requireCommission: false,
+                keywords: "achadinhos shopee, oferta relâmpago, mais vendidos",
+            },
+            commission: {
+                listType: 1, sortType: 5, minRating: 4.0, minSales: 0, requireCommission: true,
+                keywords: "suplemento, perfume importado, smartwatch feminino",
+            },
+            rated: {
+                listType: 0, sortType: 1, minRating: 4.7, minSales: 30, requireCommission: false,
+                keywords: "creme facial, escova secadora, air fryer",
+            },
+            popular: {
+                listType: 0, sortType: 2, minRating: 4.0, minSales: 100, requireCommission: false,
+                keywords: "capinha iphone, fone bluetooth, power bank",
+            },
+            budget: {
+                listType: 0, sortType: 4, minRating: 4.0, minSales: 20, requireCommission: false,
+                keywords: "organizador, kit maquiagem, meia feminina",
+            },
+        };
+
+        const LIST_TYPE_LABELS_UI = { 0: "Recomendados", 1: "Maior comissão", 2: "Top performance" };
+        const SORT_TYPE_LABELS_UI = {
+            1: "Relevância", 2: "Mais vendidos", 3: "Maior preço", 4: "Menor preço", 5: "Maior comissão",
+        };
+
+        let explorerProducts = [];
+        let explorerSelected = new Set();
+        let explorerAbort = null;
+        let explorerBusy = false;
+
+        function parseExplorerKeywords(raw) {
+            return [...new Set(String(raw || "")
+                .split(/[\n,;]+/)
+                .map((s) => s.trim())
+                .filter(Boolean))];
+        }
+
+        function updateExplorerKwCount() {
+            const el = document.getElementById("explorer-kw-count");
+            const n = parseExplorerKeywords(document.getElementById("admin-keyword")?.value).length;
+            if (el) el.textContent = n === 1 ? "1 keyword" : `${n} keywords`;
+        }
+
+        function updateExplorerModeHint() {
+            const lt = Number(document.getElementById("admin-list-type")?.value) || 0;
+            const st = Number(document.getElementById("admin-sort-type")?.value) || 2;
+            const hint = document.getElementById("explorer-mode-hint");
+            if (hint) {
+                hint.innerHTML = `Modo: <strong class="text-slate-700">${LIST_TYPE_LABELS_UI[lt] || lt}</strong> · ordenado por <strong class="text-slate-700">${SORT_TYPE_LABELS_UI[st] || st}</strong>`;
+            }
+        }
+
+        function applyExplorerPreset(name) {
+            const p = EXPLORER_PRESETS[name];
+            if (!p) return;
+            const kw = document.getElementById("admin-keyword");
+            const lt = document.getElementById("admin-list-type");
+            const st = document.getElementById("admin-sort-type");
+            const mr = document.getElementById("admin-min-rating");
+            const ms = document.getElementById("admin-min-sales");
+            const rc = document.getElementById("admin-require-commission");
+            if (kw) kw.value = p.keywords;
+            if (lt) lt.value = String(p.listType);
+            if (st) st.value = String(p.sortType);
+            if (mr) mr.value = String(p.minRating);
+            if (ms) ms.value = String(p.minSales);
+            if (rc) rc.checked = !!p.requireCommission;
+            document.querySelectorAll(".explorer-preset").forEach((btn) => {
+                const on = btn.dataset.preset === name;
+                btn.classList.toggle("bg-shopee-orange", on);
+                btn.classList.toggle("border-shopee-orange", on);
+                btn.classList.toggle("bg-white/10", !on);
+                btn.classList.toggle("border-white/10", !on);
+            });
+            updateExplorerKwCount();
+            updateExplorerModeHint();
+            showToast(`Preset: ${name}`, "success");
+        }
+
+        function setExplorerProgress(show, pct = 0, label = "") {
+            const wrap = document.getElementById("explorer-progress");
+            const bar = document.getElementById("explorer-progress-bar");
+            const pctEl = document.getElementById("explorer-progress-pct");
+            const lab = document.getElementById("explorer-progress-label");
+            if (!wrap) return;
+            wrap.classList.toggle("hidden", !show);
+            if (bar) bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+            if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+            if (lab && label) lab.textContent = label;
+        }
+
+        function setExplorerStatus(type, html) {
+            const el = document.getElementById("explorer-status");
+            if (!el) return;
+            if (!html) {
+                el.classList.add("hidden");
+                el.innerHTML = "";
+                return;
+            }
+            const styles = {
+                info: "bg-slate-50 border-slate-200 text-slate-600",
+                success: "bg-emerald-50 border-emerald-200 text-emerald-800",
+                empty: "bg-amber-50 border-amber-200 text-amber-900",
+                error: "bg-red-50 border-red-200 text-red-700",
+                rate: "bg-orange-50 border-orange-200 text-orange-900",
+            };
+            el.className = `text-[11px] rounded-lg px-3 py-2 border ${styles[type] || styles.info}`;
+            el.innerHTML = html;
+            el.classList.remove("hidden");
+        }
+
+        function setExplorerBusy(busy) {
+            explorerBusy = busy;
+            const btn = document.getElementById("btn-explorer-search");
+            const cancel = document.getElementById("btn-explorer-cancel");
+            if (btn) {
+                btn.disabled = busy;
+                btn.innerHTML = busy
+                    ? `<i class="fas fa-spinner fa-spin"></i> Buscando…`
+                    : `<i class="fas fa-magnifying-glass"></i> Pré-visualizar`;
+            }
+            if (cancel) cancel.classList.toggle("hidden", !busy);
+        }
+
+        function cancelExplorerSearch() {
+            if (explorerAbort) {
+                explorerAbort.abort();
+                explorerAbort = null;
+            }
+            setExplorerBusy(false);
+            setExplorerProgress(false);
+            setExplorerStatus("info", "Busca cancelada. Os resultados já obtidos foram mantidos.");
+        }
+
+        function getExplorerFormParams() {
+            return {
+                keywords: parseExplorerKeywords(document.getElementById("admin-keyword")?.value),
+                limit: Number(document.getElementById("admin-limit")?.value) || 20,
+                pages: Number(document.getElementById("admin-pages")?.value) || 1,
+                listType: Number(document.getElementById("admin-list-type")?.value) || 0,
+                sortType: Number(document.getElementById("admin-sort-type")?.value) || 2,
+                minRating: Number(document.getElementById("admin-min-rating")?.value) || 4,
+                minSales: Number(document.getElementById("admin-min-sales")?.value) || 0,
+                requireCommission: !!document.getElementById("admin-require-commission")?.checked,
+            };
+        }
+
+        function renderExplorerPreview(products, meta = {}) {
+            const box = document.getElementById("explorer-preview");
+            if (!box) return;
+            explorerProducts = Array.isArray(products) ? products : [];
+            explorerSelected = new Set(explorerProducts.map((p) => String(p.itemId || p.id)));
+            const selAll = document.getElementById("explorer-select-all");
+            if (selAll) selAll.checked = explorerProducts.length > 0;
+
+            if (!explorerProducts.length) {
+                box.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-[11px]">
+                        <i class="fas fa-inbox text-2xl text-slate-300 mb-2 block"></i>
+                        Nenhum produto na prévia.
+                        ${meta.rateLimited ? "<br><strong class='text-orange-700'>Possível rate-limit da Shopee — aguarde e tente de novo.</strong>" : ""}
+                        ${meta.filteredOut ? `<br>${meta.filteredOut} itens filtrados pelos critérios de qualidade.` : ""}
+                    </div>`;
+                updateExplorerSelectionMeta();
+                return;
+            }
+
+            box.innerHTML = explorerProducts.map((p) => {
+                const id = String(p.itemId || p.id);
+                const img = p.image || "";
+                const price = Number(p.newPrice || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                const stars = Number(p.stars || 0).toFixed(1);
+                const commission = p.commissionRate || "—";
+                return `
+                <label class="flex gap-3 p-2.5 rounded-lg border border-slate-100 hover:border-shopee-orange/40 hover:bg-orange-50/30 cursor-pointer transition">
+                    <input type="checkbox" class="explorer-item-cb mt-1 rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange"
+                        data-id="${escapeHtml(id)}" checked onchange="onExplorerItemToggle('${escapeHtml(id)}', this.checked)">
+                    <img src="${escapeHtml(img)}" alt="" class="w-12 h-12 rounded-md object-cover bg-slate-100 shrink-0" loading="lazy"
+                        onerror="this.src='https://via.placeholder.com/48?text=…'">
+                    <div class="min-w-0 flex-1">
+                        <p class="font-bold text-slate-800 text-[11px] leading-snug line-clamp-2">${escapeHtml(p.title || "")}</p>
+                        <div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-slate-500">
+                            <span class="font-black text-shopee-orange">${price}</span>
+                            <span><i class="fas fa-star text-amber-400"></i> ${stars}</span>
+                            <span>${escapeHtml(String(p.sales || "—"))}</span>
+                            <span class="text-emerald-700 font-bold">${escapeHtml(String(commission))}</span>
+                            ${p.keyword ? `<span class="text-slate-400">· ${escapeHtml(p.keyword)}</span>` : ""}
+                        </div>
+                    </div>
+                </label>`;
+            }).join("");
+            updateExplorerSelectionMeta();
+        }
+
+        function onExplorerItemToggle(id, checked) {
+            if (checked) explorerSelected.add(String(id));
+            else explorerSelected.delete(String(id));
+            const selAll = document.getElementById("explorer-select-all");
+            if (selAll) selAll.checked = explorerProducts.length > 0 && explorerSelected.size === explorerProducts.length;
+            updateExplorerSelectionMeta();
+        }
+
+        function toggleExplorerSelectAll(checked) {
+            explorerSelected = checked
+                ? new Set(explorerProducts.map((p) => String(p.itemId || p.id)))
+                : new Set();
+            document.querySelectorAll(".explorer-item-cb").forEach((cb) => { cb.checked = checked; });
+            updateExplorerSelectionMeta();
+        }
+
+        function updateExplorerSelectionMeta() {
+            const meta = document.getElementById("explorer-selection-meta");
+            const btn = document.getElementById("btn-explorer-save");
+            if (meta) meta.textContent = `${explorerSelected.size} selecionados · ${explorerProducts.length} na prévia`;
+            if (btn) btn.disabled = explorerSelected.size === 0;
+        }
+
+        async function runExplorerSearch({ sync = false } = {}) {
+            if (explorerBusy) return;
+            const params = getExplorerFormParams();
+            if (!params.keywords.length) {
+                setExplorerStatus("error", "Informe ao menos uma palavra-chave.");
+                showToast("Digite uma keyword", "error");
+                return;
+            }
+
+            explorerAbort = new AbortController();
+            setExplorerBusy(true);
+            setExplorerProgress(true, 8, sync ? "Buscando e salvando…" : "Pré-visualizando na Shopee…");
+            setExplorerStatus("info", `Consultando ${params.keywords.length} keyword(s) × ${params.pages} página(s)…`);
+
+            // Progresso simulado suave enquanto o batch roda no servidor
+            let fakePct = 8;
+            const tick = setInterval(() => {
+                fakePct = Math.min(90, fakePct + (90 - fakePct) * 0.08);
+                setExplorerProgress(true, fakePct, `Shopee · ${params.listType === 2 ? "Top performance" : LIST_TYPE_LABELS_UI[params.listType] || "lista"}…`);
+            }, 400);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ofertas/batch`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    signal: explorerAbort.signal,
+                    body: JSON.stringify({
+                        keywords: params.keywords,
+                        pages: params.pages,
+                        pageStart: 1,
+                        limit: params.limit,
+                        listType: params.listType,
+                        sortType: params.sortType,
+                        minRating: params.minRating,
+                        minSales: params.minSales,
+                        requireCommission: params.requireCommission,
+                        sync,
+                    }),
+                });
+                const data = await res.json().catch(() => ({}));
+                clearInterval(tick);
+                if (!res.ok) {
+                    const rate = data.rateLimited || res.status === 429;
+                    setExplorerStatus(rate ? "rate" : "error",
+                        rate
+                            ? `<i class="fas fa-clock mr-1"></i> Rate-limit da Shopee. Aguarde alguns segundos e tente novamente. <span class="font-mono">${escapeHtml(data.error || "")}</span>`
+                            : `<i class="fas fa-triangle-exclamation mr-1"></i> ${escapeHtml(data.error || `HTTP ${res.status}`)}`
+                    );
+                    renderExplorerPreview([], { rateLimited: rate });
+                    showToast(data.error || "Falha na busca", "error");
+                    return;
+                }
+
+                setExplorerProgress(true, 100, "Concluído");
+                const products = data.products || [];
+                renderExplorerPreview(products, { filteredOut: data.filteredOut, rateLimited: data.rateLimited });
+
+                const failures = (data.report || []).filter((r) => !r.ok);
+                if (data.empty || !products.length) {
+                    setExplorerStatus(
+                        data.rateLimited ? "rate" : "empty",
+                        data.rateLimited
+                            ? "A API respondeu com limite de taxa e nenhum item útil. Tente menos páginas ou aguarde."
+                            : `Nenhum produto passou nos filtros. Filtrados: ${data.filteredOut || 0}. Tente outras keywords ou baixe a nota mínima.`
+                    );
+                    showToast("Shopee sem resultados para esses filtros", "error");
+                } else {
+                    const mode = `${data.listTypeLabel || ""} · ${data.sortTypeLabel || ""}`;
+                    const savedBit = sync && data.saved ? ` · ${data.saved} salvos no banco` : "";
+                    const failBit = failures.length ? ` · ${failures.length} falha(s)` : "";
+                    setExplorerStatus(
+                        "success",
+                        `<strong>${data.count}</strong> únicos · ${mode} · filtrados ${data.filteredOut || 0}${data.hasNextPage ? " · há mais páginas" : ""}${savedBit}${failBit}`
+                    );
+                    showToast(`Explorador: ${data.count} produtos${savedBit}`, "success");
+                    if (sync) {
+                        await loadOffersFromSupabase({ silent: true, reset: true });
+                        await loadCategoriesFromApi({ silent: true });
+                        populateAdminCategorySelect();
+                        loadAdminStats();
+                    }
+                }
+                setApiStatus("API Status: Shopee explorador", true);
+            } catch (err) {
+                clearInterval(tick);
+                if (err.name === "AbortError") return;
+                setExplorerStatus("error", escapeHtml(err.message));
+                showToast(`Erro Shopee: ${err.message}`, "error");
+            } finally {
+                clearInterval(tick);
+                setExplorerBusy(false);
+                setTimeout(() => setExplorerProgress(false), 600);
+                explorerAbort = null;
+            }
+        }
+
+        async function saveExplorerSelection() {
+            const selected = explorerProducts.filter((p) => explorerSelected.has(String(p.itemId || p.id)));
+            if (!selected.length) {
+                showToast("Selecione ao menos um produto", "error");
+                return;
+            }
+            // Deduplicar por itemId (já único na prévia, reforço)
+            const byId = new Map();
+            for (const p of selected) byId.set(String(p.itemId || p.id), p);
+            const products = [...byId.values()];
+            const btn = document.getElementById("btn-explorer-save");
+            const original = btn ? btn.innerHTML : "";
+            if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Salvando…`; }
+            try {
+                const res = await fetch(`${API_BASE}/api/ofertas/save-bulk`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        products,
+                        listType: Number(document.getElementById("admin-list-type")?.value) || 0,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Salvos: ${data.saved} produtos no Supabase`, "success");
+                setExplorerStatus("success", `<strong>${data.saved}</strong> produtos gravados (de ${data.unique} únicos selecionados).`);
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                await loadCategoriesFromApi({ silent: true });
+                populateAdminCategorySelect();
+                loadAdminStats();
+            } catch (err) {
+                showToast(`Falha ao salvar: ${err.message}`, "error");
+                setExplorerStatus("error", escapeHtml(err.message));
+            } finally {
+                if (btn) { btn.disabled = explorerSelected.size === 0; btn.innerHTML = original; }
+            }
+        }
+
         async function fetchLiveOffers(syncToSupabase = false, opts = {}) {
-            const keyword = opts.keyword
+            // Compat: busca simples ainda funciona; multi-keyword usa o Explorador
+            const raw = opts.keyword
                 || document.getElementById("admin-keyword")?.value
                 || document.getElementById("store-search-input")?.value
                 || "oferta";
+            const keywords = parseExplorerKeywords(raw);
+            if (keywords.length > 1 || Number(document.getElementById("admin-pages")?.value) > 1) {
+                if (document.getElementById("admin-keyword") && opts.keyword) {
+                    document.getElementById("admin-keyword").value = keywords.join(", ");
+                }
+                return runExplorerSearch({ sync: syncToSupabase });
+            }
+            const keyword = keywords[0] || "oferta";
             const limit = document.getElementById("admin-limit")?.value || 20;
+            const listType = Number(document.getElementById("admin-list-type")?.value) || 0;
+            const sortType = Number(document.getElementById("admin-sort-type")?.value) || 2;
+            const minRating = document.getElementById("admin-min-rating")?.value ?? 4;
+            const minSales = document.getElementById("admin-min-sales")?.value ?? 0;
+            const requireCommission = document.getElementById("admin-require-commission")?.checked ? "1" : "0";
             const sync = syncToSupabase ? "&sync=1" : "";
             try {
-                const res = await fetch(`${API_BASE}/api/ofertas?keyword=${encodeURIComponent(keyword)}&limit=${limit}${sync}`);
+                const res = await fetch(
+                    `${API_BASE}/api/ofertas?keyword=${encodeURIComponent(keyword)}&limit=${limit}&listType=${listType}&sortType=${sortType}`
+                    + `&minRating=${encodeURIComponent(minRating)}&minSales=${encodeURIComponent(minSales)}&requireCommission=${requireCommission}${sync}`
+                );
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ok = applyProducts(data.products, "shopee");
+                renderExplorerPreview(data.products || [], { filteredOut: data.filteredOut, rateLimited: data.rateLimited });
+                if (data.count === 0) {
+                    setExplorerStatus(data.rateLimited ? "rate" : "empty",
+                        data.rateLimited
+                            ? "Rate-limit da Shopee."
+                            : `Nenhum produto. Filtrados: ${data.filteredOut || 0}.`);
+                } else {
+                    setExplorerStatus("success",
+                        `<strong>${data.count}</strong> · ${data.listTypeLabel || ""} · ${data.sortTypeLabel || ""} · filtrados ${data.filteredOut || 0}${data.saved ? ` · ${data.saved} salvos` : ""}`);
+                }
                 if (isAdminMode()) loadAdminStats();
                 if (!opts.silent) {
                     showToast(ok
@@ -1285,6 +1843,7 @@
                 return ok;
             } catch (err) {
                 if (!opts.silent) showToast(`Erro Shopee: ${err.message}`, "error");
+                setExplorerStatus("error", escapeHtml(err.message));
                 return false;
             }
         }
@@ -1429,6 +1988,13 @@
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+                updateExplorerKwCount();
+                updateExplorerModeHint();
+                try {
+                    if ((location.hash || '').replace(/^#/, '') !== 'catalogo') {
+                        history.replaceState(null, '', '#catalogo');
+                    }
+                } catch (_) {}
             } else if (mode === 'campaigns') {
                 storefront.classList.add('hidden');
                 consoleSection.classList.remove('hidden');
@@ -3569,6 +4135,7 @@
 
         async function loadAutoStatus() {
             const box = document.getElementById('auto-status-box');
+            const badge = document.getElementById('auto-enabled-badge');
             try {
                 const res = await fetch(`${API_BASE}/api/auto/status`);
                 const s = await res.json();
@@ -3583,23 +4150,39 @@
                 if (lastEl) lastEl.innerText = fmtDateTime(s.lastRunAt);
                 if (upsEl) upsEl.innerText = `itens salvos: ${s.totalUpserts ?? 0}`;
 
+                if (badge) {
+                    if (s.enabled) {
+                        badge.textContent = s.running ? 'Rodando' : 'Ativo';
+                        badge.className = 'text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200';
+                    } else {
+                        badge.textContent = 'Pausado (AUTO_SYNC=0)';
+                        badge.className = 'text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-slate-100 text-slate-500 border-slate-200';
+                    }
+                }
+
+                const modes = (s.modes || []).map(m => m.label || `${m.listType}/${m.sortType}`).join(' → ');
                 if (box) {
                     box.innerHTML = [
-                        `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado'}`,
+                        `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado (pausado)'}`,
                         `lote..........: ${s.batch} keyword(s) / execução`,
                         `foco feminino.: ${s.femalePercentTarget || 90}% das buscas`,
                         `intervalo.....: ${s.intervalMin} min`,
                         `itens/keyword.: ${s.limit}`,
                         `keywords total: ${s.keywordsTotal} (posição ${s.cursor})`,
+                        `rotação.......: ${modes || '—'}`,
                         `execuções.....: ${s.runs}`,
                         `última........: ${fmtDateTime(s.lastRunAt)}`,
-                        `próxima.......: ${fmtDateTime(s.nextRunAt)}`,
+                        `próxima.......: ${s.enabled ? fmtDateTime(s.nextRunAt) : '— (agendador off)'}`,
                         `limpeza.......: ${s.pruneDays ? s.pruneDays + ' dias' : 'desligada'}`,
                         s.lastError ? `último erro...: ${escapeHtml(s.lastError)}` : ``,
                     ].filter(Boolean).map(l => `<div>${l}</div>`).join('');
                 }
             } catch (err) {
                 if (box) box.innerHTML = `<div class="text-red-500">Não foi possível ler o status (${escapeHtml(err.message)}).</div>`;
+                if (badge) {
+                    badge.textContent = 'Indisponível';
+                    badge.className = 'text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-red-50 text-red-600 border-red-200';
+                }
             }
         }
 
@@ -3654,13 +4237,56 @@
             const sel = document.getElementById('admin-cat-sync');
             const catId = sel?.value;
             if (!catId) return;
+            const btn = document.getElementById('btn-sync-cat');
+            const status = document.getElementById('cat-sync-status');
+            const original = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sincronizando…`; }
+            if (status) {
+                status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-slate-50 border-slate-200 text-slate-600';
+                status.textContent = `Sincronizando categoria "${catId}"…`;
+                status.classList.remove('hidden');
+            }
             const data = await syncCategory(catId, { silent: false });
             if (data) {
+                if (status) {
+                    status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-emerald-50 border-emerald-200 text-emerald-800';
+                    status.innerHTML = `<strong>${data.count}</strong> produtos · ${data.keywordsRun || 0} keywords · ${data.listTypeLabel || ''} · filtrados ${data.filteredOut || 0}`;
+                }
                 await loadOffersFromSupabase({ silent: true, reset: true, category: catId });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
+            } else if (status) {
+                status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-red-50 border-red-200 text-red-700';
+                status.textContent = 'Falha ao sincronizar a categoria.';
             }
+            if (btn) { btn.disabled = false; btn.innerHTML = original; }
+        }
+
+        /** Alias estável para views do painel (hash #catalogo etc.). */
+        function switchAdminView(view) {
+            const v = String(view || '').replace(/^#/, '').toLowerCase();
+            if (v === 'catalogo' || v === 'console' || v === 'admin') {
+                if (location.hash !== '#catalogo') {
+                    try { history.replaceState(null, '', '#catalogo'); } catch (_) {}
+                }
+                switchMainMode('console');
+                const el = document.getElementById('admin-view-catalogo');
+                if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                return;
+            }
+            if (v === 'campanhas' || v === 'campaigns') return switchMainMode('campaigns');
+            if (v === 'desempenho' || v === 'performance') return switchMainMode('performance');
+            if (v === 'vitrine' || v === 'storefront') return switchMainMode('storefront');
+            switchMainMode('console');
+        }
+
+        function applyAdminHashRoute() {
+            const hash = (location.hash || '').replace(/^#/, '').toLowerCase();
+            if (!hash) return;
+            if (hash === 'catalogo' || hash === 'console') switchAdminView('catalogo');
+            else if (hash === 'campanhas' || hash === 'campaigns') switchAdminView('campaigns');
+            else if (hash === 'desempenho' || hash === 'performance') switchAdminView('performance');
         }
 
         // Unified compatibility clipboard copier helper
