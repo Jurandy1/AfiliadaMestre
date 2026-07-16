@@ -36,21 +36,37 @@ const {
   listCampanhasRastreio,
   upsertCampanhaRastreio,
   deleteCampanhaRastreio,
+  patchOferta,
+  deleteOfertasByIds,
 } = require("./supabase");
 const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
 const { refillVitrine } = require("./refillVitrine");
 const { productMatchesSubcategory } = require("./productMeta");
+const { SITE_SUBID, buildProductSubIds } = require("./tracking");
 const autosync = require("./autosync");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3789;
 const ROOT = path.join(__dirname, "..");
-
-/** Marcador fixo nos Sub IDs deste site (aparece em utmContent da Shopee). */
-const SITE_SUBID = "afiliada_mestre";
+const VITRINE_HTML = path.join(ROOT, "uploads", "painel_e_vitrine_afiliado_mestre.html");
+const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || "").trim();
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+/** Protege rotas de escrita do admin. Se ADMIN_TOKEN não estiver no .env, libera (dev local). */
+function requireAdmin(req, res, next) {
+  if (!ADMIN_TOKEN) return next();
+  const header = String(req.headers["x-admin-token"] || "").trim();
+  const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  const token = header || bearer || String(req.query.adminToken || "").trim();
+  if (token && token === ADMIN_TOKEN) return next();
+  return res.status(401).json({ error: "Não autorizado. Configure ADMIN_TOKEN e envie X-Admin-Token.", code: "ADMIN_AUTH" });
+}
+
+function sendVitrine(_req, res) {
+  res.sendFile(VITRINE_HTML);
+}
 
 // Cache leve em memória para campanhas (reduz hits Shopee/Vercel)
 let campaignsCache = { at: 0, data: null };
@@ -164,7 +180,7 @@ app.get("/api/ofertas", async (req, res) => {
  * Body: { keywords: string[]|string, pages?, pageStart?, limit?, listType?, sortType?,
  *         minRating?, minSales?, requireCommission?, sync?, gapMs? }
  */
-app.post("/api/ofertas/batch", async (req, res) => {
+app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
   try {
     const body = req.body || {};
     const keywordsRaw = body.keywords ?? body.keyword ?? "";
@@ -250,7 +266,7 @@ app.post("/api/ofertas/batch", async (req, res) => {
  * Body: { products: [...] } e/ou { nodes: [...], keyword?, listType? }
  * Classifica category/subcategory via resolveTaxonomy (mapa da vitrine).
  */
-app.post("/api/ofertas/save-bulk", async (req, res) => {
+app.post("/api/ofertas/save-bulk", requireAdmin, async (req, res) => {
   try {
     const body = req.body || {};
     const products = Array.isArray(body.products) ? body.products : [];
@@ -515,7 +531,7 @@ app.get("/api/categorias", async (req, res) => {
   }
 });
 
-app.post("/api/sync", async (req, res) => {
+app.post("/api/sync", requireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 5), 50);
     const listType = req.body?.listType != null ? Number(req.body.listType) : 0;
@@ -602,7 +618,7 @@ app.post("/api/sync", async (req, res) => {
   }
 });
 
-app.get("/api/sync/categoria/:id", async (req, res) => {
+app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
   try {
     const catId = String(req.params.id || "").trim();
     const cat = CATEGORIAS.find((c) => c.id === catId);
@@ -681,7 +697,7 @@ app.get("/api/auto/status", (_req, res) => {
   res.json(autosync.status());
 });
 
-app.post("/api/auto/run", async (_req, res) => {
+app.post("/api/auto/run", requireAdmin, async (_req, res) => {
   try {
     const result = await autosync.runOnce({ manual: true });
     res.json({ ok: true, result, status: autosync.status() });
@@ -691,7 +707,7 @@ app.post("/api/auto/run", async (_req, res) => {
 });
 
 /** Popular destaques (Top Performance). */
-app.post("/api/auto/top-performance", async (_req, res) => {
+app.post("/api/auto/top-performance", requireAdmin, async (_req, res) => {
   try {
     const result = await autosync.runTopPerformance({ manual: true });
     res.json({ ok: true, result, status: autosync.status() });
@@ -732,7 +748,7 @@ app.get("/api/campanhas-rastreio", async (_req, res) => {
   }
 });
 
-app.post("/api/campanhas-rastreio", async (req, res) => {
+app.post("/api/campanhas-rastreio", requireAdmin, async (req, res) => {
   try {
     const body = req.body || {};
     if (!body.id || !body.campaign) {
@@ -746,7 +762,7 @@ app.post("/api/campanhas-rastreio", async (req, res) => {
   }
 });
 
-app.delete("/api/campanhas-rastreio/:id", async (req, res) => {
+app.delete("/api/campanhas-rastreio/:id", requireAdmin, async (req, res) => {
   try {
     await deleteCampanhaRastreio(req.params.id);
     res.json({ ok: true });
@@ -764,9 +780,9 @@ app.post("/api/shortlink", async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "").trim();
     if (!originUrl) return res.status(400).json({ error: "originUrl obrigatório" });
-    const subIds = Array.isArray(req.body?.subIds)
+    const subIds = Array.isArray(req.body?.subIds) && req.body.subIds.length
       ? req.body.subIds.map(String)
-      : [SITE_SUBID, "site", "vitrine"];
+      : buildProductSubIds("geral", req.body?.itemId);
     const itemId = req.body?.itemId != null ? Number(req.body.itemId) : null;
     const shortLink = await generateShortLink(originUrl, subIds);
     if (shortLink && itemId) {
@@ -882,7 +898,7 @@ app.get("/api/conversions", async (req, res) => {
  * Body: { limit?, pages?, clear?, maxItems? }
  * maxItems: para ao atingir N itens únicos (ex.: 2000 para demo).
  */
-app.post("/api/reset-vitrine", async (req, res) => {
+app.post("/api/reset-vitrine", requireAdmin, async (req, res) => {
   try {
     const result = await refillVitrine({
       clear: req.body?.clear !== false,
@@ -898,24 +914,107 @@ app.post("/api/reset-vitrine", async (req, res) => {
   }
 });
 
-app.use(express.static(ROOT));
-app.use("/uploads", express.static(path.join(ROOT, "uploads")));
+/** Atualiza preços/comissão de produtos selecionados preservando category/subcategory/sub_ids. */
+app.post("/api/ofertas/refresh", requireAdmin, async (req, res) => {
+  try {
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : [];
+    const ids = [...new Set(itemIds.map(Number).filter((n) => Number.isSafeInteger(n) && n > 0))].slice(0, 40);
+    if (!ids.length) return res.status(400).json({ error: "itemIds obrigatório" });
 
-app.get("/admin", (req, res) => {
-  res.redirect(302, "/?admin=1#dashboard");
+    const existing = await getOffersByItemIds(ids, { full: true });
+    const byId = new Map((existing || []).map((r) => [Number(r.item_id), r]));
+
+    const details = await fetchProductDetailsByIds(ids);
+    const nodes = Array.isArray(details) ? details : [];
+    const rows = [];
+    for (const n of nodes) {
+      const itemId = Number(n.itemId);
+      const prev = byId.get(itemId);
+      const row = mapOfferToRow(n, prev?.keyword || "", prev?.list_type ?? null, {
+        forceCategory: prev?.category && prev.category !== "todos" ? prev.category : null,
+        forceSubcategory: prev?.subcategory || null,
+      });
+      if (prev?.sub_ids?.length) row.sub_ids = prev.sub_ids;
+      if (prev?.short_link) row.short_link = prev.short_link;
+      if (row.item_id && row.offer_link) rows.push(row);
+    }
+    if (!rows.length) return res.status(404).json({ error: "Nenhum produto atualizado pela Shopee" });
+    const saved = await upsertOfertas(rows);
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    res.json({ ok: true, requested: ids.length, saved: Array.isArray(saved) ? saved.length : rows.length });
+  } catch (err) {
+    console.error("[/api/ofertas/refresh]", err.message);
+    res.status(err.status || 500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
 });
 
-app.get("/", (req, res) => {
-  // Mantém ?admin=1 e outros parâmetros no redirect para a vitrine.
-  const qs = new URLSearchParams(req.query).toString();
-  const target = `/uploads/painel_e_vitrine_afiliado_mestre.html${qs ? `?${qs}` : ""}`;
-  res.redirect(302, target);
+app.patch("/api/ofertas/:itemId", requireAdmin, async (req, res) => {
+  try {
+    const itemId = Number(req.params.itemId);
+    const body = req.body || {};
+    const patch = {};
+    if (body.category != null) patch.category = String(body.category);
+    if (body.subcategory !== undefined) patch.subcategory = body.subcategory ? String(body.subcategory) : null;
+    if (body.hidden != null) patch.hidden = !!body.hidden;
+    if (!Object.keys(patch).length) return res.status(400).json({ error: "Nada para atualizar" });
+    const updated = await patchOferta(itemId, patch);
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    res.json({ ok: true, product: Array.isArray(updated) ? updated[0] : updated });
+  } catch (err) {
+    console.error("[/api/ofertas PATCH]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/ofertas", requireAdmin, async (req, res) => {
+  try {
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds : [];
+    const removed = await deleteOfertasByIds(itemIds);
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    res.json({ ok: true, removed });
+  } catch (err) {
+    console.error("[/api/ofertas DELETE]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// Canonical: path antigo do HTML → URL limpa (antes do static)
+app.get("/uploads/painel_e_vitrine_afiliado_mestre.html", (req, res) => {
+  const qs = new URLSearchParams(req.query);
+  if (qs.has("admin") || qs.get("mode") === "admin") {
+    qs.delete("admin");
+    qs.delete("mode");
+    const rest = qs.toString();
+    return res.redirect(301, `/admin${rest ? `?${rest}` : ""}`);
+  }
+  const rest = qs.toString();
+  return res.redirect(301, `/${rest ? `?${rest}` : ""}`);
+});
+
+app.use("/uploads", express.static(path.join(ROOT, "uploads")));
+app.use(express.static(ROOT, { index: false }));
+
+const APP_PAGE_RE = /^\/(categoria(\/[^/]+){0,2}|relampago|mais-vendidos|maiores-descontos|melhor-avaliados|lojas-oficiais|admin(\/[\w-]+)?)\/?$/;
+
+app.get(["/", "/admin", "/admin/:view", "/categoria", "/categoria/:cat", "/categoria/:cat/:sub",
+  "/relampago", "/mais-vendidos", "/maiores-descontos", "/melhor-avaliados", "/lojas-oficiais"], sendVitrine);
+
+// SPA fallback: paths de app conhecidos (sem /api)
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/")) return next();
+  if (APP_PAGE_RE.test(req.path)) return sendVitrine(req, res);
+  if (req.accepts("html") && !path.extname(req.path)) return sendVitrine(req, res);
+  return res.status(404).json({ error: "Não encontrado" });
 });
 
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Afiliado Mestre rodando em http://localhost:${PORT}`);
-    console.log(`Vitrine: http://localhost:${PORT}/uploads/painel_e_vitrine_afiliado_mestre.html`);
+    console.log(`Vitrine: http://localhost:${PORT}/`);
+    console.log(`Admin:   http://localhost:${PORT}/admin`);
     console.log(`Health:  http://localhost:${PORT}/api/health`);
     autosync.start();
   });

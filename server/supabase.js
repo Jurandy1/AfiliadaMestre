@@ -11,12 +11,21 @@ function quoteInFilter(values = []) {
 }
 
 function subcategoryFilterQuery(categoryId, subcategoryId) {
-  const { keywordsForSubcategory } = require("./categorias");
   const cat = encodeURIComponent(String(categoryId));
+  const sub = encodeURIComponent(String(subcategoryId));
+  // Coluna subcategory (produtos classificados). Fallback legado: keyword do mapa.
+  const { keywordsForSubcategory } = require("./categorias");
   const kws = keywordsForSubcategory(categoryId, subcategoryId);
-  if (!kws.length) return `category=eq.${cat}`;
+  if (!kws.length) {
+    return `category=eq.${cat}&subcategory=eq.${sub}`;
+  }
   const quoted = quoteInFilter(kws);
-  return `category=eq.${cat}&keyword=in.(${quoted})`;
+  // PostgREST or: (subcategory.eq.X,and(subcategory.is.null,keyword.in.(...)))
+  return `category=eq.${cat}&or=(subcategory.eq.${sub},and(subcategory.is.null,keyword.in.(${quoted})))`;
+}
+
+function visibleOnlyQuery() {
+  return "or=(hidden.is.null,hidden.eq.false)";
 }
 
 function getConfig() {
@@ -98,7 +107,7 @@ async function upsertOfertas(rows) {
     if (copy.subcategory == null) delete copy.subcategory;
     if (copy.product_options == null) delete copy.product_options;
     if (!Array.isArray(copy.sub_ids) || !copy.sub_ids.length) {
-      copy.sub_ids = buildProductSubIds(copy.category, copy.item_id);
+      copy.sub_ids = buildProductSubIds(copy.category, copy.item_id, copy.subcategory);
     }
     return copy;
   });
@@ -154,11 +163,11 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
     const kw = String(keyword || "").trim();
     const cat = String(category || "").trim();
     const sub = String(subcategory || "").trim();
-    if (cat && cat !== "todos") {
-      path += `&category=eq.${encodeURIComponent(cat)}`;
-    }
-    if (sub && cat) {
+    path += `&${visibleOnlyQuery()}`;
+    if (sub && cat && cat !== "todos") {
       path += `&${subcategoryFilterQuery(cat, sub)}`;
+    } else if (cat && cat !== "todos") {
+      path += `&category=eq.${encodeURIComponent(cat)}`;
     } else if (kw) {
       path += `&keyword=eq.${encodeURIComponent(kw)}`;
     }
@@ -200,12 +209,14 @@ async function countByCategory() {
   const counts = {};
   const results = await Promise.all(
     CATEGORIAS.map(async (cat) => {
-      const n = await supabaseCount(`category=eq.${encodeURIComponent(cat.id)}`).catch(() => 0);
+      const n = await supabaseCount(
+        `category=eq.${encodeURIComponent(cat.id)}&${visibleOnlyQuery()}`
+      ).catch(() => 0);
       return [cat.id, n];
     })
   );
   for (const [id, n] of results) counts[id] = n;
-  counts.total = await supabaseCount().catch(() => 0);
+  counts.total = await supabaseCount(visibleOnlyQuery()).catch(() => 0);
   return counts;
 }
 
@@ -216,7 +227,9 @@ async function countBySubcategory(categoryId) {
   const counts = {};
   await Promise.all(
     (cat.subcategories || []).map(async (sub) => {
-      const n = await supabaseCount(subcategoryFilterQuery(categoryId, sub.id)).catch(() => 0);
+      const n = await supabaseCount(
+        `${subcategoryFilterQuery(categoryId, sub.id)}&${visibleOnlyQuery()}`
+      ).catch(() => 0);
       counts[sub.id] = n;
     })
   );
@@ -252,14 +265,15 @@ async function countOfertas() {
 function parseDiscountFromRow(row) {
   const priceMin = Number(row.price_min) || 0;
   const priceMax = Number(row.price_max) || priceMin;
+  let raw = 0;
   if (row.price_discount_rate != null && row.price_discount_rate !== "") {
     const n = Number(String(row.price_discount_rate).replace("%", ""));
-    if (Number.isFinite(n)) return Math.round(n > 1 ? n : n * 100);
+    if (Number.isFinite(n)) raw = Math.round(n > 1 ? n : n * 100);
+  } else if (priceMax > priceMin && priceMax > 0) {
+    raw = Math.round(((priceMax - priceMin) / priceMax) * 100);
   }
-  if (priceMax > priceMin && priceMax > 0) {
-    return Math.round(((priceMax - priceMin) / priceMax) * 100);
-  }
-  return 0;
+  if (raw < 5) return 0;
+  return Math.min(raw, 85);
 }
 
 function rowToProduct(row) {
@@ -312,9 +326,9 @@ function rowToProduct(row) {
     shortLink: row.short_link || null,
     subIds: Array.isArray(row.sub_ids) && row.sub_ids.length
       ? row.sub_ids
-      : buildProductSubIds(row.category, row.item_id),
+      : buildProductSubIds(row.category, row.item_id, row.subcategory),
     isFlashSale: flash,
-    flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (72 * 3600)) * 100))) : 0,
+    flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (24 * 3600)) * 100))) : 0,
     periodStart,
     periodEnd,
     listType: row.list_type != null ? Number(row.list_type) : null,
@@ -324,9 +338,48 @@ function rowToProduct(row) {
     totalCommission: row.commission != null ? `R$ ${row.commission}` : "—",
     shopName: row.shop_name || "",
     shopId: row.shop_id,
+    shopType: row.shop_type != null ? Number(row.shop_type) : null,
     keyword: row.keyword || "",
+    hidden: !!row.hidden,
     desc,
   };
+}
+
+async function patchOferta(itemId, patch = {}) {
+  const id = Number(itemId);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    const err = new Error("itemId inválido");
+    err.status = 400;
+    throw err;
+  }
+  const body = { ...patch, updated_at: new Date().toISOString() };
+  if (body.category != null || body.subcategory != null) {
+    const cat = body.category;
+    const sub = body.subcategory;
+    if (cat != null) {
+      body.sub_ids = buildProductSubIds(cat, id, sub);
+    }
+  }
+  return supabaseRequest(`/ofertas?item_id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body,
+    prefer: "return=representation",
+    useService: true,
+  });
+}
+
+async function deleteOfertasByIds(itemIds = []) {
+  const ids = [...new Set(
+    itemIds.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0)
+  )].slice(0, 200);
+  if (!ids.length) return 0;
+  const filter = encodeURIComponent(`(${ids.join(",")})`);
+  const removed = await supabaseRequest(`/ofertas?item_id=in.${filter}`, {
+    method: "DELETE",
+    prefer: "return=representation",
+    useService: true,
+  });
+  return Array.isArray(removed) ? removed.length : 0;
 }
 
 module.exports = {
@@ -342,6 +395,8 @@ module.exports = {
   pruneOlderThan,
   clearAllOfertas,
   rowToProduct,
+  patchOferta,
+  deleteOfertasByIds,
   listCampanhasRastreio,
   upsertCampanhaRastreio,
   deleteCampanhaRastreio,

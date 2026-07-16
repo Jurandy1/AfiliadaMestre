@@ -32,6 +32,7 @@ alter table public.ofertas add column if not exists short_link text;
 alter table public.ofertas add column if not exists subcategory text;
 alter table public.ofertas add column if not exists product_options jsonb;
 alter table public.ofertas add column if not exists sub_ids text[];
+alter table public.ofertas add column if not exists hidden boolean default false;
 
 create index if not exists ofertas_updated_at_idx on public.ofertas (updated_at desc);
 create index if not exists ofertas_keyword_idx on public.ofertas (keyword);

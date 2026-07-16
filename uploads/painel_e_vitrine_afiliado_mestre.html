@@ -163,17 +163,27 @@
     <!-- SECTION 1: PUBLIC STOREFRONT MODE -->
     <div id="main-storefront-section" class="flex-1 flex flex-col">
         <!-- Shopee Style Header Block -->
-        <div class="bg-shopee-orange pb-6 pt-4 text-white">
+        <div id="store-header" class="bg-shopee-orange pb-6 pt-4 text-white sticky top-0 z-40 shadow-md">
+            <div class="hidden md:block border-b border-white/10 mb-3">
+                <div class="max-w-7xl mx-auto px-4 flex items-center gap-4 py-1.5 text-[11px]">
+                    <a href="/mais-vendidos" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Mais Vendidos</a>
+                    <a href="/maiores-descontos" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Maiores Descontos</a>
+                    <a href="/melhor-avaliados" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Melhor Avaliados</a>
+                    <a href="/lojas-oficiais" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Lojas Oficiais</a>
+                    <a href="/relampago" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Relâmpago</a>
+                    <span class="ml-auto text-white/70">Site independente · comissão sem custo pra você</span>
+                </div>
+            </div>
             <div class="max-w-7xl mx-auto px-4">
                 <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 shrink-0">
+                    <a href="/" class="flex items-center gap-3 shrink-0">
                         <div class="bg-white rounded-xl shadow-lg px-3 py-2 flex items-center justify-center">
                             <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-12 md:h-14 w-auto">
                         </div>
                         <p class="hidden sm:block text-[11px] text-orange-100 font-semibold max-w-[160px] leading-tight">
                             Achadinhos e ofertas selecionadas da Shopee
                         </p>
-                    </div>
+                    </a>
 
                     <div class="w-full md:max-w-2xl">
                         <div class="bg-white p-1 rounded-lg flex items-center shadow-md border-2 border-white focus-within:border-amber-300 transition-all">
@@ -219,13 +229,13 @@
                         </p>
                         <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas Relâmpago</h2>
                     </div>
-                    <button onclick="scrollToStoreGrid()" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
-                        Ver produtos <i class="fas fa-arrow-down"></i>
+                    <button onclick="navigateTo('/relampago')" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
+                        Ver ofertas relâmpago <i class="fas fa-arrow-right"></i>
                     </button>
                 </div>
-                <div id="hero-products-track" class="flex gap-3 overflow-x-auto pb-2 snap-x">
-                    <div class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white flex items-center justify-center">
-                        <span class="text-sm font-bold opacity-90"><i class="fas fa-spinner fa-spin mr-2"></i> Carregando produtos…</span>
+                <div id="hero-products-track" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+                    <div class="col-span-full py-8 text-center text-slate-400 text-xs">
+                        <i class="fas fa-spinner fa-spin mr-2"></i> Carregando produtos…
                     </div>
                 </div>
             </section>
@@ -286,10 +296,12 @@
                     </div>
                     <span class="text-xs text-slate-500 font-semibold">Baseado no prazo real da oferta</span>
                 </div>
-                <div class="p-4 overflow-x-auto flex space-x-4 pb-6" id="flash-products-container"></div>
+                <div class="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3 pb-6" id="flash-products-container"></div>
             </div>
 
             <!-- PRODUCTS SHOWCASE GRID -->
+            <div id="home-sections" class="space-y-4"></div>
+
             <div id="store-grid-section" class="space-y-4 pt-2 scroll-mt-24">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
                     <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -510,7 +522,19 @@
         <!-- VIEW: Catálogo & Sync -->
         <section id="admin-view-catalogo" class="admin-view space-y-6">
 
-                <!-- Explorador Shopee -->
+                <!-- Ofertas oficiais Shopee -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-bullhorn text-shopee-orange mr-1"></i> Ofertas oficiais Shopee</h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Campanhas/coleções da API (shopeeOfferV2) — distinto das campanhas de rastreio FB/IG</p>
+                        </div>
+                        <button type="button" onclick="loadOfficialShopeeOffers()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                            <i class="fas fa-cloud-download-alt mr-1"></i> Carregar oficiais
+                        </button>
+                    </div>
+                    <div id="official-offers-box" class="p-4 text-[11px] text-slate-400">Clique em Carregar para listar ofertas oficiais.</div>
+                </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="bg-gradient-to-r from-slate-800 to-slate-700 p-4 border-b border-slate-600 flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -1157,7 +1181,7 @@
     </div>
 
     <!-- POPUP DE DETALHES DO PRODUTO (cliente) -->
-    <div id="product-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeProductModal()">
+    <div id="product-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4 opacity-0 transition-opacity duration-200" onclick="if(event.target===this) closeProductModal()">
         <div class="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full max-h-[92vh] overflow-y-auto transform scale-95 transition-transform duration-200" id="modal-card">
             <div class="relative">
                 <button onclick="closeProductModal()" class="absolute top-3 right-3 z-10 h-9 w-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition">
@@ -1187,12 +1211,6 @@
                         <p id="modal-options-hint" class="hidden text-[11px] text-slate-500 mt-2 leading-relaxed"></p>
 
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <span class="bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
-                                <i class="fas fa-truck"></i> Ver frete na Shopee
-                            </span>
-                            <span class="bg-orange-50 text-shopee-orange text-[10px] font-bold px-2.5 py-1 rounded flex items-center gap-1">
-                                <i class="fas fa-shield-halved"></i> Compra protegida
-                            </span>
                             <span id="modal-shop" class="hidden bg-slate-100 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded items-center gap-1">
                                 <i class="fas fa-store"></i> <span id="modal-shop-name"></span>
                             </span>
@@ -1201,7 +1219,7 @@
                         <p id="modal-desc" class="text-xs text-slate-500 leading-relaxed mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100"></p>
                         <p id="modal-deadline" class="hidden text-[11px] text-red-600 font-bold mt-2"></p>
 
-                        <a id="modal-buy-btn" href="#" target="_blank" rel="noopener noreferrer sponsored"
+                        <a id="modal-buy-btn" href="#" target="_blank" rel="nofollow sponsored noopener"
                            class="mt-auto pt-4 block" onclick="return handleBuyClick(event)">
                             <span class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white py-3 px-4 rounded-xl font-bold text-sm shadow flex items-center justify-center gap-2 transition uppercase tracking-wide">
                                 <i class="fas fa-bag-shopping"></i> <span id="modal-buy-label">Comprar na Shopee</span> <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
@@ -1238,7 +1256,7 @@
             <div>
                 <h4 class="font-extrabold text-xs uppercase text-slate-700 tracking-wider mb-3">Aviso</h4>
                 <p class="text-[10px] text-slate-400 leading-relaxed">
-                    Site independente de divulgação de ofertas. Não somos a Shopee. Marcas e produtos pertencem aos respectivos donos. Preços e estoque podem mudar na Shopee.
+                    Site independente de divulgação de ofertas. Não somos a Shopee. Marcas e produtos pertencem aos respectivos donos. Preços e estoque podem mudar na Shopee. Ao comprar pelos nossos links, ganhamos uma comissão sem custo extra para você.
                 </p>
             </div>
         </div>
@@ -1519,14 +1537,103 @@
             ] }
         ];
 
+        const ADMIN_TOKEN_KEY = "afiliada_mestre_admin_token";
+        let currentNavSection = "destaque";
+
+        function getAdminToken() {
+            try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) || ""; } catch (_) { return ""; }
+        }
+        function ensureAdminToken() {
+            if (!isAdminMode()) return getAdminToken();
+            let t = getAdminToken();
+            if (t) return t;
+            t = window.prompt("Token do admin (ADMIN_TOKEN do .env). Deixe vazio se não configurou:") || "";
+            try { if (t) sessionStorage.setItem(ADMIN_TOKEN_KEY, t); } catch (_) {}
+            return t;
+        }
+        async function adminFetch(url, opts = {}) {
+            const headers = Object.assign({}, opts.headers || {});
+            const token = ensureAdminToken();
+            if (token) headers["X-Admin-Token"] = token;
+            return fetch(url, { ...opts, headers });
+        }
+
+        function formatSold(n) {
+            const raw = n;
+            if (typeof n === "string") {
+                const cleaned = n.replace(/vendid[oa]s?/gi, "").trim();
+                if (/mil/i.test(cleaned) || /k\b/i.test(cleaned)) return cleaned.includes("vendid") ? cleaned : `${cleaned} vendidos`;
+                n = Number(cleaned.replace(/[^\d.,]/g, "").replace(",", "."));
+            }
+            if (n == null || n === "" || (typeof n === "number" && !Number.isFinite(n))) {
+                return raw && String(raw).trim() ? String(raw) : null;
+            }
+            if (n < 1000) return `${Math.round(n)} vendidos`;
+            if (n < 10000) return `${(n / 1000).toFixed(1).replace(".", ",")} mil vendidos`;
+            if (n < 1000000) return `${Math.floor(n / 1000)}mil+ vendidos`;
+            return `${(n / 1000000).toFixed(1).replace(".", ",")}mi+ vendidos`;
+        }
+        function formatRating(r) {
+            const n = Number(r);
+            if (!Number.isFinite(n) || n <= 0) return null;
+            return n.toFixed(1);
+        }
+        function displayDiscount(p) {
+            let raw = Number(p?.discountPct);
+            if (!Number.isFinite(raw) || raw <= 0) {
+                raw = parseInt(String(p?.discount || "0").replace("%", ""), 10) || 0;
+            }
+            if (raw < 5) return 0;
+            return Math.min(raw, 85);
+        }
+        function cleanShopName(name) {
+            if (!name || typeof name !== "string") return null;
+            const trimmed = name.trim();
+            if (trimmed.length < 4) return null;
+            if (/^[a-z]{2}\s/i.test(trimmed) && trimmed.length < 20) return null;
+            if (/^cc\b/i.test(trimmed)) return null;
+            return trimmed;
+        }
+        function isOfficialShop(shopType) {
+            if (shopType == null || shopType === "") return false;
+            if (typeof shopType === "string") return /SHOPEE_MALL|MALL|1/i.test(shopType);
+            return Number(shopType) === 1;
+        }
+        function formatCountBadge(count) {
+            const n = Number(count) || 0;
+            if (n <= 0) return "";
+            if (n >= 100) return "99+";
+            return String(n);
+        }
+
+        function pathClean() {
+            return (window.location.pathname.replace(/\/+$/, "") || "/");
+        }
+
         function isAdminMode() {
+            const path = pathClean();
+            if (path === "/admin" || path.startsWith("/admin/")) return true;
             const params = new URLSearchParams(window.location.search);
             return params.has("admin") || params.get("mode") === "admin";
         }
 
+        function navigateTo(path, { replace = false } = {}) {
+            const next = path.startsWith("/") ? path : `/${path}`;
+            if (replace) history.replaceState({ path: next }, "", next);
+            else history.pushState({ path: next }, "", next);
+            applyRoute({ fromNav: true });
+        }
+
         function initAdminUi() {
             const panel = document.getElementById("admin-panel-root");
-            if (!panel || !isAdminMode()) return;
+            if (!panel || !isAdminMode()) {
+                if (panel) {
+                    panel.classList.add("hidden");
+                    panel.classList.remove("flex");
+                }
+                document.body.classList.remove("admin-mode");
+                return;
+            }
 
             document.body.classList.add("admin-mode");
             panel.classList.remove("hidden");
@@ -1538,8 +1645,8 @@
 
             loadSubIdSettings();
 
-            const hash = (window.location.hash || "").replace("#", "");
-            const viewParam = new URLSearchParams(window.location.search).get("view");
+            const parts = pathClean().split("/").filter(Boolean);
+            let view = parts[1] || "dashboard";
             const legacyMap = {
                 console: "produtos",
                 performance: "desempenho",
@@ -1547,11 +1654,9 @@
                 "campaign-perf": "campanha-desempenho",
                 "campanhas-desempenho": "campanha-desempenho",
             };
-            let view = hash || viewParam || "dashboard";
             if (legacyMap[view]) view = legacyMap[view];
             if (!ADMIN_VIEWS[view]) view = "dashboard";
-
-            setTimeout(() => switchAdminView(view), 0);
+            setTimeout(() => switchAdminView(view, { skipUrl: true }), 0);
         }
 
         const ADMIN_VIEWS = {
@@ -1572,8 +1677,11 @@
             if (backdrop) backdrop.classList.toggle("hidden", !open);
         }
 
-        function switchAdminView(view) {
-            if (!isAdminMode()) return;
+        function switchAdminView(view, opts = {}) {
+            if (!isAdminMode()) {
+                navigateTo(`/admin/${view || "dashboard"}`);
+                return;
+            }
             if (!ADMIN_VIEWS[view]) view = "dashboard";
 
             document.querySelectorAll(".admin-view").forEach(el => el.classList.remove("active"));
@@ -1590,15 +1698,14 @@
             if (titleEl && meta) titleEl.textContent = meta.title;
             if (subEl && meta) subEl.textContent = meta.subtitle;
 
-            try {
-                const url = new URL(window.location.href);
-                url.searchParams.set("admin", "1");
-                url.hash = view;
-                history.replaceState(null, "", url.pathname + url.search + url.hash);
-            } catch (_) {}
+            if (!opts.skipUrl) {
+                try {
+                    const next = view === "dashboard" ? "/admin" : `/admin/${view}`;
+                    history.replaceState({ path: next }, "", next);
+                } catch (_) {}
+            }
 
             toggleAdminSidebar(false);
-
             if (view === "dashboard") {
                 loadAdminStats();
                 loadAutoStatus();
@@ -1625,6 +1732,77 @@
             }
         }
 
+        async function applyRoute(opts = {}) {
+            const params = new URLSearchParams(window.location.search);
+            if ((params.has("admin") || params.get("mode") === "admin") && !pathClean().startsWith("/admin")) {
+                const hash = (window.location.hash || "").replace("#", "");
+                const view = hash || params.get("view") || "dashboard";
+                history.replaceState(null, "", `/admin/${view === "dashboard" ? "" : view}`.replace(/\/$/, "") || "/admin");
+            }
+
+            if (isAdminMode()) {
+                initAdminUi();
+                return;
+            }
+
+            document.body.classList.remove("admin-mode");
+            const panel = document.getElementById("admin-panel-root");
+            if (panel) {
+                panel.classList.add("hidden");
+                panel.classList.remove("flex");
+            }
+            document.title = "Afiliada Mestre — Ofertas selecionadas na Shopee";
+
+            const path = pathClean();
+            const parts = path.split("/").filter(Boolean);
+
+            if (parts[0] === "categoria") {
+                const catId = parts[1] || "todos";
+                const subId = parts[2] || "";
+                currentNavSection = "category_page";
+                if (catId === "todos" || !catId) {
+                    await setStoreCategory("todos", { skipUrl: true });
+                } else {
+                    await setStoreCategory(catId, { skipUrl: true });
+                    if (subId) await setStoreSubcategory(subId, { skipUrl: true });
+                }
+                scrollToStoreGrid();
+                return;
+            }
+
+            const sectionMap = {
+                relampago: { sort: "ending", section: "flash_deals", scroll: "flash" },
+                "mais-vendidos": { sort: "sales", section: "top_sellers" },
+                "maiores-descontos": { sort: "discount", section: "big_discounts" },
+                "melhor-avaliados": { sort: "rating", section: "top_rated" },
+                "lojas-oficiais": { sort: "recent", section: "official_shops", filterOfficial: true },
+            };
+            if (sectionMap[parts[0]]) {
+                const cfg = sectionMap[parts[0]];
+                currentNavSection = cfg.section;
+                currentStoreCategory = "todos";
+                currentStoreSubcategory = "";
+                if (cfg.sort) setStoreSort(cfg.sort, { skipUrl: true });
+                window.__filterOfficialOnly = !!cfg.filterOfficial;
+                renderStoreProducts();
+                renderHomeSections();
+                if (cfg.scroll === "flash") scrollToFlashSale();
+                else scrollToStoreGrid();
+                return;
+            }
+
+            window.__filterOfficialOnly = false;
+            currentNavSection = "destaque";
+            if (opts.fromNav && path === "/") {
+                currentStoreCategory = "todos";
+                currentStoreSubcategory = "";
+                renderCategories();
+                renderSubcategories();
+                renderStoreProducts();
+                renderHomeSections();
+            }
+        }
+
         // Ícones inválidos / Pro-only → equivalentes Free
         const ICON_FIXES = {
             "fa-sparkles": "fa-spa",
@@ -1641,6 +1819,7 @@
 
         window.onload = async function() {
             captureTrafficAttribution();
+            window.addEventListener('popstate', () => applyRoute({ fromNav: true }));
             initAdminUi();
             initDatabase();
             initCountdown();
@@ -1665,10 +1844,13 @@
                 } else {
                     await loadOffersFromSupabase({ silent: true, reset: true });
                     preloadCategoryCovers();
+                    renderHomeSections();
+                    await loadHeroProducts();
                 }
             } else if (isAdminMode()) {
                 showToast("Backend offline — rode: npm start", "error");
             }
+            await applyRoute({ fromNav: false });
             await applyCampaignLanding();
         };
 
@@ -1765,7 +1947,7 @@
 
         async function syncAllCategories({ silent = false } = {}) {
             try {
-                const res = await fetch(`${API_BASE}/api/sync`, {
+                const res = await adminFetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ limit: 20, listType: 0, sortType: 2 }),
@@ -1788,7 +1970,7 @@
                 const listType = Number(document.getElementById("admin-list-type")?.value) || 0;
                 const sortType = Number(document.getElementById("admin-sort-type")?.value) || 2;
                 const minRating = document.getElementById("admin-min-rating")?.value;
-                const res = await fetch(
+                const res = await adminFetch(
                     `${API_BASE}/api/sync/categoria/${encodeURIComponent(catId)}?limit=25&listType=${listType}&sortType=${sortType}&pages=${pageCount}`
                     + (minRating != null && minRating !== "" ? `&minRating=${encodeURIComponent(minRating)}` : "")
                 );
@@ -2059,7 +2241,7 @@
             }, 400);
 
             try {
-                const res = await fetch(`${API_BASE}/api/ofertas/batch`, {
+                const res = await adminFetch(`${API_BASE}/api/ofertas/batch`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     signal: explorerAbort.signal,
@@ -2147,7 +2329,7 @@
             const original = btn ? btn.innerHTML : "";
             if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Salvando…`; }
             try {
-                const res = await fetch(`${API_BASE}/api/ofertas/save-bulk`, {
+                const res = await adminFetch(`${API_BASE}/api/ofertas/save-bulk`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -2364,7 +2546,7 @@ async function loadOffersFromSupabase(opts = {}) {
         async function syncDefaultKeywords() {
             showToast("Sincronizando keywords na Shopee…", "success");
             try {
-                const res = await fetch(`${API_BASE}/api/sync`, {
+                const res = await adminFetch(`${API_BASE}/api/sync`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ limit: 12, listType: 0, sortType: 2 }),
@@ -2501,84 +2683,116 @@ async function loadOffersFromSupabase(opts = {}) {
             setTimeout(() => input.focus(), 350);
         }
 
-        async function setStoreSort(sort) {
+        async function setStoreSort(sort, opts = {}) {
             currentStoreSort = sort || 'recent';
             document.querySelectorAll('.store-sort-btn').forEach((btn) => {
                 const active = btn.getAttribute('data-sort') === currentStoreSort;
                 btn.className = active
-                    ? 'store-sort-btn px-2.5 py-1.5 rounded-md bg-white text-shopee-orange shadow-sm'
-                    : 'store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500';
+                    ? 'store-sort-btn px-2.5 py-1.5 rounded-md bg-shopee-orange text-white shadow-sm'
+                    : 'store-sort-btn px-2.5 py-1.5 rounded-md text-slate-500 hover:bg-slate-50';
             });
             if (apiLive) {
                 await loadOffersFromSupabase({ silent: true, reset: true, sort: currentStoreSort });
             } else {
                 renderStoreProducts();
             }
+            renderHomeSections();
+        }
+
+        async function setStoreCategory(catId, opts = {}) {
+            currentStoreCategory = catId;
+            currentStoreSubcategory = '';
+            currentPage = 0;
+            currentNavSection = catId === 'todos' ? 'destaque' : 'category_page';
+            if (!opts.skipUrl) {
+                const next = !catId || catId === 'todos' ? '/' : `/categoria/${catId}`;
+                history.pushState({ path: next }, '', next);
+            }
+            renderCategories();
+            renderSubcategories();
+            renderStoreProducts();
+            renderHomeSections();
+            preloadSubcategoryCovers(catId);
+            if (!apiLive) return;
+
+            const MIN_LOCAL = 12;
+            const localCount = catId === 'todos'
+                ? productsDatabase.length
+                : productsDatabase.filter(p => p.category === catId).length;
+            if (localCount >= MIN_LOCAL) {
+                if (localCount < 60) {
+                    loadCategoryProducts(catId).catch(() => {});
+                }
+                return;
+            }
+            await loadCategoryProducts(catId);
+        }
+
+        async function setStoreSubcategory(key, opts = {}) {
+            currentStoreSubcategory = key || '';
+            currentPage = 0;
+            if (!opts.skipUrl && currentStoreCategory && currentStoreCategory !== 'todos') {
+                const next = key
+                    ? `/categoria/${currentStoreCategory}/${key}`
+                    : `/categoria/${currentStoreCategory}`;
+                history.pushState({ path: next }, '', next);
+            }
+            renderSubcategories();
+            renderStoreProducts();
+            scrollToStoreGrid();
         }
 
         async function loadHeroProducts() {
             const track = document.getElementById('hero-products-track');
             if (!track) return;
-            try {
-                const res = await fetch(`${API_BASE}/api/ofertas/db?limit=12&sort=discount`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                const list = Array.isArray(data.products) ? data.products : [];
-                if (list.length) applyProducts(list, 'hero', { append: true });
 
+            const renderHeroCards = (list) => {
                 const now = Math.floor(Date.now() / 1000);
-                const picks = list
-                    .filter(p => p.image && p.newPrice > 0)
+                let picks = (list || [])
+                    .filter(p => p && p.image && Number(p.newPrice) > 0)
                     .sort((a, b) => {
                         const flashA = a.isFlashSale && a.periodEnd > now ? 1 : 0;
                         const flashB = b.isFlashSale && b.periodEnd > now ? 1 : 0;
                         if (flashB !== flashA) return flashB - flashA;
-                        return (b.discountPct || 0) - (a.discountPct || 0);
-                    })
-                    .slice(0, 10);
-
+                        return (displayDiscount(b) || 0) - (displayDiscount(a) || 0);
+                    });
+                // Preferir relâmpago crível; se não houver, mostra destaques com desconto
+                const flashPicks = picks.filter(p => {
+                    if (!(p.isFlashSale && p.periodEnd > now && p.periodEnd - now <= 24 * 3600)) return false;
+                    const d = displayDiscount(p);
+                    return d >= 20 && d <= 80;
+                });
+                picks = (flashPicks.length ? flashPicks : picks).slice(0, 12);
                 if (!picks.length) {
                     track.innerHTML = `
-                        <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
-                            <p class="text-[11px] font-black uppercase text-shopee-yellow">Afiliada Mestre</p>
-                            <h3 class="text-2xl font-black leading-tight mt-1">Ofertas Relâmpago</h3>
-                            <p class="text-sm text-orange-100 mt-2">Clique para ver todos os produtos.</p>
+                        <div class="shrink-0 w-full py-8 text-center text-slate-400 text-xs">
+                            Carregando ofertas relâmpago…
                         </div>`;
-                    return;
+                    return false;
                 }
+                track.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5';
+                track.innerHTML = picks.map((p, index) => productCardHTML(p, { index, section: 'flash_deals' })).join('');
+                return true;
+            };
 
-                track.innerHTML = picks.map((p) => {
-                    const price = Number(p.newPrice).toFixed(2).replace('.', ',');
-                    const old = Number(p.oldPrice).toFixed(2).replace('.', ',');
-                    const showOld = p.oldPrice > p.newPrice;
-                    const flash = p.isFlashSale && p.periodEnd > now;
-                    return `
-                        <div onclick="openProductModal(${p.id})"
-                            class="shrink-0 snap-start w-[70%] sm:w-[45%] md:w-[32%] lg:w-[24%] h-44 md:h-56 rounded-2xl overflow-hidden relative group shadow-md border border-orange-100 cursor-pointer bg-white">
-                            ${productImgHTML(p.image, {
-                                eager: picks.indexOf(p) < 2,
-                                className: 'absolute inset-0 w-full h-full object-cover transition duration-300 group-hover:scale-105',
-                                fallbackSize: 400
-                            })}
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
-                            ${p.discount && p.discount !== '0%' ? `
-                            <span class="absolute top-2 right-2 bg-shopee-yellow text-shopee-orange text-[10px] font-black px-2 py-0.5 rounded-lg z-10">-${escapeHtml(p.discount)}</span>` : ''}
-                            ${flash ? `<span class="absolute top-2 left-2 bg-shopee-orange text-white text-[9px] font-black px-2 py-0.5 rounded-lg z-10"><i class="fas fa-bolt mr-0.5"></i>RELÂMPAGO</span>` : ''}
-                            <div class="absolute bottom-0 left-0 right-0 p-3 text-white">
-                                <h3 class="text-sm md:text-base font-bold leading-snug line-clamp-2">${escapeHtml(p.title)}</h3>
-                                <div class="flex items-baseline gap-2 mt-1.5">
-                                    <span class="text-shopee-yellow text-lg font-black">R$ ${price}</span>
-                                    ${showOld ? `<span class="text-[10px] text-white/60 line-through">R$ ${old}</span>` : ''}
-                                </div>
-                            </div>
-                        </div>`;
-                }).join('');
+            try {
+                const res = await fetch(`${API_BASE}/api/ofertas/db?limit=36&sort=discount`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const list = Array.isArray(data.products) ? data.products : [];
+                if (list.length) applyProducts(list, 'hero', { append: true });
+                if (!renderHeroCards(list.length ? list : productsDatabase)) {
+                    renderHeroCards(productsDatabase);
+                }
             } catch (err) {
-                track.innerHTML = `
-                    <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
-                        <h3 class="text-2xl font-black">Ofertas Relâmpago</h3>
-                        <p class="text-sm text-orange-100 mt-2">Clique para ver os produtos.</p>
-                    </div>`;
+                if (!renderHeroCards(productsDatabase)) {
+                    track.className = 'flex gap-3 overflow-x-auto pb-2 snap-x';
+                    track.innerHTML = `
+                        <div onclick="scrollToStoreGrid()" class="shrink-0 w-full md:w-[70%] h-44 md:h-56 rounded-2xl bg-shopee-orange text-white p-8 flex flex-col justify-end cursor-pointer">
+                            <h3 class="text-2xl font-black">Ofertas Relâmpago</h3>
+                            <p class="text-sm text-orange-100 mt-2">Clique para ver os produtos.</p>
+                        </div>`;
+                }
             }
         }
 
@@ -2830,8 +3044,9 @@ async function loadOffersFromSupabase(opts = {}) {
             const bgIconClass = isActive || cat.id === 'todos' ? 'bg-orange-100 text-shopee-orange' : 'bg-slate-100 text-slate-600';
             const textClass = isActive ? 'text-shopee-orange font-bold' : 'text-slate-600 font-medium';
             const count = Number(cat.count || 0);
-            const badge = count > 0
-                ? `<span class="text-[9px] text-slate-400 font-semibold">${count}</span>`
+            const badgeLabel = formatCountBadge(count);
+            const badge = badgeLabel
+                ? `<span class="text-[9px] text-slate-400 font-semibold">${badgeLabel}</span>`
                 : '';
             const circleSize = size === 'lg' ? 'h-16 w-16' : 'h-11 w-11';
             const iconSize = size === 'lg' ? 'text-2xl' : 'text-base';
@@ -2883,30 +3098,6 @@ async function loadOffersFromSupabase(opts = {}) {
         // Filter by category — usa cache local imediatamente; só busca no servidor
         // se a categoria tiver poucos itens no cache atual (evita ida ao Supabase
         // a cada toque, que era o principal gargalo no mobile).
-        async function setStoreCategory(catId) {
-            currentStoreCategory = catId;
-            currentStoreSubcategory = '';
-            currentPage = 0;
-            renderCategories();
-            renderSubcategories();
-            // Render imediato do que já temos — feedback instantâneo no mobile
-            renderStoreProducts();
-            preloadSubcategoryCovers(catId);
-            if (!apiLive) return;
-
-            const MIN_LOCAL = 12;
-            const localCount = catId === 'todos'
-                ? productsDatabase.length
-                : productsDatabase.filter(p => p.category === catId).length;
-            if (localCount >= MIN_LOCAL) {
-                // Já temos suficiente em cache; carrega mais em background sem bloquear
-                if (localCount < 60) {
-                    loadCategoryProducts(catId).catch(() => {});
-                }
-                return;
-            }
-            await loadCategoryProducts(catId);
-        }
 
         async function loadCategoryProducts(catId) {
             try {
@@ -3127,14 +3318,6 @@ async function loadOffersFromSupabase(opts = {}) {
                 </div>`;
         }
 
-        async function setStoreSubcategory(key) {
-            currentStoreSubcategory = key || '';
-            currentPage = 0;
-            renderSubcategories();
-            renderStoreProducts();
-            scrollToStoreGrid();
-        }
-
         function isFemaleProduct(p) {
             if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade'].includes(String(p.category || ''))) return true;
             return /feminin|mulher|maquiagem|batom|vestido|legging|saia|bolsa|brinco|colar|skincare|unha|cabelo|bebe menina|gestante|maternidade|lingerie|biquini|maio|pijama|scrunchie|tiara/i
@@ -3155,6 +3338,114 @@ async function loadOffersFromSupabase(opts = {}) {
                 if (gi < allowedGeneral.length) result.push(allowedGeneral[gi++]);
             }
             return result;
+        }
+
+        function productCardHTML(p, { index = 0, section = 'destaque' } = {}) {
+            const disc = displayDiscount(p);
+            const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
+            const rating = formatRating(p.stars);
+            const sold = formatSold(p.salesRaw != null ? p.salesRaw : p.sales);
+            const shop = cleanShopName(p.shopName);
+            const official = isOfficialShop(p.shopType);
+            const subLabel = subcategoryLabelForProduct(p);
+            return `
+                <div onclick="openProductModal(${p.id}, '${section}')"
+                    class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group">
+                    ${disc ? `
+                    <div class="absolute top-0 right-0 bg-[#ffe97a] text-shopee-orange text-[9px] font-black px-1.5 py-1 text-center rounded-bl-lg z-10 leading-none">
+                        <span class="block">-${disc}%</span>
+                        <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
+                    </div>` : ''}
+                    ${official ? `<span class="absolute left-2 top-2 z-10 rounded bg-shopee-orange px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Oficial</span>` : ''}
+                    <div class="aspect-square bg-slate-50 relative overflow-hidden">
+                        ${productImgHTML(p.image, {
+                            eager: index < 8,
+                            className: 'w-full h-full object-cover transition duration-300 group-hover:scale-105'
+                        })}
+                    </div>
+                    <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1">
+                        ${subLabel ? `<span class="self-start bg-orange-50 text-shopee-orange text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">${escapeHtml(subLabel)}</span>` : ''}
+                        <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                        ${renderOptionBadges(p, true)}
+                        <div>
+                            ${p.oldPrice > p.newPrice ? `<p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>` : ''}
+                            <p class="text-shopee-orange text-base font-black mt-0.5">R$ ${priceFormatted}</p>
+                        </div>
+                        <div class="flex items-center gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-50 mt-auto">
+                            ${rating ? `<span class="text-amber-500">★</span><span class="font-semibold text-slate-600">${rating}</span>` : ''}
+                            ${rating && sold ? `<span class="text-slate-300">·</span>` : ''}
+                            ${sold ? `<span>${escapeHtml(sold)}</span>` : ''}
+                        </div>
+                        ${shop ? `<p class="text-[9px] text-slate-400 truncate">${escapeHtml(shop)}</p>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        function parseSalesNumber(p) {
+            if (typeof p.salesRaw === 'number') return p.salesRaw;
+            const s = String(p.salesRaw || p.sales || '');
+            const mil = s.match(/([\d.,]+)\s*mil/i);
+            if (mil) return Number(mil[1].replace(',', '.')) * 1000 || 0;
+            const k = s.match(/([\d.,]+)\s*k/i);
+            if (k) return Number(k[1].replace(',', '.')) * 1000 || 0;
+            const n = Number(String(s).replace(/[^\d]/g, ''));
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function deriveHomeSections(list) {
+            const items = Array.isArray(list) ? list.slice() : [];
+            const topSellers = items
+                .filter(p => parseSalesNumber(p) >= 100)
+                .sort((a, b) => parseSalesNumber(b) - parseSalesNumber(a))
+                .slice(0, 12);
+            const bigDiscounts = items
+                .map(p => ({ p, d: displayDiscount(p) }))
+                .filter(x => x.d >= 30 && x.d <= 85 && parseSalesNumber(x.p) >= 50)
+                .sort((a, b) => b.d - a.d)
+                .map(x => x.p)
+                .slice(0, 12);
+            const topRated = items
+                .filter(p => Number(p.stars) >= 4.7 && parseSalesNumber(p) >= 200)
+                .sort((a, b) => Number(b.stars) - Number(a.stars))
+                .slice(0, 12);
+            const officialShops = items.filter(p => isOfficialShop(p.shopType)).slice(0, 12);
+            return { topSellers, bigDiscounts, topRated, officialShops };
+        }
+
+        function renderHomeSections() {
+            const box = document.getElementById('home-sections');
+            if (!box || isAdminMode()) return;
+            if (currentStoreCategory !== 'todos' || currentStoreSubcategory) {
+                box.innerHTML = '';
+                return;
+            }
+            const path = pathClean();
+            if (path !== '/' && path !== '') {
+                box.innerHTML = '';
+                return;
+            }
+            const { topSellers, bigDiscounts, topRated, officialShops } = deriveHomeSections(productsDatabase);
+            const blocks = [
+                { title: 'Mais Vendidos', href: '/mais-vendidos', items: topSellers, section: 'top_sellers' },
+                { title: 'Maiores Descontos', href: '/maiores-descontos', items: bigDiscounts, section: 'big_discounts' },
+                { title: 'Melhor Avaliados', href: '/melhor-avaliados', items: topRated, section: 'top_rated' },
+                { title: 'Lojas Oficiais', href: '/lojas-oficiais', items: officialShops, section: 'official_shops' },
+            ].filter(b => b.items.length > 0);
+            if (!blocks.length) {
+                box.innerHTML = '';
+                return;
+            }
+            box.innerHTML = blocks.map(b => `
+                <section class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-base md:text-lg font-black text-slate-800">${escapeHtml(b.title)}</h3>
+                        <a href="${b.href}" class="text-xs font-bold text-shopee-orange hover:underline" onclick="event.preventDefault(); navigateTo('${b.href}')">Ver todos →</a>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                        ${b.items.slice(0, 6).map((p, i) => productCardHTML(p, { index: i, section: b.section })).join('')}
+                    </div>
+                </section>
+            `).join('');
         }
 
         // Render Products in the Public Storefront Grid
@@ -3183,8 +3474,13 @@ async function loadOffersFromSupabase(opts = {}) {
             filtered = filtered.slice(0, (currentPage + 1) * PAGE_SIZE);
 
             const now = Math.floor(Date.now() / 1000);
-            const flashSales = filtered
-                .filter(p => p.isFlashSale && p.periodEnd && p.periodEnd > now)
+            let flashSales = filtered
+                .filter(p => {
+                    if (!p.isFlashSale || !p.periodEnd || p.periodEnd <= now) return false;
+                    if (p.periodEnd - now > 24 * 3600) return false;
+                    const d = displayDiscount(p);
+                    return d >= 20 && d <= 80;
+                })
                 .sort((a, b) => (a.periodEnd || 0) - (b.periodEnd || 0));
 
             flashEndsAt = flashSales.length ? flashSales[0].periodEnd : null;
@@ -3196,29 +3492,12 @@ async function loadOffersFromSupabase(opts = {}) {
                         Nenhuma oferta com prazo de término próximo nesta categoria.
                     </div>`;
             } else {
-                flashContainer.innerHTML = flashSales.slice(0, 16).map((p, index) => {
-                    const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
-                    return `
-                        <div onclick="openProductModal(${p.id})"
-                            class="bg-white rounded-xl overflow-hidden border border-orange-100 hover:border-shopee-orange shadow-sm cursor-pointer transition shrink-0 w-36 md:w-44 flex flex-col group relative">
-                            <span class="absolute top-0 right-0 bg-shopee-yellow text-shopee-orange text-[9px] font-black px-1.5 py-0.5 rounded-bl-lg z-10">
-                                -${p.discount}
-                            </span>
-                            <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                ${productImgHTML(p.image, {
-                                    eager: index < 2,
-                                    className: 'w-full h-full object-cover transition duration-300 group-hover:scale-105'
-                                })}
-                            </div>
-                            <div class="p-2 space-y-1.5 flex flex-col justify-between flex-1">
-                                <h4 class="text-[11px] text-slate-800 font-semibold truncate">${escapeHtml(p.title)}</h4>
-                                <div class="text-center">
-                                    <p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>
-                                    <p class="text-shopee-orange text-sm font-black mt-0.5">R$ ${priceFormatted}</p>
-                                </div>
-                            </div>
-                        </div>`;
-                }).join('');
+                flashContainer.className = 'p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-3';
+                flashContainer.innerHTML = flashSales.slice(0, 10).map((p, index) => productCardHTML(p, { index, section: 'flash_deals' })).join('');
+            }
+
+            if (window.__filterOfficialOnly) {
+                filtered = filtered.filter(p => isOfficialShop(p.shopType));
             }
 
             if (filtered.length === 0) {
@@ -3229,45 +3508,7 @@ async function loadOffersFromSupabase(opts = {}) {
                         <p class="text-xs">Tente mudar sua busca ou categoria!</p>
                     </div>`;
             } else {
-                grid.innerHTML = filtered.map((p, index) => {
-                    const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
-                    const starsHtml = '<i class="fas fa-star"></i>'.repeat(Math.floor(p.stars || 4)) + ((p.stars % 1 >= 0.5) ? '<i class="fas fa-star-half-alt"></i>' : '');
-                    const showOff = p.discount && p.discount !== '0%';
-                    const shopLine = p.shopName ? `<p class="text-[9px] text-slate-400 truncate">${escapeHtml(p.shopName)}</p>` : '';
-                    const subLabel = subcategoryLabelForProduct(p);
-                    const subBadge = subLabel
-                        ? `<span class="self-start bg-orange-50 text-shopee-orange text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">${escapeHtml(subLabel)}</span>`
-                        : '';
-                    return `
-                        <div onclick="openProductModal(${p.id})"
-                            class="bg-white rounded-xl overflow-hidden border border-slate-100 hover:border-shopee-orange hover:shadow-md cursor-pointer transition flex flex-col h-full relative group">
-                            ${showOff ? `
-                            <div class="absolute top-0 right-0 bg-[#ffe97a] text-shopee-orange text-[9px] font-black px-1.5 py-1 text-center rounded-bl-lg z-10 leading-none">
-                                <span class="block">${escapeHtml(p.discount)}</span>
-                                <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
-                            </div>` : ''}
-                            <div class="aspect-square bg-slate-50 relative overflow-hidden">
-                                ${productImgHTML(p.image, {
-                                    eager: index < 8,
-                                    className: 'w-full h-full object-cover transition duration-300 group-hover:scale-105'
-                                })}
-                            </div>
-                            <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1.5">
-                                ${subBadge}
-                                <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
-                                ${renderOptionBadges(p, true)}
-                                ${shopLine}
-                                <div>
-                                    ${p.oldPrice > p.newPrice ? `<p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>` : ''}
-                                    <p class="text-shopee-orange text-base font-black mt-0.5">R$ ${priceFormatted}</p>
-                                </div>
-                                <div class="flex items-center justify-between text-[9px] text-slate-400 pt-1 border-t border-slate-50">
-                                    <div class="text-amber-400 flex gap-0.5">${starsHtml}</div>
-                                    <span>${escapeHtml(String(p.sales || ''))}</span>
-                                </div>
-                            </div>
-                        </div>`;
-                }).join('');
+                grid.innerHTML = filtered.map((p, index) => productCardHTML(p, { index, section: currentNavSection || 'destaque' })).join('');
             }
 
             const info = document.getElementById('store-results-info');
@@ -3338,7 +3579,7 @@ async function loadOffersFromSupabase(opts = {}) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.textContent = term;
-                btn.className = 'bg-white/20 hover:bg-white/30 active:bg-white/40 text-white rounded-full px-3 py-1 text-[11px] font-semibold transition min-h-[28px] cursor-pointer';
+                btn.className = 'bg-white/15 hover:bg-white hover:text-shopee-orange active:scale-95 text-white rounded-full px-3 py-1 text-[11px] font-semibold transition min-h-[28px] cursor-pointer border border-white/20';
                 btn.addEventListener('click', () => applyStoreSearch(term));
                 container.appendChild(btn);
             });
@@ -3363,18 +3604,23 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         // Abre o popup com as informações do produto para o cliente
-        function openProductModal(id) {
+        function openProductModal(id, section = null) {
             const p = productsDatabase.find(prod => prod.id === id);
             if (!p) return;
             activeProductForBuy = p;
+            if (section) currentNavSection = section;
 
             const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || 'Oferta';
+            const disc = displayDiscount(p);
+            const rating = formatRating(p.stars);
+            const sold = formatSold(p.salesRaw != null ? p.salesRaw : p.sales);
+            const shop = cleanShopName(p.shopName);
 
             document.getElementById('modal-img').src = p.image || '';
-            document.getElementById('modal-discount').innerText = (p.discount && p.discount !== '0%') ? `-${p.discount} OFF` : 'OFERTA';
+            document.getElementById('modal-discount').innerText = disc ? `-${disc}% OFF` : 'OFERTA';
             document.getElementById('modal-category').innerText = catLabel;
             document.getElementById('modal-title').innerText = p.title || 'Produto';
-            document.getElementById('modal-sales').innerText = p.sales && p.sales !== '—' ? p.sales : '';
+            document.getElementById('modal-sales').innerText = [rating ? `★ ${rating}` : '', sold].filter(Boolean).join(' · ');
             document.getElementById('modal-old-price').innerText = (p.oldPrice && p.oldPrice > p.newPrice)
                 ? `De: R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}` : '';
             document.getElementById('modal-new-price').innerText = `R$ ${Number(p.newPrice).toFixed(2).replace('.', ',')}`;
@@ -3405,11 +3651,13 @@ async function loadOffersFromSupabase(opts = {}) {
             }
 
             const starsBox = document.getElementById('modal-stars');
-            starsBox.innerHTML = '<i class="fas fa-star mr-0.5"></i>'.repeat(Math.max(1, Math.floor(p.stars || 4)));
+            starsBox.innerHTML = rating
+                ? `<span class="text-amber-500 mr-1">★</span><span class="text-slate-700 font-bold">${rating}</span>`
+                : '';
 
             const shopWrap = document.getElementById('modal-shop');
-            if (p.shopName) {
-                document.getElementById('modal-shop-name').innerText = p.shopName;
+            if (shop) {
+                document.getElementById('modal-shop-name').innerText = shop;
                 shopWrap.classList.remove('hidden');
                 shopWrap.classList.add('flex');
             } else {
@@ -3441,6 +3689,7 @@ async function loadOffersFromSupabase(opts = {}) {
             buyBtn.dataset.itemId = String(p.id);
             buyBtn.dataset.category = String(p.category || 'todos');
             buyBtn.dataset.origin = p.affiliateLink || p.productLink || '';
+            buyBtn.dataset.section = section || currentNavSection || 'modal_direct';
 
             const modal = document.getElementById('product-modal');
             const card = document.getElementById('modal-card');
@@ -3555,27 +3804,37 @@ async function loadOffersFromSupabase(opts = {}) {
             };
         }
 
-        function getTrackingSubIds(category, itemId = '', product = null) {
+        function getTrackingSubIds(category, itemId = '', product = null, section = null) {
             const s = getSubIdSettings();
+            const catSlot = product?.subcategory
+                ? sanitizeSubId(`${category || product.category}_${product.subcategory}`, sanitizeSubId(category || product.category, 'geral'))
+                : sanitizeSubId(category || product?.category, 'geral');
             const base = Array.isArray(product?.subIds) && product.subIds.length
                 ? product.subIds
                 : [
                     SITE_SUBID,
                     'organico',
                     'vitrine',
-                    sanitizeSubId(category, 'geral'),
+                    catSlot,
                     sanitizeSubId(itemId ? `p${itemId}` : 'produto', 'produto'),
                 ];
-            // Slot 2: se houver medium (ex: cpc), junta no canal → facebook_cpc
             const channelSlot = s.medium && s.medium !== s.channel
                 ? sanitizeSubId(`${s.channel}_${s.medium}`, s.channel)
                 : s.channel;
-            // Produto já tem Sub IDs do sync; no clique sobrescreve canal/campanha da visita
+            const SECTION_CODES = {
+                home: 'vitrine', home_hero: 'hh', flash_deals: 'fl', top_sellers: 'ts',
+                big_discounts: 'bd', top_rated: 'tr', official_shops: 'of', category_page: 'ct',
+                search_result: 'sr', modal_direct: 'md', destaque: 'vd', oficial: 'oficial',
+            };
+            const sec = section || currentNavSection || null;
+            const sectionCode = sec && SECTION_CODES[sec] ? SECTION_CODES[sec] : (sec ? sanitizeSubId(sec, null) : null);
+            const campaignDefault = !s.campaign || s.campaign === 'vitrine';
+            const campaignSlot = campaignDefault && sectionCode ? sectionCode : s.campaign;
             return [
                 SITE_SUBID,
                 channelSlot,
-                s.campaign,
-                sanitizeSubId(base[3] || category, 'geral'),
+                campaignSlot,
+                sanitizeSubId(base[3] || catSlot, 'geral'),
                 sanitizeSubId(base[4] || (itemId ? `p${itemId}` : 'produto'), 'produto'),
             ].slice(0, 5);
         }
@@ -4008,7 +4267,7 @@ async function loadOffersFromSupabase(opts = {}) {
             if (!confirm('Isso apaga todos os produtos do Supabase e busca de novo (foco feminino). Continuar?')) return;
             showToast('Limpando e realimentando a vitrine…', 'success');
             try {
-                const res = await fetch(`${API_BASE}/api/reset-vitrine`, {
+                const res = await adminFetch(`${API_BASE}/api/reset-vitrine`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ limit: 50, pages: 2, maxItems: 2000 }),
@@ -4548,13 +4807,14 @@ async function loadOffersFromSupabase(opts = {}) {
             const origin = p.affiliateLink || p.productLink;
             if (!origin || origin === '#') return '#';
             try {
+                const section = document.getElementById('modal-buy-btn')?.dataset?.section || currentNavSection || 'modal_direct';
                 const res = await fetch(`${API_BASE}/api/shortlink`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         originUrl: origin,
                         itemId: p.id,
-                        subIds: getTrackingSubIds(p.category, p.id, p),
+                        subIds: getTrackingSubIds(p.category, p.id, p, section),
                     }),
                 });
                 const data = await res.json();
@@ -5159,7 +5419,7 @@ async function loadOffersFromSupabase(opts = {}) {
             if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Sincronizando…`; }
             showToast('Rodando um lote de sincronização…', 'success');
             try {
-                const res = await fetch(`${API_BASE}/api/auto/run`, { method: 'POST' });
+                const res = await adminFetch(`${API_BASE}/api/auto/run`, { method: 'POST' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
@@ -5182,7 +5442,7 @@ async function loadOffersFromSupabase(opts = {}) {
             if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Buscando…`; }
             showToast('Populando destaques (Top Performance)…', 'success');
             try {
-                const res = await fetch(`${API_BASE}/api/auto/top-performance`, { method: 'POST' });
+                const res = await adminFetch(`${API_BASE}/api/auto/top-performance`, { method: 'POST' });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
@@ -5229,6 +5489,69 @@ async function loadOffersFromSupabase(opts = {}) {
                 status.textContent = 'Falha ao sincronizar a categoria.';
             }
             if (btn) { btn.disabled = false; btn.innerHTML = original; }
+        }
+
+        async function loadOfficialShopeeOffers() {
+            const box = document.getElementById('official-offers-box');
+            if (!box) return;
+            box.innerHTML = '<p class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando oficiais…</p>';
+            try {
+                const res = await fetch(`${API_BASE}/api/campanhas?limit=20`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const items = data.campaigns || data.offers || data.nodes || [];
+                if (!items.length) {
+                    box.innerHTML = '<p class="text-slate-400">Nenhuma oferta oficial retornada agora.</p>';
+                    return;
+                }
+                window.__officialOffers = items;
+                box.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-700">${items.length} ofertas</span>
+                        <button type="button" onclick="importOfficialShopeeOffers()" class="px-3 py-1.5 rounded-lg bg-shopee-orange text-white text-[10px] font-bold">Importar todas</button>
+                    </div>
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                        ${items.slice(0, 20).map((c, i) => `
+                            <div class="border border-slate-100 rounded-lg p-2 flex gap-2">
+                                <img src="${escapeHtml(c.imageUrl || c.image || '')}" class="w-10 h-10 rounded object-cover bg-slate-100" onerror="this.style.display='none'">
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-bold text-slate-800 text-[11px] line-clamp-2">${escapeHtml(c.title || c.productName || c.name || 'Oferta')}</p>
+                                    <p class="text-[10px] text-slate-400 truncate">${escapeHtml(c.offerLink || c.link || '')}</p>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+            } catch (err) {
+                box.innerHTML = `<p class="text-red-600">Falha: ${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        async function importOfficialShopeeOffers() {
+            const items = window.__officialOffers || [];
+            if (!items.length) return showToast('Nada para importar', 'error');
+            const products = items.map((c) => ({
+                itemId: c.itemId || c.id,
+                title: c.title || c.productName || c.name,
+                image: c.imageUrl || c.image,
+                affiliateLink: c.offerLink || c.link || c.productLink,
+                productLink: c.productLink || c.offerLink || c.link,
+                keyword: 'oficial',
+                category: 'todos',
+                listType: null,
+            })).filter((p) => p.itemId && p.affiliateLink);
+            if (!products.length) return showToast('Oficiais sem itemId/link — use o Explorador', 'error');
+            try {
+                const res = await adminFetch(`${API_BASE}/api/ofertas/save-bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ products, keyword: 'oficial' }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Importadas ${data.saved || data.count || 0} ofertas oficiais`, 'success');
+            } catch (err) {
+                showToast(`Import falhou: ${err.message}`, 'error');
+            }
         }
 
         // Unified compatibility clipboard copier helper

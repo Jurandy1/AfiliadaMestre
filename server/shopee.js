@@ -90,47 +90,89 @@ function sign(appId, timestamp, payload, secret) {
   return crypto.createHash("sha256").update(appId + timestamp + payload + secret).digest("hex");
 }
 
-async function shopeeGraphql(query, variables) {
+function isRateLimitError(status, message) {
+  if (status === 429) return true;
+  const msg = String(message || "").toLowerCase();
+  return /rate.?limit|too many|quota|throttl/i.test(msg);
+}
+
+async function shopeeGraphql(query, variables, { retries = 3 } = {}) {
   const { appId, secret } = getCreds();
   const bodyObj = variables ? { query, variables } : { query };
   const body = JSON.stringify(bodyObj);
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const signature = sign(appId, timestamp, body, secret);
 
-  const res = await fetch(SHOPEE_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`,
-    },
-    body,
-  });
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = sign(appId, timestamp, body, secret);
 
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(`Shopee HTTP ${res.status}`);
-    err.status = res.status;
-    err.payload = json;
-    throw err;
+    let res;
+    let json = {};
+    try {
+      res = await fetch(SHOPEE_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`,
+        },
+        body,
+      });
+      json = await res.json().catch(() => ({}));
+    } catch (netErr) {
+      lastErr = netErr;
+      if (attempt < retries) {
+        await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 250));
+        continue;
+      }
+      throw netErr;
+    }
+
+    if (!res.ok) {
+      const err = new Error(`Shopee HTTP ${res.status}`);
+      err.status = res.status;
+      err.payload = json;
+      err.rateLimited = isRateLimitError(res.status, json?.message || json?.error);
+      if (err.rateLimited && attempt < retries) {
+        lastErr = err;
+        await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 250));
+        continue;
+      }
+      throw err;
+    }
+    if (json.errors && json.errors.length) {
+      const msg = json.errors[0]?.message || "Erro GraphQL Shopee";
+      const err = new Error(msg);
+      err.code = json.errors[0]?.extensions?.code;
+      err.payload = json;
+      err.rateLimited = isRateLimitError(null, msg);
+      if (err.rateLimited && attempt < retries) {
+        lastErr = err;
+        await sleep(1000 * 2 ** attempt + Math.floor(Math.random() * 250));
+        continue;
+      }
+      throw err;
+    }
+    return json.data;
   }
-  if (json.errors && json.errors.length) {
-    const err = new Error(json.errors[0]?.message || "Erro GraphQL Shopee");
-    err.code = json.errors[0]?.extensions?.code;
-    err.payload = json;
-    throw err;
-  }
-  return json.data;
+  throw lastErr || new Error("Shopee GraphQL falhou após retries");
 }
 
+/** Desconto bruto; displayDiscountPct aplica cap de confiança (85%). */
 function parseDiscountPct(discountRaw, priceMin, priceMax) {
+  let raw = 0;
   if (discountRaw != null && discountRaw !== "") {
     const n = Number(String(discountRaw).replace("%", ""));
-    if (Number.isFinite(n)) return Math.round(n > 1 ? n : n * 100);
+    if (Number.isFinite(n)) raw = Math.round(n > 1 ? n : n * 100);
+  } else if (priceMax > priceMin && priceMax > 0) {
+    raw = Math.round(((priceMax - priceMin) / priceMax) * 100);
   }
-  if (priceMax > priceMin && priceMax > 0) {
-    return Math.round(((priceMax - priceMin) / priceMax) * 100);
-  }
-  return 0;
+  return Math.max(0, raw);
+}
+
+function displayDiscountPct(discountRaw, priceMin, priceMax) {
+  const raw = parseDiscountPct(discountRaw, priceMin, priceMax);
+  if (raw < 5) return 0;
+  return Math.min(raw, 85);
 }
 
 function parseCommissionPct(rate) {
@@ -146,11 +188,12 @@ function toUnixSec(val) {
   return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
 }
 
-function isFlashActive(periodEnd) {
+function isFlashActive(periodEnd, windowHours = 24) {
   const end = toUnixSec(periodEnd);
   if (!end) return false;
   const now = Math.floor(Date.now() / 1000);
-  return end > now && end - now < 72 * 3600;
+  const hours = Number(windowHours) > 0 ? Number(windowHours) : 24;
+  return end > now && end - now < hours * 3600;
 }
 
 function normalizeQualityFilters({
@@ -406,6 +449,22 @@ async function fetchProductDetailsByIds(itemIds = []) {
         itemId
         productName
         imageUrl
+        priceMin
+        priceMax
+        priceDiscountRate
+        sales
+        ratingStar
+        commissionRate
+        sellerCommissionRate
+        shopeeCommissionRate
+        commission
+        offerLink
+        productLink
+        shopId
+        shopName
+        shopType
+        periodStartTime
+        periodEndTime
       }
     }`).join("\n");
   const data = await shopeeGraphql(`{ ${selections} }`);
@@ -553,8 +612,10 @@ async function fetchConversionReport({
   return data?.conversionReport || { nodes: [], pageInfo: {} };
 }
 
-async function generateShortLink(originUrl, subIds = ["afiliada_mestre", "site", "vitrine"]) {
-  const clean = (Array.isArray(subIds) ? subIds : ["vitrine"])
+async function generateShortLink(originUrl, subIds = null) {
+  const { SITE_SUBID, buildProductSubIds } = require("./tracking");
+  const fallback = buildProductSubIds("geral", null);
+  const clean = (Array.isArray(subIds) && subIds.length ? subIds : fallback)
     .map((s) => String(s).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40))
     .filter(Boolean)
     .slice(0, 5);
@@ -565,14 +626,17 @@ async function generateShortLink(originUrl, subIds = ["afiliada_mestre", "site",
       }
     }
   `;
-  const data = await shopeeGraphql(query, { originUrl, subIds: clean.length ? clean : ["vitrine"] });
+  const data = await shopeeGraphql(query, {
+    originUrl,
+    subIds: clean.length ? clean : [SITE_SUBID, "organico", "vitrine", "geral", "produto"],
+  });
   return data?.generateShortLink?.shortLink || null;
 }
 
 function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = null) {
   const priceMin = Number(node.priceMin) || 0;
   const priceMax = Number(node.priceMax) || priceMin;
-  const discountPct = parseDiscountPct(node.priceDiscountRate, priceMin, priceMax);
+  const discountPct = displayDiscountPct(node.priceDiscountRate, priceMin, priceMax);
   const ratePct = parseCommissionPct(node.commissionRate);
   const periodStart = toUnixSec(node.periodStartTime);
   const periodEnd = toUnixSec(node.periodEndTime);
@@ -615,9 +679,9 @@ function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = n
     affiliateLink: node.offerLink || node.productLink || "#",
     productLink: node.productLink || "",
     shortLink: node.shortLink || node.short_link || null,
-    subIds: buildProductSubIds(catId, Number(node.itemId)),
+    subIds: buildProductSubIds(catId, Number(node.itemId), subId),
     isFlashSale: flash,
-    flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (72 * 3600)) * 100))) : 0,
+    flashStock: flash ? Math.min(99, Math.max(5, Math.round((secondsLeft / (24 * 3600)) * 100))) : 0,
     periodStart,
     periodEnd,
     listType: listType != null ? listType : (node.listType != null ? Number(node.listType) : null),
@@ -627,6 +691,7 @@ function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = n
     totalCommission: node.commission != null ? `R$ ${node.commission}` : "—",
     shopName: node.shopName || "",
     shopId: node.shopId,
+    shopType: node.shopType != null ? Number(node.shopType) : null,
     keyword: keyword || "",
     taxonomySource: tax.source || null,
     desc,
@@ -664,8 +729,7 @@ function mapOfferToRow(node, keyword = "", listType = null, taxonomyOpts = null)
     period_start: toUnixSec(node.periodStartTime),
     period_end: toUnixSec(node.periodEndTime),
     list_type: listType != null ? Number(listType) : null,
-    // Identidade de rastreio do produto — gerada no sync, sem depender do clique
-    sub_ids: buildProductSubIds(catId, itemId),
+    sub_ids: buildProductSubIds(catId, itemId, tax.subcategory),
     updated_at: new Date().toISOString(),
   };
 }
@@ -686,6 +750,8 @@ module.exports = {
   isFlashActive,
   toUnixSec,
   parseSalesCount,
+  parseDiscountPct,
+  displayDiscountPct,
   parseCommissionPct,
   listTypeLabel,
   sortTypeLabel,
