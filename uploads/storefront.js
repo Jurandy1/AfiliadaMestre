@@ -923,10 +923,16 @@
             await applyCampaignLanding();
         }
 
+        // O setTimeout garante que o arquivo inteiro terminou de avaliar: há
+        // const/arrow (thumbUrl, displayUrl…) declarados abaixo daqui e usados
+        // já no primeiro render — chamar direto cai em TDZ e trava a vitrine.
+        function kickBootStorefront() {
+            setTimeout(() => { bootStorefront().catch((e) => console.error("[boot]", e)); }, 0);
+        }
         if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", () => { bootStorefront().catch(() => {}); });
+            document.addEventListener("DOMContentLoaded", kickBootStorefront);
         } else {
-            bootStorefront().catch(() => {});
+            kickBootStorefront();
         }
 
         function scheduleHomeSections() {
@@ -1952,7 +1958,11 @@ async function loadOffersFromSupabase(opts = {}) {
             };
 
             // Home: usa o que já veio do sort=money — evita um 2º /api/ofertas/db.
-            if (opts.fromCacheOnly || renderHeroCards(productsDatabase)) return;
+            if (opts.fromCacheOnly) {
+                renderHeroCards(productsDatabase);
+                return;
+            }
+            if (renderHeroCards(productsDatabase)) return;
 
             try {
                 const res = await fetch(`${API_BASE}/api/ofertas/db?limit=24&sort=discount`);
