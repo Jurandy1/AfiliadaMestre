@@ -1,6 +1,6 @@
 "use strict";
 
-const { isFlashActive, toUnixSec } = require("./shopee");
+const { isFlashActive, toUnixSec, computeMoneyScore, parseCommissionPct } = require("./shopee");
 const { extractProductOptions } = require("./productMeta");
 const { buildProductSubIds } = require("./tracking");
 
@@ -293,10 +293,12 @@ function rowToProduct(row) {
   const priceMin = Number(row.price_min) || 0;
   const priceMax = Number(row.price_max) || priceMin;
   const discountPct = parseDiscountFromRow(row);
-  const commissionRateNum = Number(String(row.commission_rate || "0").replace("%", ""));
-  const ratePct = Number.isFinite(commissionRateNum)
-    ? (commissionRateNum <= 1 ? commissionRateNum * 100 : commissionRateNum)
-    : 0;
+  const ratePct = parseCommissionPct(row.commission_rate);
+  const moneyScore = computeMoneyScore({
+    commissionRate: row.commission_rate,
+    sales: row.sales,
+    ratingStar: row.rating_star,
+  });
   const sales = row.sales != null ? String(row.sales) : "";
   const salesLabel = sales && !/vendid/i.test(sales) ? `${sales} vendidos` : sales;
 
@@ -346,6 +348,8 @@ function rowToProduct(row) {
     periodEnd,
     listType: row.list_type != null ? Number(row.list_type) : null,
     commissionRate: `${ratePct.toFixed(1)}%`,
+    commissionPct: ratePct,
+    moneyScore,
     sellerCommission: row.seller_commission_rate || "—",
     shopeeCommission: row.shopee_commission_rate || "—",
     totalCommission: row.commission != null ? `R$ ${row.commission}` : "—",

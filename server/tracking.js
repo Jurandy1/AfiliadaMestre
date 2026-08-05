@@ -20,6 +20,10 @@ const SECTION_CODES = {
   modal_direct: "md",
   destaque: "vd",
   oficial: "oficial",
+  premium_picks: "prem",
+  moda_picks: "moda",
+  beleza_picks: "beleza",
+  for_her: "praela",
 };
 
 /**

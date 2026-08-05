@@ -43,7 +43,8 @@ const {
   listOffersMissingShortlink,
   countShortlinkStatus,
 } = require("./supabase");
-const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
+const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly, sortCategoriesForHome, DEFAULT_FEMALE_PERCENT, normalizeKeywordEntry, isFemaleAudience } = require("./categorias");
+const { buildCoverageReport, buildCoverageQueue } = require("./coverage");
 const { refillVitrine } = require("./refillVitrine");
 const { productMatchesSubcategory } = require("./productMeta");
 const { SITE_SUBID, buildProductSubIds, buildTrackedSubIds, sanitizeSubId } = require("./tracking");
@@ -478,13 +479,24 @@ app.get("/api/campanhas", async (req, res) => {
       return res.json({ ...campaignsCache.data, cached: true });
     }
     const limit = Math.min(Number(req.query.limit) || 8, 20);
-    const offer = await fetchShopeeOffers({ sortType: 1, page: 1, limit });
-    const campaigns = (offer.nodes || [])
+    const offer = await fetchShopeeOffers({ sortType: 1, page: 1, limit: Math.max(limit, 20) });
+    const FEMALE_OFFER_RE = /women|woman|fashion|beauty|moda|beleza|feminin|accessories|saúde|saude|health|vestuario|roupa/i;
+    let campaigns = (offer.nodes || [])
       .map(mapCampaignNode)
       .filter((c) => c.affiliateLink && c.affiliateLink !== "#" && c.isActive);
+    campaigns.sort((a, b) => {
+      const af = FEMALE_OFFER_RE.test(a.title || "") ? 1 : 0;
+      const bf = FEMALE_OFFER_RE.test(b.title || "") ? 1 : 0;
+      return bf - af;
+    });
+    // Prioriza moda/beleza no topo; mantém as demais depois
+    const femaleFirst = campaigns.filter((c) => FEMALE_OFFER_RE.test(c.title || ""));
+    const rest = campaigns.filter((c) => !FEMALE_OFFER_RE.test(c.title || ""));
+    campaigns = [...femaleFirst, ...rest].slice(0, limit);
     const payload = {
       source: "shopee",
       count: campaigns.length,
+      femaleFocused: femaleFirst.length,
       updatedAt: new Date().toISOString(),
       campaigns,
     };
@@ -497,6 +509,69 @@ app.get("/api/campanhas", async (req, res) => {
     if (campaignsCache.data) {
       return res.json({ ...campaignsCache.data, cached: true, stale: true, error: err.message });
     }
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
+/** Importa itens de coleção/categoria oficial (listType 6 ou 4 + matchId). */
+app.post("/api/campanhas/import-products", requireAdmin, async (req, res) => {
+  try {
+    const collectionId = req.body?.collectionId != null ? Number(req.body.collectionId) : null;
+    const categoryId = req.body?.categoryId != null ? Number(req.body.categoryId) : null;
+    const limit = Math.min(Math.max(Number(req.body?.limit) || 30, 5), 50);
+    const keyword = String(req.body?.keyword || "oficial").trim();
+    const forceCategory = String(req.body?.forceCategory || "").trim() || null;
+
+    let listType = 0;
+    let matchId = null;
+    if (collectionId && Number.isFinite(collectionId) && collectionId > 0) {
+      listType = 6;
+      matchId = collectionId;
+    } else if (categoryId && Number.isFinite(categoryId) && categoryId > 0) {
+      listType = 4;
+      matchId = categoryId;
+    } else {
+      return res.status(400).json({ error: "Informe collectionId ou categoryId" });
+    }
+
+    const offer = await fetchProductOffers({
+      listType,
+      matchId,
+      limit,
+      page: 1,
+      sortType: 5,
+      requireCommission: true,
+      minRating: MIN_RATING,
+    });
+
+    const rows = (offer.nodes || [])
+      .map((n) =>
+        mapOfferToRow(n, keyword, listType, {
+          forceCategory: forceCategory || undefined,
+        })
+      )
+      .filter((r) => r.item_id && r.offer_link);
+
+    let saved = 0;
+    let shortlinks = { generated: 0 };
+    if (rows.length) {
+      const result = await upsertOfertas(rows);
+      saved = Array.isArray(result) ? result.length : rows.length;
+      shortlinks = await generateShortlinksForRows(rows);
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
+    }
+
+    res.json({
+      ok: true,
+      listType,
+      matchId,
+      raw: offer.rawCount,
+      saved,
+      shortlinks,
+    });
+  } catch (err) {
+    console.error("[/api/campanhas/import-products]", err.message);
     res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
   }
 });
@@ -523,14 +598,16 @@ app.get("/api/categorias", async (req, res) => {
       metas.map((c) => countBySubcategory(c.id).catch(() => ({})))
     );
 
-    const categories = metas.map((c, idx) => ({
-      ...c,
-      count: counts[c.id] || 0,
-      subcategories: (c.subcategories || []).map((sub) => ({
-        ...sub,
-        count: subCountsList[idx][sub.id] || 0,
-      })),
-    }));
+    const categories = sortCategoriesForHome(
+      metas.map((c, idx) => ({
+        ...c,
+        count: counts[c.id] || 0,
+        subcategories: (c.subcategories || []).map((sub) => ({
+          ...sub,
+          count: subCountsList[idx][sub.id] || 0,
+        })),
+      }))
+    );
 
     categories.unshift({
       id: "todos",
@@ -556,11 +633,11 @@ app.get("/api/categorias", async (req, res) => {
 app.post("/api/sync", requireAdmin, async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 5), 50);
-    const listType = req.body?.listType != null ? Number(req.body.listType) : 0;
-    const sortType = req.body?.sortType != null ? Number(req.body.sortType) : 2;
+    const listType = req.body?.listType != null ? Number(req.body.listType) : 1;
+    const sortType = req.body?.sortType != null ? Number(req.body.sortType) : 5;
     const minRating = req.body?.minRating != null ? Number(req.body.minRating) : MIN_RATING;
     const minSales = req.body?.minSales != null ? Number(req.body.minSales) : 0;
-    const requireCommission = !!req.body?.requireCommission;
+    const requireCommission = req.body?.requireCommission !== false;
     const pages = Math.min(Math.max(Number(req.body?.pages) || 1, 1), 5);
     let plano;
 
@@ -570,11 +647,14 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
       const target = String(req.body.category).trim();
       const cat = CATEGORIAS.find((c) => c.id === target);
       plano = (cat?.subcategories || []).flatMap((sub) =>
-        sub.keywords.map((k) => ({ keyword: k, category: cat.id, subcategory: sub.id }))
+        (sub.keywords || []).map((raw) => {
+          const { keyword } = normalizeKeywordEntry(raw);
+          return { keyword, category: cat.id, subcategory: sub.id };
+        })
       );
     } else {
-      // Lote manual limitado: 27 buscas femininas + 3 gerais.
-      plano = weightedKeywords({ femalePercent: 90 }).slice(0, 30);
+      // Lote ~95% feminino / 5% geral (até 40 buscas).
+      plano = weightedKeywords({ femalePercent: DEFAULT_FEMALE_PERCENT }).slice(0, 40);
     }
 
     if (!plano.length) {
@@ -596,6 +676,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (batch.nodes?.length) {
       const planoByKw = new Map(
         plano.map((p) => [String(p.keyword).toLowerCase().trim(), p])
@@ -614,6 +695,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
       if (rows.length) {
         const result = await upsertOfertas(rows);
         saved = Array.isArray(result) ? result.length : rows.length;
+        shortlinks = await generateShortlinksForRows(rows);
       }
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -621,6 +703,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
 
     res.json({
       ok: true,
+      femalePercentTarget: DEFAULT_FEMALE_PERCENT,
       keywordsRun: keywords.length,
       pages,
       listType: batch.listType,
@@ -630,6 +713,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      shortlinks,
       report: batch.report,
       count: batch.count,
       products: batch.products,
@@ -645,19 +729,29 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
     const catId = String(req.params.id || "").trim();
     const cat = CATEGORIAS.find((c) => c.id === catId);
     if (!cat) return res.status(404).json({ error: `Categoria desconhecida: ${catId}` });
+    const keywords = [];
+    const subByKeyword = new Map();
+    for (const sub of cat.subcategories || []) {
+      for (const raw of sub.keywords || []) {
+        const { keyword } = normalizeKeywordEntry(raw);
+        if (!keyword) continue;
+        keywords.push(keyword);
+        subByKeyword.set(keyword.toLowerCase().trim(), sub.id);
+      }
+    }
+    const listType = req.query.listType != null ? Number(req.query.listType) : 1;
+    const sortType = req.query.sortType != null ? Number(req.query.sortType) : 5;
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 5), 50);
-    const listType = req.query.listType != null ? Number(req.query.listType) : 0;
-    const sortType = req.query.sortType != null ? Number(req.query.sortType) : 2;
     const pages = Math.min(Math.max(Number(req.query.pages) || 1, 1), 5);
     const minRating = req.query.minRating != null ? Number(req.query.minRating) : MIN_RATING;
     const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
-    const requireCommission = req.query.requireCommission === "1" || req.query.requireCommission === "true";
-    const keywords = (cat.subcategories || []).flatMap((sub) => sub.keywords);
-    const subByKeyword = new Map();
-    for (const sub of cat.subcategories || []) {
-      for (const kw of sub.keywords || []) {
-        subByKeyword.set(String(kw).toLowerCase().trim(), sub.id);
-      }
+    const requireCommission =
+      req.query.requireCommission == null
+        ? true
+        : req.query.requireCommission === "1" || req.query.requireCommission === "true";
+
+    if (!keywords.length) {
+      return res.status(400).json({ error: "Categoria sem keywords" });
     }
 
     const batch = await fetchProductOffersBatch({
@@ -674,6 +768,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (batch.nodes?.length) {
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
       const rows = batch.nodes
@@ -689,6 +784,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
       if (rows.length) {
         const result = await upsertOfertas(rows);
         saved = Array.isArray(result) ? result.length : rows.length;
+        shortlinks = await generateShortlinksForRows(rows);
       }
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -706,6 +802,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      shortlinks,
       count: batch.count,
       report: batch.report,
       products: batch.products,
@@ -715,14 +812,131 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
   }
 });
 
+let coverageCache = { at: 0, data: null };
+const COVERAGE_TTL_MS = 60 * 1000;
+
+/** Snapshot de cobertura (leitura) — sem token, como /api/status/shortlinks. */
+app.get("/api/coverage", async (_req, res) => {
+  try {
+    if (coverageCache.data && Date.now() - coverageCache.at < COVERAGE_TTL_MS) {
+      return res.json({ ...coverageCache.data, cached: true });
+    }
+    const report = await buildCoverageReport();
+    coverageCache = { at: Date.now(), data: report };
+    res.json({ ...report, cached: false });
+  } catch (err) {
+    console.error("[/api/coverage]", err.message);
+    if (coverageCache.data) {
+      return res.json({ ...coverageCache.data, cached: true, stale: true, error: err.message });
+    }
+    res.status(err.status || 500).json({ error: err.message || "Falha ao calcular cobertura" });
+  }
+});
+
+app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
+  try {
+    const batchSize = Math.min(Math.max(Number(req.body?.batch) || 12, 1), 40);
+    const limit = Math.min(Math.max(Number(req.body?.limit) || 20, 5), 50);
+    const pages = Math.min(Math.max(Number(req.body?.pages) || 1, 1), 3);
+    const onlyCategory = req.body?.category ? String(req.body.category).trim() : "";
+    const rotation = [
+      { listType: 1, sortType: 5 },
+      { listType: 2, sortType: 2 },
+    ];
+    const modeIdx = Number(req.body?.mode) || 0;
+    const mode = rotation[modeIdx % rotation.length];
+    const listType = req.body?.listType != null ? Number(req.body.listType) : mode.listType;
+    const sortType = req.body?.sortType != null ? Number(req.body.sortType) : mode.sortType;
+
+    const { queue, report } = await buildCoverageQueue({ femalePercent: DEFAULT_FEMALE_PERCENT });
+    let jobs = onlyCategory ? queue.filter((j) => j.category === onlyCategory) : queue;
+    jobs = jobs.slice(0, batchSize);
+
+    if (!jobs.length) {
+      return res.json({
+        ok: true,
+        saved: 0,
+        processed: [],
+        shortlinks: { generated: 0 },
+        message: "Nenhum buraco na cobertura — fila vazia.",
+        coverage: report,
+      });
+    }
+
+    const keywords = jobs.map((j) => j.keyword);
+    const batch = await fetchProductOffersBatch({
+      keywords,
+      pages,
+      pageStart: 1,
+      limit,
+      listType,
+      sortType,
+      minRating: MIN_RATING,
+      requireCommission: true,
+      gapMs: DEFAULT_BATCH_GAP_MS,
+    });
+
+    const planByKw = new Map(jobs.map((j) => [String(j.keyword).toLowerCase().trim(), j]));
+    const kwById = new Map(
+      (batch.products || []).map((p) => [String(p.itemId || p.id), p.keyword || ""])
+    );
+
+    let saved = 0;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
+    if (batch.nodes?.length) {
+      const rows = batch.nodes
+        .map((n) => {
+          const kw = kwById.get(String(n.itemId)) || keywords[0];
+          const plan = planByKw.get(String(kw).toLowerCase().trim());
+          return mapOfferToRow(n, kw, batch.listType, {
+            forceCategory: plan?.category || null,
+            forceSubcategory: plan?.subcategory || null,
+          });
+        })
+        .filter((r) => r.item_id && r.offer_link);
+      if (rows.length) {
+        const result = await upsertOfertas(rows);
+        saved = Array.isArray(result) ? result.length : rows.length;
+        shortlinks = await generateShortlinksForRows(rows);
+      }
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
+      coverageCache = { at: 0, data: null };
+    }
+
+    const coverageAfter = await buildCoverageReport().catch(() => report);
+    coverageCache = { at: Date.now(), data: coverageAfter };
+    res.json({
+      ok: true,
+      femalePercentTarget: DEFAULT_FEMALE_PERCENT,
+      listType,
+      sortType,
+      jobsRun: jobs.length,
+      saved,
+      shortlinks,
+      filteredOut: batch.filteredOut,
+      processed: jobs.map((j) => ({
+        keyword: j.keyword,
+        category: j.category,
+        subcategory: j.subcategory,
+        audience: j.audience,
+      })),
+      coverage: coverageAfter,
+    });
+  } catch (err) {
+    console.error("[/api/sync/coverage]", err.message);
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
 app.get("/api/auto/status", (_req, res) => {
-  res.json(autosync.status());
+  res.json(autosync.getStatus());
 });
 
 app.post("/api/auto/run", requireAdmin, async (_req, res) => {
   try {
     const result = await autosync.runOnce({ manual: true });
-    res.json({ ok: true, result, status: autosync.status() });
+    res.json({ ok: true, result, status: autosync.getStatus() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -731,8 +945,8 @@ app.post("/api/auto/run", requireAdmin, async (_req, res) => {
 /** Popular destaques (Top Performance). */
 app.post("/api/auto/top-performance", requireAdmin, async (_req, res) => {
   try {
-    const result = await autosync.runTopPerformance({ manual: true });
-    res.json({ ok: true, result, status: autosync.status() });
+    const result = await autosync.runTopPerformance();
+    res.json({ ok: true, result, status: autosync.getStatus() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -230,7 +230,7 @@
                         <p class="text-[11px] font-extrabold text-shopee-orange uppercase tracking-wider flex items-center gap-1.5">
                             <i class="fas fa-bolt text-shopee-yellow"></i> Promoção por tempo limitado
                         </p>
-                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Ofertas Relâmpago</h2>
+                        <h2 class="text-xl md:text-2xl font-black text-slate-800 leading-tight">Relâmpago pra ela</h2>
                     </div>
                     <button onclick="navigateTo('/relampago')" class="hidden sm:inline-flex text-xs font-bold text-shopee-orange hover:underline items-center gap-1">
                         Ver ofertas relâmpago <i class="fas fa-arrow-right"></i>
@@ -525,6 +525,26 @@
         <!-- VIEW: Catálogo & Sync -->
         <section id="admin-view-catalogo" class="admin-view space-y-6">
 
+                <!-- Cobertura feminina 95/5 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-venus text-pink-500 mr-1"></i> Cobertura feminina (95/5)</h4>
+                            <p class="text-[10px] text-slate-500 mt-1">Preenche buracos por categoria/sub · home 100% feminina · sync busca maior comissão</p>
+                            <p id="coverage-status-line" class="text-[11px] text-slate-700 font-semibold mt-2"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando cobertura…</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="loadCoverageReport()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">
+                                <i class="fas fa-sync mr-1"></i> Atualizar
+                            </button>
+                            <button type="button" id="btn-coverage-fill" onclick="runCoverageFill()" class="px-3 py-2 rounded-lg bg-pink-600 text-white text-[11px] font-bold hover:bg-pink-700 disabled:opacity-50">
+                                <i class="fas fa-fill-drip mr-1"></i> Preencher buracos
+                            </button>
+                        </div>
+                    </div>
+                    <div id="coverage-table" class="p-4 text-[11px] text-slate-400 max-h-72 overflow-y-auto">—</div>
+                </div>
+
                 <!-- Shortlinks pré-gerados (acelera clique "Comprar") -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
@@ -540,6 +560,20 @@
                             <i class="fas fa-wand-magic-sparkles mr-1"></i> Gerar tudo que falta
                         </button>
                     </div>
+                </div>
+
+                <!-- Fila dinheiro (maior comissão feminina sem shortlink) -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-coins text-amber-500 mr-1"></i> Mais dinheiro agora</h4>
+                            <p class="text-[10px] text-slate-500 mt-1">Top femininos por score de comissão — priorize shortlink neles</p>
+                        </div>
+                        <button type="button" onclick="renderMoneyQueue()" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600">
+                            <i class="fas fa-chart-line mr-1"></i> Ver top comissão
+                        </button>
+                    </div>
+                    <div id="money-queue-box" class="p-4 text-[11px] text-slate-400">Clique para listar os produtos femininos com maior potencial de comissão.</div>
                 </div>
 
                 <!-- Ofertas oficiais Shopee -->
@@ -564,6 +598,7 @@
                             <p class="text-[10px] text-slate-300 mt-1">Presets · multi-keyword · multi-página · filtros de qualidade · salvar seleção</p>
                         </div>
                         <div class="flex flex-wrap gap-1.5" id="explorer-presets">
+                            <button type="button" data-preset="female_money" onclick="applyExplorerPreset('female_money')" class="explorer-preset px-2.5 py-1 rounded-md bg-shopee-orange text-white text-[10px] font-bold border border-shopee-orange">Feminino + comissão</button>
                             <button type="button" data-preset="bestsellers" onclick="applyExplorerPreset('bestsellers')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Mais vendidos</button>
                             <button type="button" data-preset="topperf" onclick="applyExplorerPreset('topperf')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Top performance</button>
                             <button type="button" data-preset="commission" onclick="applyExplorerPreset('commission')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Maior comissão</button>
@@ -1480,24 +1515,6 @@
         // garante navegação por subcategoria mesmo antes da API responder.
         let categories = [
             { id: 'todos', label: 'Tudo', icon: 'fa-border-all', color: 'orange', count: 0 },
-            { id: 'eletronicos', label: 'Eletrônicos', icon: 'fa-laptop', color: 'blue', count: 0, subcategories: [
-                { id: 'audio', label: 'Áudio', count: 0 },
-                { id: 'wearables', label: 'Relógios & Wearables', count: 0 },
-                { id: 'informatica', label: 'Informática', count: 0 },
-                { id: 'video', label: 'Vídeo & Projeção', count: 0 },
-                { id: 'smart_home', label: 'Casa Inteligente', count: 0 }
-            ] },
-            { id: 'celular', label: 'Celular', icon: 'fa-mobile-alt', color: 'cyan', count: 0, subcategories: [
-                { id: 'protecao', label: 'Proteção', count: 0 },
-                { id: 'energia', label: 'Energia & Cabos', count: 0 },
-                { id: 'acessorios_cel', label: 'Acessórios', count: 0 }
-            ] },
-            { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0, subcategories: [
-                { id: 'cozinha', label: 'Cozinha', count: 0 },
-                { id: 'decoracao', label: 'Decoração', count: 0 },
-                { id: 'organizacao', label: 'Organização', count: 0 },
-                { id: 'limpeza', label: 'Limpeza & Clima', count: 0 }
-            ] },
             { id: 'moda', label: 'Moda Feminina', icon: 'fa-tshirt', color: 'pink', count: 0, subcategories: [
                 { id: 'vestidos', label: 'Vestidos & Saias', count: 0 },
                 { id: 'calcas', label: 'Calças & Leggings', count: 0 },
@@ -1526,19 +1543,42 @@
                 { id: 'cabelo_acessorios', label: 'Cabelo', count: 0 },
                 { id: 'outros', label: 'Outros', count: 0 }
             ] },
-            { id: 'maternidade', label: 'Mãe & Bebê', icon: 'fa-baby', color: 'rose', count: 0, subcategories: [
-                { id: 'bebe_menina', label: 'Bebê Menina', count: 0 },
-                { id: 'maternidade_roupa', label: 'Maternidade', count: 0 }
-            ] },
             { id: 'fitness', label: 'Fitness', icon: 'fa-dumbbell', color: 'emerald', count: 0, subcategories: [
                 { id: 'roupa_fitness', label: 'Roupas', count: 0 },
                 { id: 'equipamentos', label: 'Equipamentos', count: 0 },
                 { id: 'bem_estar', label: 'Bem-estar', count: 0 }
             ] },
+            { id: 'maternidade', label: 'Mãe & Bebê', icon: 'fa-baby', color: 'rose', count: 0, subcategories: [
+                { id: 'bebe_menina', label: 'Bebê Menina', count: 0 },
+                { id: 'maternidade_roupa', label: 'Maternidade', count: 0 }
+            ] },
+            { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0, subcategories: [
+                { id: 'cozinha', label: 'Cozinha', count: 0 },
+                { id: 'decoracao', label: 'Decoração', count: 0 },
+                { id: 'organizacao', label: 'Organização', count: 0 },
+                { id: 'limpeza', label: 'Limpeza & Clima', count: 0 }
+            ] },
+            { id: 'celular', label: 'Celular', icon: 'fa-mobile-alt', color: 'cyan', count: 0, subcategories: [
+                { id: 'protecao', label: 'Proteção', count: 0 },
+                { id: 'energia', label: 'Energia & Cabos', count: 0 },
+                { id: 'acessorios_cel', label: 'Acessórios', count: 0 }
+            ] },
+            { id: 'eletronicos', label: 'Eletrônicos', icon: 'fa-laptop', color: 'blue', count: 0, subcategories: [
+                { id: 'audio', label: 'Áudio', count: 0 },
+                { id: 'wearables', label: 'Relógios & Wearables', count: 0 },
+                { id: 'informatica', label: 'Informática', count: 0 },
+                { id: 'video', label: 'Vídeo & Projeção', count: 0 },
+                { id: 'smart_home', label: 'Casa Inteligente', count: 0 }
+            ] },
             { id: 'pet', label: 'Pet Shop', icon: 'fa-paw', color: 'orange', count: 0, subcategories: [
                 { id: 'gatos', label: 'Gatos', count: 0 },
                 { id: 'caes', label: 'Cães', count: 0 },
                 { id: 'acessorios_pet', label: 'Acessórios Pet', count: 0 }
+            ] },
+            { id: 'infantil', label: 'Infantil', icon: 'fa-child', color: 'indigo', count: 0, subcategories: [
+                { id: 'brinquedos', label: 'Brinquedos', count: 0 },
+                { id: 'roupa_infantil', label: 'Roupas & Calçados', count: 0 },
+                { id: 'escola', label: 'Escola', count: 0 }
             ] },
             { id: 'utilidades', label: 'Utilidades', icon: 'fa-tools', color: 'teal', count: 0, subcategories: [
                 { id: 'ferramentas', label: 'Ferramentas', count: 0 },
@@ -1549,11 +1589,6 @@
                 { id: 'limpeza_auto', label: 'Limpeza', count: 0 },
                 { id: 'tecnologia_auto', label: 'Tecnologia', count: 0 },
                 { id: 'conforto_auto', label: 'Conforto', count: 0 }
-            ] },
-            { id: 'infantil', label: 'Infantil', icon: 'fa-child', color: 'indigo', count: 0, subcategories: [
-                { id: 'brinquedos', label: 'Brinquedos', count: 0 },
-                { id: 'roupa_infantil', label: 'Roupas & Calçados', count: 0 },
-                { id: 'escola', label: 'Escola', count: 0 }
             ] }
         ];
 
@@ -1664,6 +1699,9 @@
             if (badge) badge.classList.remove("hidden");
 
             loadSubIdSettings();
+            loadShortlinkStatus();
+            loadCoverageReport();
+            loadAutoStatus();
 
             const parts = pathClean().split("/").filter(Boolean);
             let view = parts[1] || "dashboard";
@@ -2011,29 +2049,33 @@
 
         // ---- Explorador Shopee (Catálogo & Sync) ----
         const EXPLORER_PRESETS = {
+            female_money: {
+                listType: 1, sortType: 5, minRating: 4.0, minSales: 20, requireCommission: true,
+                keywords: "vestido longo feminino, kit skincare, bolsa transversal feminina, conjunto fitness feminino, perfume feminino, sandalia feminina, lingerie feminina",
+            },
             bestsellers: {
                 listType: 0, sortType: 2, minRating: 4.0, minSales: 50, requireCommission: false,
-                keywords: "vestido longo, blusa feminina, tênis feminino, kit skincare",
+                keywords: "vestido longo feminino, blusa feminina, tênis feminino, kit skincare",
             },
             topperf: {
-                listType: 2, sortType: 2, minRating: 4.2, minSales: 20, requireCommission: false,
-                keywords: "achadinhos shopee, oferta relâmpago, mais vendidos",
+                listType: 2, sortType: 2, minRating: 4.2, minSales: 20, requireCommission: true,
+                keywords: "vestido midi feminino, skincare coreano, bolsa feminina, conjunto fitness",
             },
             commission: {
                 listType: 1, sortType: 5, minRating: 4.0, minSales: 0, requireCommission: true,
-                keywords: "suplemento, perfume importado, smartwatch feminino",
+                keywords: "perfume feminino, smartwatch feminino, maquiagem, colageno hidrolisado",
             },
             rated: {
                 listType: 0, sortType: 1, minRating: 4.7, minSales: 30, requireCommission: false,
-                keywords: "creme facial, escova secadora, air fryer",
+                keywords: "creme facial, escova secadora, serum vitamina c",
             },
             popular: {
                 listType: 0, sortType: 2, minRating: 4.0, minSales: 100, requireCommission: false,
-                keywords: "capinha iphone, fone bluetooth, power bank",
+                keywords: "capinha celular aesthetic, fone bluetooth feminino, power bank compacto",
             },
             budget: {
                 listType: 0, sortType: 4, minRating: 4.0, minSales: 20, requireCommission: false,
-                keywords: "organizador, kit maquiagem, meia feminina",
+                keywords: "organizador maquiagem, kit maquiagem, scrunchie, necessaire feminina",
             },
         };
 
@@ -2775,15 +2817,16 @@ async function loadOffersFromSupabase(opts = {}) {
 
             const renderHeroCards = (list) => {
                 const now = Math.floor(Date.now() / 1000);
-                let picks = (list || [])
+                let picks = femaleOnly(list || [])
                     .filter(p => p && p.image && Number(p.newPrice) > 0)
                     .sort((a, b) => {
                         const flashA = a.isFlashSale && a.periodEnd > now ? 1 : 0;
                         const flashB = b.isFlashSale && b.periodEnd > now ? 1 : 0;
                         if (flashB !== flashA) return flashB - flashA;
+                        const money = moneyScoreOf(b) - moneyScoreOf(a);
+                        if (money) return money;
                         return (displayDiscount(b) || 0) - (displayDiscount(a) || 0);
                     });
-                // Preferir relâmpago crível; se não houver, mostra destaques com desconto
                 const flashPicks = picks.filter(p => {
                     if (!(p.isFlashSale && p.periodEnd > now && p.periodEnd - now <= 24 * 3600)) return false;
                     const d = displayDiscount(p);
@@ -3346,25 +3389,33 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         function isFemaleProduct(p) {
-            if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade'].includes(String(p.category || ''))) return true;
-            return /feminin|mulher|maquiagem|batom|vestido|legging|saia|bolsa|brinco|colar|skincare|unha|cabelo|bebe menina|gestante|maternidade|lingerie|biquini|maio|pijama|scrunchie|tiara/i
-                .test(`${p.title || ''} ${p.keyword || ''}`);
+            if (!p) return false;
+            const cat = String(p.category || '').toLowerCase();
+            if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade', 'casa', 'pet', 'infantil'].includes(cat)) return true;
+            return /feminin|mulher|menina|gestante|matern|maquiagem|skincare|batom|vestido|saia|biquini|lingerie|suti[aã]|calcinha|bolsa|necessaire|cropped|pantalo|sandalia|rasteir|scrunchie|boob\s*tape|plus\s*size|amamenta|legging|brinco|colar|unha|pijama|tiara/i
+                .test(`${p.title || ''} ${p.keyword || ''} ${p.subcategory || ''}`);
+        }
+
+        function moneyScoreOf(p) {
+            if (p && Number.isFinite(Number(p.moneyScore))) return Number(p.moneyScore);
+            const rate = Number(String(p.commissionRate || p.commissionPct || '0').replace('%', '')) || 0;
+            const commissionPct = rate <= 1 && rate > 0 ? rate * 100 : rate;
+            const sales = parseSalesNumber(p);
+            const rating = Number(p.stars) > 0 ? Math.min(5, Number(p.stars)) : 4;
+            return Math.round(commissionPct * Math.log10(sales + 1) * rating * 100) / 100;
+        }
+
+        function femaleOnly(list) {
+            return (Array.isArray(list) ? list : []).filter(isFemaleProduct);
+        }
+
+        function sortByMoney(list) {
+            return [...(list || [])].sort((a, b) => moneyScoreOf(b) - moneyScoreOf(a));
         }
 
         function prioritizeFemaleProducts(list) {
-            const female = list.filter(isFemaleProduct);
-            const general = list.filter(p => !isFemaleProduct(p));
-            if (!female.length) return list;
-
-            const allowedGeneral = general.slice(0, Math.ceil(female.length / 9));
-            const result = [];
-            let fi = 0;
-            let gi = 0;
-            while (fi < female.length) {
-                for (let i = 0; i < 9 && fi < female.length; i += 1) result.push(female[fi++]);
-                if (gi < allowedGeneral.length) result.push(allowedGeneral[gi++]);
-            }
-            return result;
+            // Home: 100% feminino. Em outras telas, 95/5 via filter duro só na home.
+            return femaleOnly(list);
         }
 
         function productCardHTML(p, { index = 0, section = 'destaque' } = {}) {
@@ -3420,7 +3471,7 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         function deriveHomeSections(list) {
-            const items = Array.isArray(list) ? list.slice() : [];
+            const items = sortByMoney(femaleOnly(list));
             const topSellers = items
                 .filter(p => parseSalesNumber(p) >= 100)
                 .sort((a, b) => parseSalesNumber(b) - parseSalesNumber(a))
@@ -3436,7 +3487,10 @@ async function loadOffersFromSupabase(opts = {}) {
                 .sort((a, b) => Number(b.stars) - Number(a.stars))
                 .slice(0, 12);
             const officialShops = items.filter(p => isOfficialShop(p.shopType)).slice(0, 12);
-            return { topSellers, bigDiscounts, topRated, officialShops };
+            const premium = items.filter(p => moneyScoreOf(p) > 0).slice(0, 12);
+            const moda = items.filter(p => p.category === 'moda').slice(0, 12);
+            const beleza = items.filter(p => p.category === 'beleza').slice(0, 12);
+            return { topSellers, bigDiscounts, topRated, officialShops, premium, moda, beleza };
         }
 
         function renderHomeSections() {
@@ -3451,8 +3505,11 @@ async function loadOffersFromSupabase(opts = {}) {
                 box.innerHTML = '';
                 return;
             }
-            const { topSellers, bigDiscounts, topRated, officialShops } = deriveHomeSections(productsDatabase);
+            const { topSellers, bigDiscounts, topRated, officialShops, premium, moda, beleza } = deriveHomeSections(productsDatabase);
             const blocks = [
+                { title: 'Seleção premium pra ela', href: '/mais-vendidos', items: premium, section: 'premium_picks' },
+                { title: 'Achadinhos moda', href: '/categoria/moda', items: moda, section: 'moda_picks' },
+                { title: 'Beleza & skincare', href: '/categoria/beleza', items: beleza, section: 'beleza_picks' },
                 { title: 'Mais Vendidos', href: '/mais-vendidos', items: topSellers, section: 'top_sellers' },
                 { title: 'Maiores Descontos', href: '/maiores-descontos', items: bigDiscounts, section: 'big_discounts' },
                 { title: 'Melhor Avaliados', href: '/melhor-avaliados', items: topRated, section: 'top_rated' },
@@ -3483,6 +3540,8 @@ async function loadOffersFromSupabase(opts = {}) {
             const searchVal = (document.getElementById('store-search-input')?.value || '').toLowerCase().trim();
             if (!grid || !flashContainer) return;
 
+            const onHome = (pathClean() === '/' || pathClean() === '') && currentStoreCategory === 'todos' && !currentStoreSubcategory && !searchVal;
+
             let filtered = productsDatabase.filter(p => {
                 const matchesCategory = currentStoreCategory === 'todos' || p.category === currentStoreCategory;
                 if (!matchesCategory) return false;
@@ -3493,15 +3552,19 @@ async function loadOffersFromSupabase(opts = {}) {
                 }
                 return productMatchesSubcategory(p, currentStoreCategory, currentStoreSubcategory);
             });
-            filtered = sortProductsLocal(filtered);
-            if (currentStoreCategory === 'todos' && !searchVal) {
-                filtered = prioritizeFemaleProducts(filtered);
+            if (onHome) {
+                filtered = sortByMoney(femaleOnly(filtered));
+            } else {
+                filtered = sortProductsLocal(filtered);
+                if (currentStoreCategory === 'todos' && !searchVal) {
+                    filtered = prioritizeFemaleProducts(filtered);
+                }
             }
             const totalFiltered = filtered.length;
             filtered = filtered.slice(0, (currentPage + 1) * PAGE_SIZE);
 
             const now = Math.floor(Date.now() / 1000);
-            let flashSales = filtered
+            let flashSales = (onHome ? femaleOnly(productsDatabase) : filtered)
                 .filter(p => {
                     if (!p.isFlashSale || !p.periodEnd || p.periodEnd <= now) return false;
                     if (p.periodEnd - now > 24 * 3600) return false;
@@ -3575,10 +3638,9 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         const POPULAR_TERM_CANDIDATES = [
-            'Smartwatch', 'Fone', 'Projetor', 'Câmera', 'Carregador', 'LED',
-            'Vestido', 'Blusa', 'Tênis', 'Bolsa', 'Legging', 'Pijama',
-            'Perfume', 'Skincare', 'Maquiagem', 'Cabelo', 'Batom',
-            'Umidificador', 'Kit', 'Relógio'
+            'Vestido', 'Skincare', 'Bolsa', 'Sandália', 'Conjunto', 'Lingerie',
+            'Perfume', 'Maquiagem', 'Legging', 'Cropped', 'Plus size', 'Batom',
+            'Scrunchie', 'Pijama', 'Smartwatch'
         ];
 
         function renderPopularTerms() {
@@ -3587,7 +3649,7 @@ async function loadOffersFromSupabase(opts = {}) {
             const scored = POPULAR_TERM_CANDIDATES
                 .map(term => {
                     const t = term.toLowerCase();
-                    const count = productsDatabase.filter(p =>
+                    const count = femaleOnly(productsDatabase).filter(p =>
                         (p.title || '').toLowerCase().includes(t)
                     ).length;
                     return { term, count };
@@ -3596,9 +3658,9 @@ async function loadOffersFromSupabase(opts = {}) {
                 .sort((a, b) => b.count - a.count);
 
             const items = (scored.length ? scored : [
-                { term: 'Mini Projetor' },
-                { term: 'Smartwatch' },
-                { term: 'Umidificador' }
+                { term: 'Vestido' },
+                { term: 'Skincare' },
+                { term: 'Bolsa' }
             ]).slice(0, 4);
 
             container.innerHTML = '';
@@ -5473,12 +5535,14 @@ async function loadOffersFromSupabase(opts = {}) {
                 if (box) {
                     box.innerHTML = [
                         `estado........: ${s.enabled ? (s.running ? 'rodando' : 'ativo') : 'desligado'}`,
+                        `feed..........: ${s.feedMode || 'coverage-95-5'}`,
+                        `home..........: ${s.homePolicy || '100% feminino'}`,
                         `lote..........: ${s.batch} keyword(s) / execução`,
-                        `foco feminino.: ${s.femalePercentTarget || 90}% das buscas`,
+                        `foco feminino.: ${s.femalePercentTarget || 95}% das buscas (5% geral)`,
+                        `fila coverage.: ${s.queueSize ?? '—'} (cursor ${s.cursor ?? 0})`,
                         `intervalo.....: ${s.intervalMin} min`,
                         `itens/keyword.: ${s.limit}`,
-                        `keywords total: ${s.keywordsTotal} (posição ${s.cursor})`,
-                        `modos.........: ${modes || '—'}`,
+                        `modos.........: ${modes || 'comissão → top → recomendados'}`,
                         `execuções.....: ${s.runs}`,
                         `última........: ${fmtDateTime(s.lastRunAt)}`,
                         `próxima.......: ${fmtDateTime(s.nextRunAt)}`,
@@ -5611,30 +5675,139 @@ async function loadOffersFromSupabase(opts = {}) {
         async function importOfficialShopeeOffers() {
             const items = window.__officialOffers || [];
             if (!items.length) return showToast('Nada para importar', 'error');
-            const products = items.map((c) => ({
-                itemId: c.itemId || c.id,
-                title: c.title || c.productName || c.name,
-                image: c.imageUrl || c.image,
-                affiliateLink: c.offerLink || c.link || c.productLink,
-                productLink: c.productLink || c.offerLink || c.link,
-                keyword: 'oficial',
-                category: 'todos',
-                listType: null,
-            })).filter((p) => p.itemId && p.affiliateLink);
-            if (!products.length) return showToast('Oficiais sem itemId/link — use o Explorador', 'error');
+            let savedTotal = 0;
+            let shortTotal = 0;
+            let usedCollection = 0;
             try {
-                const res = await adminFetch(`${API_BASE}/api/ofertas/save-bulk`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ products, keyword: 'oficial' }),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                showToast(`Importadas ${data.saved || data.count || 0} ofertas oficiais${data.shortlinks?.generated ? ` · ${data.shortlinks.generated} shortlinks` : ''}`, 'success');
+                for (const c of items.slice(0, 8)) {
+                    const collectionId = c.collectionId || c.collection_id;
+                    const categoryId = c.categoryId || c.category_id;
+                    if (collectionId || categoryId) {
+                        const res = await adminFetch(`${API_BASE}/api/campanhas/import-products`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                collectionId: collectionId || undefined,
+                                categoryId: categoryId || undefined,
+                                limit: 25,
+                                keyword: 'oficial',
+                                forceCategory: /beauty|beleza|skincare/i.test(c.title || '') ? 'beleza'
+                                    : /fashion|moda|women|roupa/i.test(c.title || '') ? 'moda' : null,
+                            }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            savedTotal += data.saved || 0;
+                            shortTotal += data.shortlinks?.generated || 0;
+                            usedCollection += 1;
+                        }
+                    }
+                }
+                if (!usedCollection) {
+                    showToast('Oficiais sem collectionId — use o Explorador "Feminino + comissão"', 'error');
+                    return;
+                }
+                showToast(`Campanhas: ${savedTotal} produtos · ${shortTotal} shortlinks`, 'success');
                 loadShortlinkStatus();
+                loadCoverageReport();
+                await loadOffersFromSupabase({ silent: true, reset: true });
             } catch (err) {
                 showToast(`Import falhou: ${err.message}`, 'error');
             }
+        }
+
+        async function loadCoverageReport() {
+            const line = document.getElementById('coverage-status-line');
+            const table = document.getElementById('coverage-table');
+            if (!line || !table) return;
+            try {
+                // Leitura pública — não precisa de token (evita prompt bloqueando)
+                const res = await fetch(`${API_BASE}/api/coverage`);
+                const text = await res.text();
+                let data = null;
+                try {
+                    data = text ? JSON.parse(text) : null;
+                } catch (_) {
+                    throw new Error(
+                        res.ok
+                            ? "Resposta inválida do servidor (não é JSON). Faça deploy da versão nova ou reinicie o servidor local."
+                            : `HTTP ${res.status}: rota /api/coverage indisponível — suba o código pro GitHub/Vercel.`
+                    );
+                }
+                if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+                window.__coverageReport = data;
+                line.innerHTML = `Alvo feed <strong>${data.femalePercentTarget || 95}%</strong> feminino · <strong>${data.femaleGaps || 0}</strong> buracos femininos · <strong>${data.generalGaps || 0}</strong> gerais · ${data.totalProducts || 0} produtos`;
+                const cats = data.categories || [];
+                table.innerHTML = cats.map((c) => {
+                    const pct = c.target ? Math.min(100, Math.round((c.count / c.target) * 100)) : 100;
+                    const subs = (c.subcategories || [])
+                        .filter((s) => s.gap > 0)
+                        .slice(0, 6)
+                        .map((s) => `<span class="inline-block mr-2 text-rose-600">${escapeHtml(s.label)} ${s.count}/${s.target}</span>`)
+                        .join('');
+                    return `<div class="mb-2 border-b border-slate-50 pb-2">
+                        <div class="flex justify-between gap-2 font-bold text-slate-700">
+                            <span>${c.feminine ? '♀' : '·'} ${escapeHtml(c.label)} <span class="text-slate-400 font-normal">${c.count}/${c.target}</span></span>
+                            <button type="button" onclick="runCoverageFill('${c.id}')" class="text-[10px] text-pink-600 font-bold hover:underline">Preencher</button>
+                        </div>
+                        <div class="h-1 bg-slate-100 rounded mt-1"><div class="h-full ${pct >= 80 ? 'bg-emerald-500' : 'bg-pink-500'} rounded" style="width:${pct}%"></div></div>
+                        <div class="mt-1 text-[10px] text-slate-500">${subs || 'Subs ok'}</div>
+                    </div>`;
+                }).join('') || '<p>Sem dados de cobertura.</p>';
+            } catch (err) {
+                line.innerHTML = `<span class="text-rose-500">${escapeHtml(err.message)}</span>`;
+                if (table) table.innerHTML = '<p class="text-slate-400">Não foi possível carregar a cobertura.</p>';
+            }
+        }
+
+        async function runCoverageFill(category) {
+            const btn = document.getElementById('btn-coverage-fill');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Preenchendo…'; }
+            try {
+                const res = await adminFetch(`${API_BASE}/api/sync/coverage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ batch: 12, limit: 20, category: category || undefined }),
+                });
+                const text = await res.text();
+                let data = null;
+                try {
+                    data = text ? JSON.parse(text) : null;
+                } catch (_) {
+                    throw new Error(
+                        res.ok
+                            ? 'Resposta inválida do sync/coverage (não é JSON). Deploy da versão nova necessário.'
+                            : `HTTP ${res.status}: sync/coverage indisponível — faça deploy.`
+                    );
+                }
+                if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+                showToast(`Cobertura: ${data.saved} salvos · ${data.shortlinks?.generated || 0} shortlinks`, 'success');
+                await loadCoverageReport();
+                loadShortlinkStatus();
+                await loadOffersFromSupabase({ silent: true, reset: true });
+            } catch (err) {
+                showToast(err.message || 'Falha na cobertura', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fill-drip mr-1"></i> Preencher buracos'; }
+            }
+        }
+
+        function renderMoneyQueue() {
+            const box = document.getElementById('money-queue-box');
+            if (!box) return;
+            const list = sortByMoney(femaleOnly(productsDatabase))
+                .filter((p) => !p.shortLink)
+                .slice(0, 15);
+            if (!list.length) {
+                box.innerHTML = '<p class="text-emerald-600 font-semibold">Todos os top femininos já têm shortlink — ótimo pra comissão.</p>';
+                return;
+            }
+            box.innerHTML = `<p class="mb-2 text-slate-600">Sem shortlink · maior moneyScore (rode “Gerar tudo que falta”):</p>
+                <div class="space-y-1">${list.map((p) => `
+                    <div class="flex justify-between gap-2 border-b border-slate-50 py-1">
+                        <span class="truncate font-medium text-slate-800">${escapeHtml(p.title || '')}</span>
+                        <span class="shrink-0 text-amber-600 font-bold">${moneyScoreOf(p).toFixed(1)} · ${escapeHtml(p.commissionRate || '—')}</span>
+                    </div>`).join('')}</div>`;
         }
 
         // Unified compatibility clipboard copier helper

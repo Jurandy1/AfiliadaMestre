@@ -12,6 +12,10 @@ const LIST_TYPE_LABELS = {
   0: "Recomendados",
   1: "Maior comissão",
   2: "Top performance",
+  3: "Landing categoria",
+  4: "Detalhe categoria",
+  5: "Detalhe loja",
+  6: "Detalhe coleção",
 };
 
 const SORT_TYPE_LABELS = {
@@ -23,9 +27,9 @@ const SORT_TYPE_LABELS = {
 };
 
 const SYNC_ROTATION = [
-  { listType: 0, sortType: 2, label: "recomendados_vendidos", listTypeLabel: LIST_TYPE_LABELS[0], sortTypeLabel: SORT_TYPE_LABELS[2] },
-  { listType: 2, sortType: 2, label: "top_performance", listTypeLabel: LIST_TYPE_LABELS[2], sortTypeLabel: SORT_TYPE_LABELS[2] },
   { listType: 1, sortType: 5, label: "maior_comissao", listTypeLabel: LIST_TYPE_LABELS[1], sortTypeLabel: SORT_TYPE_LABELS[5] },
+  { listType: 2, sortType: 2, label: "top_performance", listTypeLabel: LIST_TYPE_LABELS[2], sortTypeLabel: SORT_TYPE_LABELS[2] },
+  { listType: 0, sortType: 2, label: "recomendados_vendidos", listTypeLabel: LIST_TYPE_LABELS[0], sortTypeLabel: SORT_TYPE_LABELS[2] },
 ];
 
 const MIN_RATING = Number(process.env.SYNC_MIN_RATING) || 4.0;
@@ -181,6 +185,15 @@ function parseCommissionPct(rate) {
   return n <= 1 ? n * 100 : n;
 }
 
+/** Score afiliada: comissão% × log(vendas+1) × rating — prioriza dinheiro, não só desconto. */
+function computeMoneyScore({ commissionRate, sales, ratingStar } = {}) {
+  const commissionPct = parseCommissionPct(commissionRate);
+  const salesN = parseSalesCount(sales);
+  const rating = Number(ratingStar);
+  const ratingSafe = Number.isFinite(rating) && rating > 0 ? Math.min(5, rating) : 4;
+  return Math.round(commissionPct * Math.log10(salesN + 1) * ratingSafe * 100) / 100;
+}
+
 function toUnixSec(val) {
   if (val == null || val === "") return null;
   const n = Number(val);
@@ -241,13 +254,16 @@ async function fetchProductOffers({
   page = 1,
   sortType = 2,
   listType = 0,
+  matchId = null,
+  shopId = null,
+  itemId = null,
   minRating,
   minSales,
   requireCommission,
 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
-  const safeList = [0, 1, 2].includes(Number(listType)) ? Number(listType) : 0;
+  const safeList = [0, 1, 2, 3, 4, 5, 6].includes(Number(listType)) ? Number(listType) : 0;
   const safeSort = [1, 2, 3, 4, 5].includes(Number(sortType)) ? Number(sortType) : 2;
   const kw = String(keyword || "").trim();
   const filters = normalizeQualityFilters({ minRating, minSales, requireCommission });
@@ -259,6 +275,9 @@ async function fetchProductOffers({
     `limit: ${safeLimit}`,
   ];
   if (kw) args.unshift(`keyword: ${JSON.stringify(kw)}`);
+  if (matchId != null && Number(matchId) > 0) args.push(`matchId: ${Number(matchId)}`);
+  if (shopId != null && Number(shopId) > 0) args.push(`shopId: ${Number(shopId)}`);
+  if (itemId != null && Number(itemId) > 0) args.push(`itemId: ${Number(itemId)}`);
 
   const query = `{
     productOfferV2(${args.join(", ")}) {
@@ -755,6 +774,11 @@ function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = n
   const priceMax = Number(node.priceMax) || priceMin;
   const discountPct = displayDiscountPct(node.priceDiscountRate, priceMin, priceMax);
   const ratePct = parseCommissionPct(node.commissionRate);
+  const moneyScore = computeMoneyScore({
+    commissionRate: node.commissionRate,
+    sales: node.sales,
+    ratingStar: node.ratingStar,
+  });
   const periodStart = toUnixSec(node.periodStartTime);
   const periodEnd = toUnixSec(node.periodEndTime);
   const flash = isFlashActive(periodEnd);
@@ -803,6 +827,8 @@ function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = n
     periodEnd,
     listType: listType != null ? listType : (node.listType != null ? Number(node.listType) : null),
     commissionRate: `${ratePct.toFixed(1)}%`,
+    commissionPct: ratePct,
+    moneyScore,
     sellerCommission: node.sellerCommissionRate || "—",
     shopeeCommission: node.shopeeCommissionRate || "—",
     totalCommission: node.commission != null ? `R$ ${node.commission}` : "—",
@@ -865,6 +891,9 @@ module.exports = {
   generateShortLink,
   generateBatchShortLink,
   resolveProductOriginUrl,
+  computeMoneyScore,
+  parseCommissionPct,
+  parseSalesCount,
   mapOfferToProduct,
   mapOfferToRow,
   mapCampaignNode,

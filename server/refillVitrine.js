@@ -2,18 +2,12 @@
 
 const { fetchProductOffers, mapOfferToRow } = require("./shopee");
 const { upsertOfertas, clearAllOfertas } = require("./supabase");
-const { prioritizedKeywords, roundRobinKeywords, allKeywords } = require("./categorias");
-
-const SITE_SUBID = "afiliada_mestre";
+const { prioritizedKeywords, DEFAULT_FEMALE_PERCENT } = require("./categorias");
+const { SITE_SUBID } = require("./tracking");
 
 /**
  * Limpa (opcional) e realimenta a vitrine via API Shopee.
- * @param {object} opts
- * @param {boolean} [opts.clear=true]
- * @param {number} [opts.limit=50] itens por página na API
- * @param {number} [opts.pages=2] páginas por keyword
- * @param {number} [opts.maxItems=0] para ao atingir N itens únicos (0 = sem limite)
- * @param {number} [opts.gapMs=250] intervalo entre requisições
+ * Usa keywords priorizadas ~95% feminino.
  */
 async function refillVitrine({
   clear = true,
@@ -27,14 +21,18 @@ async function refillVitrine({
   const cap = Math.min(Math.max(Number(maxItems) || 0, 0), 10000);
 
   const removed = clear ? await clearAllOfertas() : 0;
-  const keywords = cap > 0 ? roundRobinKeywords() : allKeywords();
+  const keywords = prioritizedKeywords({ femalePercent: DEFAULT_FEMALE_PERCENT });
+  if (cap > 0) {
+    const maxKw = Math.max(20, Math.ceil(cap / Math.max(1, syncLimit)));
+    if (keywords.length > maxKw) keywords.length = maxKw;
+  }
   const report = [];
   const map = new Map();
   const byCategory = {};
   let keywordsRun = 0;
   let stoppedEarly = false;
 
-  for (const { keyword, category } of keywords) {
+  for (const { keyword, category, subcategory } of keywords) {
     if (cap > 0 && map.size >= cap) {
       stoppedEarly = true;
       break;
@@ -54,12 +52,18 @@ async function refillVitrine({
           keyword,
           limit: syncLimit,
           page,
-          listType: 0,
-          sortType: 2,
+          listType: 1,
+          sortType: 5,
+          requireCommission: true,
         });
         const nodes = offer.nodes || [];
         const rows = nodes
-          .map((n) => mapOfferToRow(n, keyword, 0))
+          .map((n) =>
+            mapOfferToRow(n, keyword, 1, {
+              forceCategory: category || null,
+              forceSubcategory: subcategory || null,
+            })
+          )
           .filter((r) => r.item_id && r.offer_link);
 
         if (rows.length) {

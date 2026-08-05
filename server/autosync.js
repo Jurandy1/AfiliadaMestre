@@ -1,17 +1,25 @@
 "use strict";
 
-// Alimentação automática leve (free-tier).
-// Rotaciona listType/sortType: recomendados+vendidos → top performance → maior comissão.
+// Alimentação automática — fila de cobertura 95% feminino / 5% geral.
+// Prioriza buracos em moda/beleza e listType comissão + top performance.
 
-const { fetchProductOffers, mapOfferToRow, SYNC_ROTATION, generateShortLink } = require("./shopee");
-const { upsertOfertas, pruneOlderThan, listOffersMissingShortlink, updateShortLink } = require("./supabase");
-const { allKeywords } = require("./categorias");
+const {
+  fetchProductOffers,
+  mapOfferToRow,
+  SYNC_ROTATION,
+  generateShortLink,
+} = require("./shopee");
+const {
+  upsertOfertas,
+  pruneOlderThan,
+  listOffersMissingShortlink,
+  updateShortLink,
+} = require("./supabase");
 const { buildProductSubIds } = require("./tracking");
+const { buildCoverageQueue, DEFAULT_FEMALE_PERCENT } = require("./coverage");
+const { resolveProductOriginUrl } = require("./shopee");
 
-// Alimenta TODAS as categorias de forma justa (round-robin).
-// A proporção 90% feminina é aplicada só na exibição da vitrine.
-const FEMALE_PERCENT = 90;
-const KEYWORDS = allKeywords();
+const FEMALE_PERCENT = clampNum(process.env.AUTO_SYNC_FEMALE_PERCENT, DEFAULT_FEMALE_PERCENT, 80, 99);
 
 const config = {
   enabled: /^(1|true|on|yes)$/i.test(String(process.env.AUTO_SYNC ?? "0")),
@@ -21,6 +29,7 @@ const config = {
   pruneDays: clampNum(process.env.AUTO_PRUNE_DAYS, 60, 0, 365),
   requestGapMs: clampNum(process.env.AUTO_SYNC_GAP_MS, 400, 100, 5000),
   shortlinkBackfillPerRun: clampNum(process.env.AUTO_SYNC_SHORTLINKS, 15, 0, 100),
+  femalePercent: FEMALE_PERCENT,
 };
 
 const state = {
@@ -30,6 +39,8 @@ const state = {
   lastPruneAt: null,
   cursor: 0,
   rotationCursor: 0,
+  queue: [],
+  queueBuiltAt: 0,
   runs: 0,
   totalUpserts: 0,
   lastResult: null,
@@ -58,13 +69,24 @@ function nextMode() {
   return mode;
 }
 
+async function ensureQueue(force = false) {
+  const stale = Date.now() - state.queueBuiltAt > 30 * 60 * 1000;
+  if (!force && state.queue.length && !stale && state.cursor < state.queue.length) {
+    return state.queue;
+  }
+  const { queue } = await buildCoverageQueue({ femalePercent: config.femalePercent });
+  state.queue = queue;
+  state.queueBuiltAt = Date.now();
+  state.cursor = 0;
+  return state.queue;
+}
+
 async function runOnce({ manual = false, forceMode = null } = {}) {
   if (state.running) return { skipped: "already-running" };
   if (!credsReady()) {
     state.lastError = "Credenciais Shopee/Supabase ausentes";
     return { skipped: "no-creds" };
   }
-  if (!KEYWORDS.length) return { skipped: "no-keywords" };
 
   state.running = true;
   const startedAt = new Date();
@@ -73,10 +95,19 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
   const mode = forceMode || nextMode();
 
   try {
+    const queue = await ensureQueue(manual);
+    if (!queue.length) {
+      state.lastError = null;
+      state.lastResult = { ok: true, processed: [], upserts: 0, note: "fila vazia" };
+      return state.lastResult;
+    }
+
     for (let i = 0; i < config.batch; i++) {
-      const idx = state.cursor % KEYWORDS.length;
-      const { keyword, category } = KEYWORDS[idx];
-      state.cursor = (state.cursor + 1) % KEYWORDS.length;
+      if (!queue.length) break;
+      const idx = state.cursor % queue.length;
+      const job = queue[idx];
+      state.cursor = (state.cursor + 1) % Math.max(1, queue.length);
+      const { keyword, category, subcategory } = job;
       try {
         const offer = await fetchProductOffers({
           keyword,
@@ -84,19 +115,29 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           page: 1,
           listType: mode.listType,
           sortType: mode.sortType,
+          minRating: 4,
+          requireCommission: true,
         });
         const nodes = offer.nodes || [];
         const rows = nodes
-          .map((n) => mapOfferToRow(n, keyword, mode.listType))
+          .map((n) =>
+            mapOfferToRow(n, keyword, mode.listType, {
+              forceCategory: category || null,
+              forceSubcategory: subcategory || null,
+            })
+          )
           .filter((r) => r.item_id && r.offer_link);
+
         if (rows.length) {
           await upsertOfertas(rows);
           upserts += rows.length;
+          state.totalUpserts += rows.length;
         }
         processed.push({
           keyword,
           category,
-          audience: KEYWORDS[idx].audience,
+          subcategory,
+          audience: job.audience,
           ok: true,
           count: rows.length,
           mode: mode.label,
@@ -104,21 +145,25 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           sortType: mode.sortType,
         });
       } catch (e) {
-        processed.push({ keyword, category, ok: false, error: e.message, mode: mode.label });
+        processed.push({
+          keyword,
+          category,
+          subcategory,
+          ok: false,
+          error: e.message,
+          mode: mode.label,
+        });
         state.lastError = e.message;
       }
       if (i < config.batch - 1) await sleep(config.requestGapMs);
     }
 
-    // Gera shortlinks para as ofertas mais recentes sem short_link cacheado.
-    // Assim, quando um visitante clica em "Comprar", o link já está pronto.
     let shortlinksGenerated = 0;
     if (config.shortlinkBackfillPerRun > 0) {
       try {
         const missing = await listOffersMissingShortlink({ limit: config.shortlinkBackfillPerRun });
         for (const row of Array.isArray(missing) ? missing : []) {
-          // product_link (URL cru) obrigatório — offer_link já vem encurtado.
-          const origin = row.product_link || row.offer_link;
+          const origin = resolveProductOriginUrl(row) || row.product_link || row.offer_link;
           if (!origin) continue;
           try {
             const subIds = buildProductSubIds(row.category, row.item_id, row.subcategory);
@@ -141,45 +186,76 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
     }
 
     if (config.pruneDays > 0) {
-      const dayMs = 24 * 60 * 60 * 1000;
-      const canPrune = !state.lastPruneAt || Date.now() - new Date(state.lastPruneAt).getTime() > dayMs;
-      if (canPrune) {
-        try {
-          const removed = await pruneOlderThan(config.pruneDays);
-          state.lastPruneAt = new Date().toISOString();
-          if (removed) console.log(`[autosync] prune: ${removed} ofertas antigas removidas`);
-        } catch (e) {
-          console.warn("[autosync] prune falhou:", e.message);
-        }
+      try {
+        const removed = await pruneOlderThan(config.pruneDays);
+        state.lastPruneAt = new Date().toISOString();
+        if (removed) console.log(`[autosync] prune: ${removed} ofertas antigas`);
+      } catch (e) {
+        console.warn("[autosync] prune falhou:", e.message);
       }
     }
 
     state.runs += 1;
-    state.totalUpserts += upserts;
     state.lastRunAt = startedAt.toISOString();
-    state.lastResult = { manual, upserts, mode: mode.label, processed, shortlinksGenerated };
-    console.log(`[autosync] run #${state.runs} [${mode.label}]: ${upserts} upserts (${processed.length} keywords)`);
+    state.lastError = null;
+    state.lastResult = {
+      ok: true,
+      manual,
+      mode: mode.label,
+      listType: mode.listType,
+      sortType: mode.sortType,
+      femalePercentTarget: config.femalePercent,
+      feedMode: "coverage-95-5",
+      processed,
+      upserts,
+      shortlinksGenerated,
+      queueSize: queue.length,
+      cursor: state.cursor,
+      durationMs: Date.now() - startedAt.getTime(),
+    };
+    console.log(
+      `[autosync] ${mode.label} upserts=${upserts} batch=${processed.length} female%=${config.femalePercent}`
+    );
     return state.lastResult;
+  } catch (err) {
+    state.lastError = err.message;
+    state.lastResult = { ok: false, error: err.message };
+    throw err;
   } finally {
     state.running = false;
-    scheduleNext();
+    if (config.enabled) {
+      state.nextRunAt = new Date(Date.now() + config.intervalMin * 60 * 1000).toISOString();
+    }
   }
 }
 
-/** Força um lote Top Performance (listType 2). */
-async function runTopPerformance({ manual = true } = {}) {
+async function runTopPerformance() {
   return runOnce({
-    manual,
+    manual: true,
     forceMode: { listType: 2, sortType: 2, label: "top_performance" },
   });
 }
 
-function scheduleNext() {
-  if (!config.enabled) return;
-  if (timer) clearTimeout(timer);
-  const ms = config.intervalMin * 60 * 1000;
-  state.nextRunAt = new Date(Date.now() + ms).toISOString();
-  timer = setTimeout(() => runOnce().catch((e) => console.error("[autosync]", e.message)), ms);
+function getStatus() {
+  return {
+    enabled: config.enabled,
+    running: state.running,
+    intervalMin: config.intervalMin,
+    batch: config.batch,
+    limit: config.limit,
+    femalePercentTarget: config.femalePercent,
+    feedMode: "coverage-95-5",
+    homePolicy: "100% feminino",
+    queueSize: state.queue.length,
+    cursor: state.cursor,
+    lastRunAt: state.lastRunAt,
+    nextRunAt: state.nextRunAt,
+    lastPruneAt: state.lastPruneAt,
+    runs: state.runs,
+    totalUpserts: state.totalUpserts,
+    lastError: state.lastError,
+    lastResult: state.lastResult,
+  };
 }
 
 function start() {
@@ -187,39 +263,31 @@ function start() {
     console.log("[autosync] desativado (AUTO_SYNC=0)");
     return;
   }
-  if (!credsReady()) {
-    console.log("[autosync] aguardando credenciais no .env — não iniciado");
-    return;
-  }
-  console.log(
-    `[autosync] ativo: lote=${config.batch} keyword(s) a cada ${config.intervalMin}min ` +
-    `(limit=${config.limit}, keywords=${KEYWORDS.length}, modos=${SYNC_ROTATION.map((m) => m.label).join("|")})`
-  );
-  setTimeout(() => runOnce().catch((e) => console.error("[autosync]", e.message)), 20000);
-  scheduleNext();
+  if (timer) return;
+  const ms = config.intervalMin * 60 * 1000;
+  console.log(`[autosync] ativo a cada ${config.intervalMin}min · feed ${config.femalePercent}% feminino`);
+  state.nextRunAt = new Date(Date.now() + ms).toISOString();
+  timer = setInterval(() => {
+    runOnce().catch((e) => console.error("[autosync]", e.message));
+  }, ms);
+  // primeira rodada após 20s
+  setTimeout(() => {
+    runOnce().catch((e) => console.error("[autosync]", e.message));
+  }, 20000);
 }
 
-function status() {
-  return {
-    enabled: config.enabled,
-    running: state.running,
-    intervalMin: config.intervalMin,
-    batch: config.batch,
-    limit: config.limit,
-    pruneDays: config.pruneDays,
-    keywordsTotal: KEYWORDS.length,
-    femalePercentTarget: FEMALE_PERCENT,
-    cursor: state.cursor,
-    rotationCursor: state.rotationCursor,
-    modes: SYNC_ROTATION,
-    runs: state.runs,
-    totalUpserts: state.totalUpserts,
-    lastRunAt: state.lastRunAt,
-    nextRunAt: state.nextRunAt,
-    lastPruneAt: state.lastPruneAt,
-    lastError: state.lastError,
-    lastResult: state.lastResult,
-  };
+function stop() {
+  if (timer) clearInterval(timer);
+  timer = null;
 }
 
-module.exports = { start, runOnce, runTopPerformance, status, config };
+module.exports = {
+  config,
+  start,
+  stop,
+  runOnce,
+  runTopPerformance,
+  getStatus,
+  status: getStatus,
+  ensureQueue,
+};
