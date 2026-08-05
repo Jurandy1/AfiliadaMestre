@@ -213,28 +213,32 @@ function normalizeQualityFilters({
   minRating = MIN_RATING,
   minSales = 0,
   requireCommission = false,
+  minCommissionPct = 0,
 } = {}) {
   const rating = Number(minRating);
   const sales = Number(minSales);
+  const minComm = Number(minCommissionPct);
   return {
     minRating: Number.isFinite(rating) && rating > 0 ? rating : MIN_RATING,
     minSales: Number.isFinite(sales) && sales > 0 ? sales : 0,
     requireCommission: !!requireCommission,
+    minCommissionPct: Number.isFinite(minComm) && minComm > 0 ? minComm : 0,
   };
 }
 
 function isQualityOffer(node, filters = {}) {
   if (!node || !node.offerLink) return false;
   if (!node.itemId) return false;
-  const { minRating, minSales, requireCommission } = normalizeQualityFilters(filters);
+  const { minRating, minSales, requireCommission, minCommissionPct } = normalizeQualityFilters(filters);
   const rating = Number(node.ratingStar);
   if (Number.isFinite(rating) && rating > 0 && rating < minRating) return false;
   if (minSales > 0 && parseSalesCount(node.sales) < minSales) return false;
+  const rate = parseCommissionPct(node.commissionRate);
   if (requireCommission) {
-    const rate = parseCommissionPct(node.commissionRate);
     const commissionVal = Number(node.commission);
     if (!(rate > 0 || (Number.isFinite(commissionVal) && commissionVal > 0))) return false;
   }
+  if (minCommissionPct > 0 && rate < minCommissionPct) return false;
   return true;
 }
 
@@ -260,13 +264,14 @@ async function fetchProductOffers({
   minRating,
   minSales,
   requireCommission,
+  minCommissionPct,
 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const safePage = Math.max(Number(page) || 1, 1);
   const safeList = [0, 1, 2, 3, 4, 5, 6].includes(Number(listType)) ? Number(listType) : 0;
   const safeSort = [1, 2, 3, 4, 5].includes(Number(sortType)) ? Number(sortType) : 2;
   const kw = String(keyword || "").trim();
-  const filters = normalizeQualityFilters({ minRating, minSales, requireCommission });
+  const filters = normalizeQualityFilters({ minRating, minSales, requireCommission, minCommissionPct });
 
   const args = [
     `listType: ${safeList}`,
@@ -322,6 +327,8 @@ async function fetchProductOffers({
     listTypeLabel: listTypeLabel(safeList),
     sortTypeLabel: sortTypeLabel(safeSort),
     filters,
+    matchId: matchId != null ? Number(matchId) : null,
+    shopId: shopId != null ? Number(shopId) : null,
   };
 }
 
@@ -336,18 +343,24 @@ async function fetchProductOffersBatch({
   limit = 20,
   listType = 0,
   sortType = 2,
+  matchId = null,
+  shopId = null,
   minRating,
   minSales,
   requireCommission,
+  minCommissionPct,
   gapMs = DEFAULT_BATCH_GAP_MS,
   onProgress,
   signal,
 } = {}) {
-  const kws = [...new Set(
+  const hasMatch = matchId != null && Number(matchId) > 0;
+  const hasShop = shopId != null && Number(shopId) > 0;
+  let kws = [...new Set(
     (Array.isArray(keywords) ? keywords : String(keywords || "").split(/[\n,;]+/))
       .map((k) => String(k || "").trim())
       .filter(Boolean)
   )].slice(0, 40);
+  if (!kws.length && (hasMatch || hasShop)) kws = [""];
   const start = Math.max(1, Number(pageStart) || 1);
   const pageCount = Math.min(Math.max(Number(pages) || 1, 1), 10);
   const pageNums = Array.from({ length: pageCount }, (_, i) => start + i);
@@ -380,15 +393,19 @@ async function fetchProductOffersBatch({
         };
       }
       try {
+        const labelKw = keyword || (hasShop ? `shop:${shopId}` : hasMatch ? `match:${matchId}` : "oferta");
         const offer = await fetchProductOffers({
           keyword,
           limit,
           page,
           listType,
           sortType,
+          matchId: hasMatch ? Number(matchId) : null,
+          shopId: hasShop ? Number(shopId) : null,
           minRating,
           minSales,
           requireCommission,
+          minCommissionPct,
         });
         lastListType = offer.listType;
         lastSortType = offer.sortType;
@@ -399,13 +416,13 @@ async function fetchProductOffersBatch({
         for (const n of nodes) {
           const id = String(n.itemId);
           if (!id || byId.has(id)) continue;
-          const product = mapOfferToProduct(n, keyword, offer.listType);
+          const product = mapOfferToProduct(n, labelKw, offer.listType);
           product._node = n;
           byId.set(id, product);
           added += 1;
         }
         report.push({
-          keyword,
+          keyword: labelKw,
           page,
           ok: true,
           count: nodes.length,
@@ -415,7 +432,7 @@ async function fetchProductOffersBatch({
         });
       } catch (e) {
         report.push({
-          keyword,
+          keyword: keyword || (hasShop ? `shop:${shopId}` : `match:${matchId}`),
           page,
           ok: false,
           error: e.message,
@@ -441,7 +458,7 @@ async function fetchProductOffersBatch({
 
   return {
     aborted: false,
-    keywords: kws,
+    keywords: kws.filter(Boolean),
     pages: pageNums,
     count: products.length,
     filteredOut,
@@ -450,6 +467,8 @@ async function fetchProductOffersBatch({
     sortType: Number(lastSortType),
     listTypeLabel: listTypeLabel(lastListType),
     sortTypeLabel: sortTypeLabel(lastSortType),
+    matchId: hasMatch ? Number(matchId) : null,
+    shopId: hasShop ? Number(shopId) : null,
     report,
     products,
     nodes,

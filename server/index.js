@@ -128,6 +128,9 @@ app.get("/api/ofertas", async (req, res) => {
     const minRating = req.query.minRating != null ? Number(req.query.minRating) : MIN_RATING;
     const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
     const requireCommission = req.query.requireCommission === "1" || req.query.requireCommission === "true";
+    const minCommissionPct = req.query.minCommissionPct != null ? Number(req.query.minCommissionPct) : 0;
+    const matchId = req.query.matchId != null ? Number(req.query.matchId) : null;
+    const shopId = req.query.shopId != null ? Number(req.query.shopId) : null;
 
     const offer = await fetchProductOffers({
       keyword,
@@ -135,9 +138,12 @@ app.get("/api/ofertas", async (req, res) => {
       page,
       listType,
       sortType,
+      matchId,
+      shopId,
       minRating,
       minSales,
       requireCommission,
+      minCommissionPct,
     });
     const nodes = offer.nodes || [];
     const products = nodes.map((n) => mapOfferToProduct(n, keyword, offer.listType));
@@ -200,12 +206,20 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
     const minRating = body.minRating != null ? Number(body.minRating) : MIN_RATING;
     const minSales = body.minSales != null ? Number(body.minSales) : 0;
     const requireCommission = !!body.requireCommission;
+    const minCommissionPct = body.minCommissionPct != null ? Number(body.minCommissionPct) : 0;
+    const matchId = body.matchId != null ? Number(body.matchId) : null;
+    const shopId = body.shopId != null ? Number(body.shopId) : null;
     const sync = body.sync === true || body.sync === 1 || body.sync === "1";
     const gapMs = body.gapMs != null ? Number(body.gapMs) : DEFAULT_BATCH_GAP_MS;
 
     const cleaned = keywords.map((k) => String(k || "").trim()).filter(Boolean);
-    if (!cleaned.length) {
-      return res.status(400).json({ error: "Informe ao menos uma keyword", code: "NO_KEYWORDS" });
+    const hasMatch = Number.isFinite(matchId) && matchId > 0;
+    const hasShop = Number.isFinite(shopId) && shopId > 0;
+    if (!cleaned.length && !hasMatch && !hasShop) {
+      return res.status(400).json({
+        error: "Informe keyword(s), ou matchId (coleção/categoria), ou shopId (loja)",
+        code: "NO_KEYWORDS",
+      });
     }
 
     const batch = await fetchProductOffersBatch({
@@ -215,9 +229,12 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
       limit,
       listType,
       sortType,
+      matchId: hasMatch ? matchId : null,
+      shopId: hasShop ? shopId : null,
       minRating,
       minSales,
       requireCommission,
+      minCommissionPct,
       gapMs,
     });
 

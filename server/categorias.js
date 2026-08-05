@@ -15,7 +15,9 @@ const FEMININE_CATEGORY_IDS = new Set([
   "acessorios",
   "fitness",
   "maternidade",
+  "saude",
   "casa",
+  "presentes",
   "pet",
   "infantil",
 ]);
@@ -27,11 +29,13 @@ const HOME_CATEGORY_ORDER = [
   "acessorios",
   "fitness",
   "maternidade",
+  "saude",
   "casa",
-  "celular",
-  "eletronicos",
+  "presentes",
   "pet",
   "infantil",
+  "celular",
+  "eletronicos",
   "utilidades",
   "automotivo",
 ];
@@ -172,8 +176,41 @@ const CATEGORIAS = [
       },
       {
         id: "maternidade_roupa",
-        label: "Maternidade",
-        keywords: ["roupa gestante", "conjunto maternidade", "sutiã amamentacao", "macacao bebe feminino"],
+        label: "Gestante",
+        keywords: ["roupa gestante", "conjunto maternidade", "sutiã amamentacao", "calca gestante", "camisola amamentacao"],
+      },
+      {
+        id: "higiene_bebe",
+        label: "Higiene Bebê",
+        keywords: ["fralda bebe", "lenço umedecido bebe", "pomada assadura", "shampoo bebe", "kit higiene bebe"],
+      },
+      {
+        id: "enxoval",
+        label: "Enxoval",
+        keywords: ["kit enxoval bebe menina", "manta bebe", "trocador portatil", "bolsa maternidade", "macacao bebe feminino"],
+      },
+    ],
+  },
+  {
+    id: "saude",
+    label: "Saúde & Bem-estar",
+    icon: "fa-heart-pulse",
+    color: "rose",
+    subcategories: [
+      {
+        id: "suplementos",
+        label: "Suplementos",
+        keywords: ["colageno hidrolisado", "vitamina c mulher", "omega 3", "multivitaminico feminino", "whey protein feminino"],
+      },
+      {
+        id: "cuidado_pessoal",
+        label: "Cuidado Pessoal",
+        keywords: ["depilador feminino", "aparelho depilacao", "creme hidratante corporal", "protetor labial"],
+      },
+      {
+        id: "higiene_intima",
+        label: "Higiene Íntima",
+        keywords: ["absorvente noturno", "protetor diario feminino", "sabonete intimo", "kit higiene intima"],
       },
     ],
   },
@@ -356,6 +393,29 @@ const CATEGORIAS = [
     ],
   },
   {
+    id: "presentes",
+    label: "Presentes & Papelaria",
+    icon: "fa-gift",
+    color: "fuchsia",
+    subcategories: [
+      {
+        id: "papelaria",
+        label: "Papelaria Aesthetic",
+        keywords: ["caderno aesthetic", "caneta gel kit", "planner feminino", "adesivo scrapbook", "washi tape kit"],
+      },
+      {
+        id: "presentes_fem",
+        label: "Presentes",
+        keywords: ["kit presente feminino", "caixa presente mulher", "kit spa presente", "caneca personalizada feminina"],
+      },
+      {
+        id: "viagem",
+        label: "Viagem",
+        keywords: ["necessaire viagem feminina", "organizador mala", "travesseiro viagem", "kit viagem feminino"],
+      },
+    ],
+  },
+  {
     id: "utilidades",
     label: "Utilidades",
     icon: "fa-tools",
@@ -374,7 +434,6 @@ const CATEGORIAS = [
         label: "Dia a dia",
         keywords: [
           "garrafa termica feminina",
-          "necessaire viagem",
           "guarda chuva compacto",
           { q: "balanca digital", audience: "geral" },
         ],

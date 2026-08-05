@@ -20,7 +20,7 @@ const MIN_PER_SUB_GENERAL = clampNum(process.env.COVERAGE_MIN_SUB_GENERAL, 3, 1,
 const MIN_PER_CAT_FEMALE = clampNum(process.env.COVERAGE_MIN_CAT_FEMALE, 40, 8, 200);
 const MIN_PER_CAT_GENERAL = clampNum(process.env.COVERAGE_MIN_CAT_GENERAL, 12, 3, 80);
 
-const PRIORITY_CATS = ["moda", "beleza", "acessorios", "fitness", "maternidade", "casa"];
+const PRIORITY_CATS = ["moda", "beleza", "acessorios", "fitness", "maternidade", "saude", "casa", "presentes"];
 
 function clampNum(v, def, min, max) {
   const n = Number(v);

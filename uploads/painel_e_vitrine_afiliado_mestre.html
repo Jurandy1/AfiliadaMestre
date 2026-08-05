@@ -562,18 +562,37 @@
                     </div>
                 </div>
 
-                <!-- Fila dinheiro (maior comissão feminina sem shortlink) -->
+                <!-- Fila dinheiro: top comissão com ações reais -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-coins text-amber-500 mr-1"></i> Mais dinheiro agora</h4>
-                            <p class="text-[10px] text-slate-500 mt-1">Top femininos por score de comissão — priorize shortlink neles</p>
+                            <p class="text-[10px] text-slate-500 mt-1">Top femininos por comissão × vendas × nota — shortlink, copiar e abrir na Shopee</p>
                         </div>
-                        <button type="button" onclick="renderMoneyQueue()" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600">
-                            <i class="fas fa-chart-line mr-1"></i> Ver top comissão
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="renderMoneyQueue()" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600">
+                                <i class="fas fa-chart-line mr-1"></i> Atualizar top
+                            </button>
+                            <button type="button" onclick="moneyQueueShortlinkTop()" class="px-3 py-2 rounded-lg bg-slate-800 text-white text-[11px] font-bold hover:bg-slate-700">
+                                <i class="fas fa-bolt mr-1"></i> Shortlink no top
+                            </button>
+                        </div>
+                    </div>
+                    <div id="money-queue-box" class="p-4 text-[11px] text-slate-400">Clique em Atualizar top para listar os produtos com maior potencial de comissão.</div>
+                </div>
+
+                <!-- Categorias da vitrine (mapa real do servidor) -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-layer-group text-pink-500 mr-1"></i> Categorias</h4>
+                            <p class="text-[10px] text-slate-500 mt-1">Mapa oficial da vitrine · carrega keywords no Explorador · sync por cat</p>
+                        </div>
+                        <button type="button" onclick="renderAdminCategoriesPanel()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">
+                            <i class="fas fa-sync mr-1"></i> Atualizar
                         </button>
                     </div>
-                    <div id="money-queue-box" class="p-4 text-[11px] text-slate-400">Clique para listar os produtos femininos com maior potencial de comissão.</div>
+                    <div id="admin-categories-panel" class="p-4 text-[11px] text-slate-400 max-h-80 overflow-y-auto">Carregando categorias…</div>
                 </div>
 
                 <!-- Ofertas oficiais Shopee -->
@@ -602,34 +621,39 @@
                             <button type="button" data-preset="bestsellers" onclick="applyExplorerPreset('bestsellers')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Mais vendidos</button>
                             <button type="button" data-preset="topperf" onclick="applyExplorerPreset('topperf')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Top performance</button>
                             <button type="button" data-preset="commission" onclick="applyExplorerPreset('commission')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Maior comissão</button>
+                            <button type="button" data-preset="collection" onclick="applyExplorerPreset('collection')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Coleção (matchId)</button>
+                            <button type="button" data-preset="shop" onclick="applyExplorerPreset('shop')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Loja (shopId)</button>
                             <button type="button" data-preset="rated" onclick="applyExplorerPreset('rated')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Bem avaliados</button>
-                            <button type="button" data-preset="popular" onclick="applyExplorerPreset('popular')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Populares</button>
                             <button type="button" data-preset="budget" onclick="applyExplorerPreset('budget')" class="explorer-preset px-2.5 py-1 rounded-md bg-white/10 hover:bg-shopee-orange text-white text-[10px] font-bold border border-white/10">Custo-benefício</button>
                         </div>
                     </div>
                     <div class="p-4 space-y-3 text-xs">
                         <div>
-                            <label class="block text-slate-600 font-bold mb-1">Palavras-chave <span class="font-semibold text-slate-400">(vírgula ou uma por linha)</span></label>
-                            <textarea id="admin-keyword" oninput="updateExplorerKwCount()" rows="2" placeholder="ex: vestido longo, blusa cropped, tênis feminino" class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-shopee-orange focus:ring-1 focus:ring-shopee-orange/30 resize-y min-h-[64px]">fone bluetooth</textarea>
-                            <p class="text-[10px] text-slate-400 mt-1" id="explorer-kw-count">1 keyword</p>
+                            <label class="block text-slate-600 font-bold mb-1">Palavras-chave <span class="font-semibold text-slate-400">(vírgula ou uma por linha · opcional se usar matchId/shopId)</span></label>
+                            <textarea id="admin-keyword" oninput="updateExplorerKwCount()" rows="2" placeholder="ex: vestido longo feminino, kit skincare, perfume feminino" class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-shopee-orange focus:ring-1 focus:ring-shopee-orange/30 resize-y min-h-[64px]">vestido longo feminino, kit skincare, bolsa transversal feminina, perfume feminino</textarea>
+                            <p class="text-[10px] text-slate-400 mt-1" id="explorer-kw-count">4 keywords</p>
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
                                 <label class="block text-slate-600 font-bold mb-1">Tipo de lista</label>
                                 <select id="admin-list-type" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" onchange="updateExplorerModeHint()">
-                                    <option value="0" selected>0 — Recomendados</option>
-                                    <option value="1">1 — Maior comissão</option>
+                                    <option value="0">0 — Recomendados</option>
+                                    <option value="1" selected>1 — Maior comissão</option>
                                     <option value="2">2 — Top performance</option>
+                                    <option value="3">3 — Landing categoria</option>
+                                    <option value="4">4 — Detalhe categoria</option>
+                                    <option value="5">5 — Detalhe loja</option>
+                                    <option value="6">6 — Detalhe coleção</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="block text-slate-600 font-bold mb-1">Ordenação</label>
                                 <select id="admin-sort-type" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" onchange="updateExplorerModeHint()">
                                     <option value="1">1 — Relevância</option>
-                                    <option value="2" selected>2 — Mais vendidos</option>
+                                    <option value="2">2 — Mais vendidos</option>
                                     <option value="3">3 — Maior preço</option>
                                     <option value="4">4 — Menor preço</option>
-                                    <option value="5">5 — Maior comissão</option>
+                                    <option value="5" selected>5 — Maior comissão</option>
                                 </select>
                             </div>
                             <div>
@@ -651,8 +675,25 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">matchId <span class="font-normal text-slate-400">(cat/coleção)</span></label>
+                                <input type="number" id="admin-match-id" min="1" placeholder="ex: collectionId" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" oninput="updateExplorerModeHint()">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">shopId <span class="font-normal text-slate-400">(loja)</span></label>
+                                <input type="number" id="admin-shop-id" min="1" placeholder="ID da loja Shopee" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange" oninput="updateExplorerModeHint()">
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Comissão mín. %</label>
+                                <input type="number" id="admin-min-commission" min="0" max="100" step="0.5" value="0" placeholder="0" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                            </div>
+                            <div class="flex items-end">
+                                <p class="text-[10px] text-slate-500 leading-snug">listType <strong>4/6</strong> → matchId · <strong>5</strong> → shopId (vem das Ofertas oficiais)</p>
+                            </div>
+                        </div>
                         <p class="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2" id="explorer-mode-hint">
-                            Modo: <strong class="text-slate-700">Recomendados</strong> · ordenado por <strong class="text-slate-700">Mais vendidos</strong>
+                            Modo: <strong class="text-slate-700">Maior comissão</strong> · ordenado por <strong class="text-slate-700">Maior comissão</strong>
                         </p>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
@@ -661,11 +702,11 @@
                             </div>
                             <div>
                                 <label class="block text-slate-600 font-bold mb-1">Vendas mín.</label>
-                                <input type="number" id="admin-min-sales" min="0" step="1" value="0" placeholder="0" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
+                                <input type="number" id="admin-min-sales" min="0" step="1" value="20" placeholder="0" class="w-full p-2 border border-slate-200 rounded-lg focus:outline-shopee-orange">
                             </div>
                             <div class="flex items-end">
                                 <label class="flex items-center gap-2 p-2 border border-slate-200 rounded-lg w-full cursor-pointer hover:bg-slate-50">
-                                    <input type="checkbox" id="admin-require-commission" class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange">
+                                    <input type="checkbox" id="admin-require-commission" checked class="rounded border-slate-300 text-shopee-orange focus:ring-shopee-orange">
                                     <span class="font-bold text-slate-600 leading-tight">Exigir comissão</span>
                                 </label>
                             </div>
@@ -1550,7 +1591,14 @@
             ] },
             { id: 'maternidade', label: 'Mãe & Bebê', icon: 'fa-baby', color: 'rose', count: 0, subcategories: [
                 { id: 'bebe_menina', label: 'Bebê Menina', count: 0 },
-                { id: 'maternidade_roupa', label: 'Maternidade', count: 0 }
+                { id: 'maternidade_roupa', label: 'Gestante', count: 0 },
+                { id: 'higiene_bebe', label: 'Higiene Bebê', count: 0 },
+                { id: 'enxoval', label: 'Enxoval', count: 0 }
+            ] },
+            { id: 'saude', label: 'Saúde & Bem-estar', icon: 'fa-heart-pulse', color: 'rose', count: 0, subcategories: [
+                { id: 'suplementos', label: 'Suplementos', count: 0 },
+                { id: 'cuidado_pessoal', label: 'Cuidado Pessoal', count: 0 },
+                { id: 'higiene_intima', label: 'Higiene Íntima', count: 0 }
             ] },
             { id: 'casa', label: 'Casa', icon: 'fa-couch', color: 'amber', count: 0, subcategories: [
                 { id: 'cozinha', label: 'Cozinha', count: 0 },
@@ -1579,6 +1627,11 @@
                 { id: 'brinquedos', label: 'Brinquedos', count: 0 },
                 { id: 'roupa_infantil', label: 'Roupas & Calçados', count: 0 },
                 { id: 'escola', label: 'Escola', count: 0 }
+            ] },
+            { id: 'presentes', label: 'Presentes & Papelaria', icon: 'fa-gift', color: 'fuchsia', count: 0, subcategories: [
+                { id: 'papelaria', label: 'Papelaria Aesthetic', count: 0 },
+                { id: 'presentes_fem', label: 'Presentes', count: 0 },
+                { id: 'viagem', label: 'Viagem', count: 0 }
             ] },
             { id: 'utilidades', label: 'Utilidades', icon: 'fa-tools', color: 'teal', count: 0, subcategories: [
                 { id: 'ferramentas', label: 'Ferramentas', count: 0 },
@@ -1702,6 +1755,8 @@
             loadShortlinkStatus();
             loadCoverageReport();
             loadAutoStatus();
+            renderAdminCategoriesPanel();
+            setTimeout(() => renderMoneyQueue(), 800);
 
             const parts = pathClean().split("/").filter(Boolean);
             let view = parts[1] || "dashboard";
@@ -2050,36 +2105,43 @@
         // ---- Explorador Shopee (Catálogo & Sync) ----
         const EXPLORER_PRESETS = {
             female_money: {
-                listType: 1, sortType: 5, minRating: 4.0, minSales: 20, requireCommission: true,
-                keywords: "vestido longo feminino, kit skincare, bolsa transversal feminina, conjunto fitness feminino, perfume feminino, sandalia feminina, lingerie feminina",
+                listType: 1, sortType: 5, minRating: 4.0, minSales: 20, requireCommission: true, minCommissionPct: 5,
+                keywords: "vestido longo feminino, kit skincare, bolsa transversal feminina, conjunto fitness feminino, perfume feminino, sandalia feminina, lingerie feminina, colageno hidrolisado",
             },
             bestsellers: {
-                listType: 0, sortType: 2, minRating: 4.0, minSales: 50, requireCommission: false,
-                keywords: "vestido longo feminino, blusa feminina, tênis feminino, kit skincare",
+                listType: 0, sortType: 2, minRating: 4.0, minSales: 50, requireCommission: true, minCommissionPct: 0,
+                keywords: "vestido longo feminino, blusa feminina, tênis feminino, kit skincare, maquiagem",
             },
             topperf: {
-                listType: 2, sortType: 2, minRating: 4.2, minSales: 20, requireCommission: true,
-                keywords: "vestido midi feminino, skincare coreano, bolsa feminina, conjunto fitness",
+                listType: 2, sortType: 2, minRating: 4.2, minSales: 20, requireCommission: true, minCommissionPct: 3,
+                keywords: "vestido midi feminino, skincare coreano, bolsa feminina, conjunto fitness, perfume feminino",
             },
             commission: {
-                listType: 1, sortType: 5, minRating: 4.0, minSales: 0, requireCommission: true,
-                keywords: "perfume feminino, smartwatch feminino, maquiagem, colageno hidrolisado",
+                listType: 1, sortType: 5, minRating: 4.0, minSales: 10, requireCommission: true, minCommissionPct: 8,
+                keywords: "perfume feminino, smartwatch feminino, maquiagem, colageno hidrolisado, serum vitamina c",
+            },
+            collection: {
+                listType: 6, sortType: 5, minRating: 4.0, minSales: 0, requireCommission: true, minCommissionPct: 0,
+                keywords: "", matchIdHint: true,
+            },
+            shop: {
+                listType: 5, sortType: 5, minRating: 4.0, minSales: 0, requireCommission: true, minCommissionPct: 0,
+                keywords: "", shopIdHint: true,
             },
             rated: {
-                listType: 0, sortType: 1, minRating: 4.7, minSales: 30, requireCommission: false,
-                keywords: "creme facial, escova secadora, serum vitamina c",
-            },
-            popular: {
-                listType: 0, sortType: 2, minRating: 4.0, minSales: 100, requireCommission: false,
-                keywords: "capinha celular aesthetic, fone bluetooth feminino, power bank compacto",
+                listType: 0, sortType: 1, minRating: 4.7, minSales: 30, requireCommission: true, minCommissionPct: 0,
+                keywords: "creme facial, escova secadora, serum vitamina c, batom liquido matte",
             },
             budget: {
-                listType: 0, sortType: 4, minRating: 4.0, minSales: 20, requireCommission: false,
-                keywords: "organizador maquiagem, kit maquiagem, scrunchie, necessaire feminina",
+                listType: 0, sortType: 4, minRating: 4.0, minSales: 20, requireCommission: true, minCommissionPct: 0,
+                keywords: "organizador maquiagem, kit maquiagem, scrunchie, necessaire feminina, caderno aesthetic",
             },
         };
 
-        const LIST_TYPE_LABELS_UI = { 0: "Recomendados", 1: "Maior comissão", 2: "Top performance" };
+        const LIST_TYPE_LABELS_UI = {
+            0: "Recomendados", 1: "Maior comissão", 2: "Top performance",
+            3: "Landing categoria", 4: "Detalhe categoria", 5: "Detalhe loja", 6: "Detalhe coleção",
+        };
         const SORT_TYPE_LABELS_UI = {
             1: "Relevância", 2: "Mais vendidos", 3: "Maior preço", 4: "Menor preço", 5: "Maior comissão",
         };
@@ -2105,10 +2167,22 @@
         function updateExplorerModeHint() {
             const lt = Number(document.getElementById("admin-list-type")?.value) || 0;
             const st = Number(document.getElementById("admin-sort-type")?.value) || 2;
+            const matchId = document.getElementById("admin-match-id")?.value;
+            const shopId = document.getElementById("admin-shop-id")?.value;
             const hint = document.getElementById("explorer-mode-hint");
-            if (hint) {
-                hint.innerHTML = `Modo: <strong class="text-slate-700">${LIST_TYPE_LABELS_UI[lt] || lt}</strong> · ordenado por <strong class="text-slate-700">${SORT_TYPE_LABELS_UI[st] || st}</strong>`;
+            if (!hint) return;
+            let extra = "";
+            if ([3, 4, 6].includes(lt)) {
+                extra = matchId
+                    ? ` · matchId <strong class="text-slate-700">${escapeHtml(matchId)}</strong>`
+                    : ` · <span class="text-amber-700 font-bold">informe matchId</span> (coleção/categoria oficial)`;
             }
+            if (lt === 5) {
+                extra = shopId
+                    ? ` · shopId <strong class="text-slate-700">${escapeHtml(shopId)}</strong>`
+                    : ` · <span class="text-amber-700 font-bold">informe shopId</span>`;
+            }
+            hint.innerHTML = `Modo: <strong class="text-slate-700">${LIST_TYPE_LABELS_UI[lt] || lt}</strong> · ordenado por <strong class="text-slate-700">${SORT_TYPE_LABELS_UI[st] || st}</strong>${extra}`;
         }
 
         function applyExplorerPreset(name) {
@@ -2120,12 +2194,14 @@
             const mr = document.getElementById("admin-min-rating");
             const ms = document.getElementById("admin-min-sales");
             const rc = document.getElementById("admin-require-commission");
-            if (kw) kw.value = p.keywords;
+            const mc = document.getElementById("admin-min-commission");
+            if (kw && p.keywords != null) kw.value = p.keywords;
             if (lt) lt.value = String(p.listType);
             if (st) st.value = String(p.sortType);
             if (mr) mr.value = String(p.minRating);
             if (ms) ms.value = String(p.minSales);
             if (rc) rc.checked = !!p.requireCommission;
+            if (mc) mc.value = String(p.minCommissionPct != null ? p.minCommissionPct : 0);
             document.querySelectorAll(".explorer-preset").forEach((btn) => {
                 const on = btn.dataset.preset === name;
                 btn.classList.toggle("bg-shopee-orange", on);
@@ -2135,7 +2211,29 @@
             });
             updateExplorerKwCount();
             updateExplorerModeHint();
-            showToast(`Preset: ${name}`, "success");
+            if (p.matchIdHint) showToast("Cole o collectionId/categoryId no campo matchId (Ofertas oficiais)", "info");
+            else if (p.shopIdHint) showToast("Cole o shopId da loja no campo shopId", "info");
+            else showToast(`Preset: ${name}`, "success");
+        }
+
+        function getExplorerFormParams() {
+            const matchRaw = document.getElementById("admin-match-id")?.value;
+            const shopRaw = document.getElementById("admin-shop-id")?.value;
+            const matchId = matchRaw ? Number(matchRaw) : null;
+            const shopId = shopRaw ? Number(shopRaw) : null;
+            return {
+                keywords: parseExplorerKeywords(document.getElementById("admin-keyword")?.value),
+                limit: Number(document.getElementById("admin-limit")?.value) || 20,
+                pages: Number(document.getElementById("admin-pages")?.value) || 1,
+                listType: Number(document.getElementById("admin-list-type")?.value) || 0,
+                sortType: Number(document.getElementById("admin-sort-type")?.value) || 2,
+                minRating: Number(document.getElementById("admin-min-rating")?.value) || 4,
+                minSales: Number(document.getElementById("admin-min-sales")?.value) || 0,
+                requireCommission: !!document.getElementById("admin-require-commission")?.checked,
+                minCommissionPct: Number(document.getElementById("admin-min-commission")?.value) || 0,
+                matchId: Number.isFinite(matchId) && matchId > 0 ? matchId : null,
+                shopId: Number.isFinite(shopId) && shopId > 0 ? shopId : null,
+            };
         }
 
         function setExplorerProgress(show, pct = 0, label = "") {
@@ -2193,23 +2291,11 @@
             setExplorerStatus("info", "Busca cancelada. Os resultados já obtidos foram mantidos.");
         }
 
-        function getExplorerFormParams() {
-            return {
-                keywords: parseExplorerKeywords(document.getElementById("admin-keyword")?.value),
-                limit: Number(document.getElementById("admin-limit")?.value) || 20,
-                pages: Number(document.getElementById("admin-pages")?.value) || 1,
-                listType: Number(document.getElementById("admin-list-type")?.value) || 0,
-                sortType: Number(document.getElementById("admin-sort-type")?.value) || 2,
-                minRating: Number(document.getElementById("admin-min-rating")?.value) || 4,
-                minSales: Number(document.getElementById("admin-min-sales")?.value) || 0,
-                requireCommission: !!document.getElementById("admin-require-commission")?.checked,
-            };
-        }
-
         function renderExplorerPreview(products, meta = {}) {
             const box = document.getElementById("explorer-preview");
             if (!box) return;
-            explorerProducts = Array.isArray(products) ? products : [];
+            const sorted = sortByMoney(Array.isArray(products) ? products : []);
+            explorerProducts = sorted;
             explorerSelected = new Set(explorerProducts.map((p) => String(p.itemId || p.id)));
             const selAll = document.getElementById("explorer-select-all");
             if (selAll) selAll.checked = explorerProducts.length > 0;
@@ -2232,6 +2318,8 @@
                 const price = Number(p.newPrice || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
                 const stars = Number(p.stars || 0).toFixed(1);
                 const commission = p.commissionRate || "—";
+                const score = moneyScoreOf(p).toFixed(1);
+                const mall = isOfficialShop(p.shopType) ? '<span class="bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded">Mall</span>' : '';
                 const catLabel = (categories.find(c => c.id === p.category) || {}).label || p.category || "—";
                 const subLabel = ((categories.find(c => c.id === p.category) || {}).subcategories || [])
                     .find(s => s.id === p.subcategory)?.label || p.subcategory || "";
@@ -2251,6 +2339,8 @@
                             <span><i class="fas fa-star text-amber-400"></i> ${stars}</span>
                             <span>${escapeHtml(String(p.sales || "—"))}</span>
                             <span class="text-emerald-700 font-bold">${escapeHtml(String(commission))}</span>
+                            <span class="text-amber-700 font-bold">score ${score}</span>
+                            ${mall}
                             ${taxBadge}
                             ${p.keyword ? `<span class="text-slate-400">· ${escapeHtml(p.keyword)}</span>` : ""}
                         </div>
@@ -2286,22 +2376,34 @@
         async function runExplorerSearch({ sync = false } = {}) {
             if (explorerBusy) return;
             const params = getExplorerFormParams();
-            if (!params.keywords.length) {
-                setExplorerStatus("error", "Informe ao menos uma palavra-chave.");
-                showToast("Digite uma keyword", "error");
+            const needsMatch = [3, 4, 6].includes(params.listType);
+            const needsShop = params.listType === 5;
+            if (needsMatch && !params.matchId) {
+                setExplorerStatus("error", "listType 3/4/6 exige <strong>matchId</strong> (collectionId ou categoryId das Ofertas oficiais).");
+                showToast("Informe o matchId", "error");
+                return;
+            }
+            if (needsShop && !params.shopId) {
+                setExplorerStatus("error", "listType 5 exige <strong>shopId</strong> da loja Shopee.");
+                showToast("Informe o shopId", "error");
+                return;
+            }
+            if (!params.keywords.length && !params.matchId && !params.shopId) {
+                setExplorerStatus("error", "Informe keyword(s), matchId ou shopId.");
+                showToast("Digite uma keyword ou ID", "error");
                 return;
             }
 
             explorerAbort = new AbortController();
             setExplorerBusy(true);
             setExplorerProgress(true, 8, sync ? "Buscando e salvando…" : "Pré-visualizando na Shopee…");
-            setExplorerStatus("info", `Consultando ${params.keywords.length} keyword(s) × ${params.pages} página(s)…`);
+            const modeLabel = LIST_TYPE_LABELS_UI[params.listType] || "lista";
+            setExplorerStatus("info", `Consultando ${params.keywords.length || 1} origem(ns) × ${params.pages} página(s) · ${modeLabel}…`);
 
-            // Progresso simulado suave enquanto o batch roda no servidor
             let fakePct = 8;
             const tick = setInterval(() => {
                 fakePct = Math.min(90, fakePct + (90 - fakePct) * 0.08);
-                setExplorerProgress(true, fakePct, `Shopee · ${params.listType === 2 ? "Top performance" : LIST_TYPE_LABELS_UI[params.listType] || "lista"}…`);
+                setExplorerProgress(true, fakePct, `Shopee · ${modeLabel}…`);
             }, 400);
 
             try {
@@ -2319,6 +2421,9 @@
                         minRating: params.minRating,
                         minSales: params.minSales,
                         requireCommission: params.requireCommission,
+                        minCommissionPct: params.minCommissionPct,
+                        matchId: params.matchId,
+                        shopId: params.shopId,
                         sync,
                     }),
                 });
@@ -2326,53 +2431,29 @@
                 clearInterval(tick);
                 if (!res.ok) {
                     const rate = data.rateLimited || res.status === 429;
-                    setExplorerStatus(rate ? "rate" : "error",
-                        rate
-                            ? `<i class="fas fa-clock mr-1"></i> Rate-limit da Shopee. Aguarde alguns segundos e tente novamente. <span class="font-mono">${escapeHtml(data.error || "")}</span>`
-                            : `<i class="fas fa-triangle-exclamation mr-1"></i> ${escapeHtml(data.error || `HTTP ${res.status}`)}`
-                    );
-                    renderExplorerPreview([], { rateLimited: rate });
+                    setExplorerStatus(rate ? "rate" : "error", escapeHtml(data.error || `HTTP ${res.status}`));
                     showToast(data.error || "Falha na busca", "error");
                     return;
                 }
-
-                setExplorerProgress(true, 100, "Concluído");
-                const products = data.products || [];
-                renderExplorerPreview(products, { filteredOut: data.filteredOut, rateLimited: data.rateLimited });
-
-                const failures = (data.report || []).filter((r) => !r.ok);
-                if (data.empty || !products.length) {
-                    setExplorerStatus(
-                        data.rateLimited ? "rate" : "empty",
-                        data.rateLimited
-                            ? "A API respondeu com limite de taxa e nenhum item útil. Tente menos páginas ou aguarde."
-                            : `Nenhum produto passou nos filtros. Filtrados: ${data.filteredOut || 0}. Tente outras keywords ou baixe a nota mínima.`
-                    );
-                    showToast("Shopee sem resultados para esses filtros", "error");
-                } else {
-                    const mode = `${data.listTypeLabel || ""} · ${data.sortTypeLabel || ""}`;
-                    const savedBit = sync && data.saved ? ` · ${data.saved} salvos no banco` : "";
-                    const failBit = failures.length ? ` · ${failures.length} falha(s)` : "";
-                    setExplorerStatus(
-                        "success",
-                        `<strong>${data.count}</strong> únicos · ${mode} · filtrados ${data.filteredOut || 0}${data.hasNextPage ? " · há mais páginas" : ""}${savedBit}${failBit}`
-                    );
-                    showToast(`Explorador: ${data.count} produtos${savedBit}`, "success");
-                    if (sync) {
-                        await loadOffersFromSupabase({ silent: true, reset: true });
-                        await loadCategoriesFromApi({ silent: true });
-                        populateAdminCategorySelect();
-                        loadAdminStats();
-                    }
+                setExplorerProgress(true, 100, "Pronto");
+                renderExplorerPreview(data.products || [], data);
+                const savedBit = sync && data.saved ? ` · <strong>${data.saved} salvos</strong>` : "";
+                setExplorerStatus(
+                    data.count ? "success" : "empty",
+                    `${data.count || 0} produtos · ${modeLabel}${data.filteredOut ? ` · ${data.filteredOut} filtrados` : ""}${savedBit}${data.rateLimited ? " · rate-limit" : ""}`
+                );
+                if (sync && data.saved) {
+                    showToast(`Salvos ${data.saved} com shortlink`, "success");
+                    await loadOffersFromSupabase({ silent: true, reset: true });
+                    loadShortlinkStatus();
+                    renderMoneyQueue();
                 }
-                setApiStatus("API Status: Shopee explorador", true);
             } catch (err) {
                 clearInterval(tick);
                 if (err.name === "AbortError") return;
-                setExplorerStatus("error", escapeHtml(err.message));
-                showToast(`Erro Shopee: ${err.message}`, "error");
+                setExplorerStatus("error", escapeHtml(err.message || "Erro na busca"));
+                showToast(err.message || "Erro", "error");
             } finally {
-                clearInterval(tick);
                 setExplorerBusy(false);
                 setTimeout(() => setExplorerProgress(false), 600);
                 explorerAbort = null;
@@ -3391,7 +3472,7 @@ async function loadOffersFromSupabase(opts = {}) {
         function isFemaleProduct(p) {
             if (!p) return false;
             const cat = String(p.category || '').toLowerCase();
-            if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade', 'casa', 'pet', 'infantil'].includes(cat)) return true;
+            if (['moda', 'beleza', 'acessorios', 'fitness', 'maternidade', 'saude', 'casa', 'presentes', 'pet', 'infantil'].includes(cat)) return true;
             return /feminin|mulher|menina|gestante|matern|maquiagem|skincare|batom|vestido|saia|biquini|lingerie|suti[aã]|calcinha|bolsa|necessaire|cropped|pantalo|sandalia|rasteir|scrunchie|boob\s*tape|plus\s*size|amamenta|legging|brinco|colar|unha|pijama|tiara/i
                 .test(`${p.title || ''} ${p.keyword || ''} ${p.subcategory || ''}`);
         }
@@ -5657,19 +5738,48 @@ async function loadOffersFromSupabase(opts = {}) {
                         <button type="button" onclick="importOfficialShopeeOffers()" class="px-3 py-1.5 rounded-lg bg-shopee-orange text-white text-[10px] font-bold">Importar todas</button>
                     </div>
                     <div class="space-y-2 max-h-64 overflow-y-auto">
-                        ${items.slice(0, 20).map((c, i) => `
+                        ${items.slice(0, 20).map((c, i) => {
+                            const collectionId = c.collectionId || c.collection_id || '';
+                            const categoryId = c.categoryId || c.category_id || '';
+                            const match = collectionId || categoryId;
+                            const lt = collectionId ? 6 : 4;
+                            return `
                             <div class="border border-slate-100 rounded-lg p-2 flex gap-2">
                                 <img src="${escapeHtml(c.imageUrl || c.image || '')}" class="w-10 h-10 rounded object-cover bg-slate-100" onerror="this.style.display='none'">
                                 <div class="min-w-0 flex-1">
                                     <p class="font-bold text-slate-800 text-[11px] line-clamp-2">${escapeHtml(c.title || c.productName || c.name || 'Oferta')}</p>
-                                    <p class="text-[10px] text-slate-400 truncate">${escapeHtml(c.offerLink || c.link || '')}</p>
+                                    <p class="text-[10px] text-slate-400">${match ? `ID ${escapeHtml(String(match))} · listType ${lt}` : 'sem matchId'}</p>
                                 </div>
-                            </div>
-                        `).join('')}
+                                ${match ? `<button type="button" onclick="useOfficialInExplorer(${i})" class="shrink-0 px-2 py-1 rounded bg-slate-800 text-white text-[10px] font-bold">Explorador</button>` : ''}
+                            </div>`;
+                        }).join('')}
                     </div>`;
             } catch (err) {
                 box.innerHTML = `<p class="text-red-600">Falha: ${escapeHtml(err.message)}</p>`;
             }
+        }
+
+        function useOfficialInExplorer(index) {
+            const c = (window.__officialOffers || [])[index];
+            if (!c) return;
+            const collectionId = c.collectionId || c.collection_id;
+            const categoryId = c.categoryId || c.category_id;
+            const match = collectionId || categoryId;
+            if (!match) return showToast('Oferta sem collectionId/categoryId', 'error');
+            const matchEl = document.getElementById('admin-match-id');
+            const lt = document.getElementById('admin-list-type');
+            const st = document.getElementById('admin-sort-type');
+            const kw = document.getElementById('admin-keyword');
+            const rc = document.getElementById('admin-require-commission');
+            if (matchEl) matchEl.value = String(match);
+            if (lt) lt.value = collectionId ? '6' : '4';
+            if (st) st.value = '5';
+            if (kw) kw.value = '';
+            if (rc) rc.checked = true;
+            updateExplorerKwCount();
+            updateExplorerModeHint();
+            document.getElementById('admin-match-id')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast('matchId no Explorador — clique Pré-visualizar', 'success');
         }
 
         async function importOfficialShopeeOffers() {
@@ -5792,22 +5902,198 @@ async function loadOffersFromSupabase(opts = {}) {
             }
         }
 
-        function renderMoneyQueue() {
+        async function renderMoneyQueue() {
             const box = document.getElementById('money-queue-box');
             if (!box) return;
-            const list = sortByMoney(femaleOnly(productsDatabase))
-                .filter((p) => !p.shortLink)
-                .slice(0, 15);
-            if (!list.length) {
-                box.innerHTML = '<p class="text-emerald-600 font-semibold">Todos os top femininos já têm shortlink — ótimo pra comissão.</p>';
-                return;
+            box.innerHTML = '<p class="text-slate-400"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando top comissão…</p>';
+            try {
+                // Garante catálogo admin carregado
+                if (!productsDatabase.length) {
+                    await loadOffersFromSupabase({ silent: true, reset: true }).catch(() => {});
+                }
+                const list = sortByMoney(femaleOnly(productsDatabase)).slice(0, 20);
+                window.__moneyQueue = list;
+                if (!list.length) {
+                    box.innerHTML = '<p class="text-slate-500">Nenhum produto feminino no banco. Rode o Explorador (preset Feminino + comissão) ou Preencher buracos.</p>';
+                    return;
+                }
+                const missing = list.filter((p) => !p.shortLink).length;
+                box.innerHTML = `
+                    <p class="mb-3 text-slate-600">${list.length} top · <strong class="text-amber-700">${missing} sem shortlink</strong> · score = comissão × vendas × nota</p>
+                    <div class="space-y-2">${list.map((p) => {
+                        const id = p.itemId || p.id;
+                        const price = Number(p.newPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                        const score = moneyScoreOf(p).toFixed(1);
+                        const hasSl = !!p.shortLink;
+                        const link = p.shortLink || p.affiliateLink || p.productLink || '';
+                        return `<div class="flex flex-wrap items-center gap-2 border border-slate-100 rounded-lg p-2 hover:border-amber-200">
+                            <img src="${escapeHtml(p.image || '')}" class="w-10 h-10 rounded object-cover bg-slate-100 shrink-0" alt="" onerror="this.style.display='none'">
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-800 text-[11px] line-clamp-1">${escapeHtml(p.title || '')}</p>
+                                <p class="text-[10px] text-slate-500">${price} · <span class="text-emerald-700 font-bold">${escapeHtml(p.commissionRate || '—')}</span> · score <span class="text-amber-700 font-bold">${score}</span>${hasSl ? ' · <span class="text-emerald-600">shope.ee</span>' : ' · <span class="text-rose-500">sem shortlink</span>'}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-1 shrink-0">
+                                ${!hasSl ? `<button type="button" onclick="moneyQueueMakeShortlink('${id}')" class="px-2 py-1 rounded bg-amber-500 text-white text-[10px] font-bold hover:bg-amber-600">Shortlink</button>` : ''}
+                                <button type="button" onclick="moneyQueueCopyLink('${id}')" class="px-2 py-1 rounded bg-slate-100 text-slate-700 text-[10px] font-bold hover:bg-slate-200">Copiar</button>
+                                <a href="${escapeHtml(link || '#')}" target="_blank" rel="nofollow sponsored noopener" class="px-2 py-1 rounded bg-shopee-orange text-white text-[10px] font-bold hover:bg-orange-600 ${link ? '' : 'pointer-events-none opacity-40'}">Abrir</a>
+                                <button type="button" onclick="moneyQueueToExplorer('${id}')" class="px-2 py-1 rounded bg-slate-800 text-white text-[10px] font-bold hover:bg-slate-700">Explorar</button>
+                            </div>
+                        </div>`;
+                    }).join('')}</div>`;
+            } catch (err) {
+                box.innerHTML = `<p class="text-rose-500">${escapeHtml(err.message)}</p>`;
             }
-            box.innerHTML = `<p class="mb-2 text-slate-600">Sem shortlink · maior moneyScore (rode “Gerar tudo que falta”):</p>
-                <div class="space-y-1">${list.map((p) => `
-                    <div class="flex justify-between gap-2 border-b border-slate-50 py-1">
-                        <span class="truncate font-medium text-slate-800">${escapeHtml(p.title || '')}</span>
-                        <span class="shrink-0 text-amber-600 font-bold">${moneyScoreOf(p).toFixed(1)} · ${escapeHtml(p.commissionRate || '—')}</span>
-                    </div>`).join('')}</div>`;
+        }
+
+        function moneyQueueFind(id) {
+            const sid = String(id);
+            return (window.__moneyQueue || []).find((p) => String(p.itemId || p.id) === sid)
+                || productsDatabase.find((p) => String(p.itemId || p.id) === sid);
+        }
+
+        async function moneyQueueMakeShortlink(id) {
+            const p = moneyQueueFind(id);
+            if (!p) return showToast('Produto não encontrado', 'error');
+            const origin = p.affiliateLink || p.productLink || p.offerLink || '';
+            if (!origin) return showToast('Sem link de afiliado', 'error');
+            try {
+                const res = await adminFetch(`${API_BASE}/api/shortlink`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        originUrl: origin,
+                        itemId: Number(p.itemId || p.id),
+                        subIds: p.subIds || undefined,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                p.shortLink = data.shortLink;
+                showToast('Shortlink gerado', 'success');
+                renderMoneyQueue();
+                loadShortlinkStatus();
+            } catch (err) {
+                showToast(err.message || 'Falha no shortlink', 'error');
+            }
+        }
+
+        function moneyQueueCopyLink(id) {
+            const p = moneyQueueFind(id);
+            if (!p) return;
+            const link = p.shortLink || p.affiliateLink || p.productLink || '';
+            if (!link) return showToast('Sem link', 'error');
+            copyTextToClipboard(link, 'Link copiado');
+        }
+
+        function moneyQueueToExplorer(id) {
+            const p = moneyQueueFind(id);
+            if (!p) return;
+            const words = String(p.title || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .split(/[^a-z0-9]+/)
+                .filter((t) => t.length > 3)
+                .slice(0, 4)
+                .join(' ');
+            const kwEl = document.getElementById('admin-keyword');
+            const lt = document.getElementById('admin-list-type');
+            const st = document.getElementById('admin-sort-type');
+            const rc = document.getElementById('admin-require-commission');
+            if (kwEl) kwEl.value = words || p.keyword || 'vestido feminino';
+            if (lt) lt.value = '1';
+            if (st) st.value = '5';
+            if (rc) rc.checked = true;
+            if (p.shopId) {
+                const shopEl = document.getElementById('admin-shop-id');
+                if (shopEl) shopEl.value = String(p.shopId);
+            }
+            updateExplorerKwCount();
+            updateExplorerModeHint();
+            document.getElementById('admin-keyword')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast('Keywords no Explorador — clique Pré-visualizar', 'success');
+        }
+
+        async function moneyQueueShortlinkTop() {
+            const list = (window.__moneyQueue || sortByMoney(femaleOnly(productsDatabase)).slice(0, 20))
+                .filter((p) => !p.shortLink);
+            if (!list.length) {
+                showToast('Top já tem shortlink', 'success');
+                return renderMoneyQueue();
+            }
+            showToast(`Gerando shortlink em ${Math.min(list.length, 10)} produtos…`, 'info');
+            for (const p of list.slice(0, 10)) {
+                await moneyQueueMakeShortlink(p.itemId || p.id);
+            }
+        }
+
+        async function renderAdminCategoriesPanel() {
+            const box = document.getElementById('admin-categories-panel');
+            if (!box) return;
+            try {
+                await loadCategoriesFromApi({ silent: true });
+                const cats = (categories || []).filter((c) => c.id !== 'todos');
+                if (!cats.length) {
+                    box.innerHTML = '<p>Sem categorias da API.</p>';
+                    return;
+                }
+                box.innerHTML = cats.map((c) => {
+                    const fem = ['moda','beleza','acessorios','fitness','maternidade','saude','casa','presentes','pet','infantil'].includes(c.id);
+                    const subs = (c.subcategories || []).map((s) =>
+                        `<button type="button" onclick="loadCategoryKeywordsToExplorer('${c.id}','${s.id}')" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 border border-slate-100 hover:border-pink-300 text-slate-600">${escapeHtml(s.label)} <span class="text-slate-400">${s.count || 0}</span></button>`
+                    ).join(' ');
+                    return `<div class="mb-3 border-b border-slate-50 pb-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                            <span class="font-bold text-slate-700">${fem ? '♀' : '·'} ${escapeHtml(c.label)} <span class="text-slate-400 font-normal">${c.count || 0}</span></span>
+                            <div class="flex gap-1">
+                                <button type="button" onclick="loadCategoryKeywordsToExplorer('${c.id}')" class="px-2 py-1 rounded bg-pink-50 text-pink-700 text-[10px] font-bold hover:bg-pink-100">Keywords → Explorador</button>
+                                <button type="button" onclick="document.getElementById('admin-cat-sync').value='${c.id}'; adminSyncCategory()" class="px-2 py-1 rounded bg-slate-800 text-white text-[10px] font-bold hover:bg-slate-700">Sync</button>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-1">${subs || '<span class="text-slate-400">Sem subs</span>'}</div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                box.innerHTML = `<p class="text-rose-500">${escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        function loadCategoryKeywordsToExplorer(catId, subId) {
+            const cat = categories.find((c) => c.id === catId);
+            if (!cat) return showToast('Categoria não encontrada', 'error');
+            let kws = [];
+            const subs = subId
+                ? (cat.subcategories || []).filter((s) => s.id === subId)
+                : (cat.subcategories || []);
+            for (const s of subs) {
+                if (Array.isArray(s.keywords) && s.keywords.length) {
+                    kws.push(...s.keywords.slice(0, 5));
+                } else {
+                    kws.push(`${s.label} feminino`.toLowerCase());
+                }
+            }
+            // Cobertura (se já carregou) complementa com keywords femininas
+            const cov = (window.__coverageReport?.categories || []).find((c) => c.id === catId);
+            if (cov) {
+                const covSubs = subId
+                    ? (cov.subcategories || []).filter((s) => s.id === subId)
+                    : (cov.subcategories || []);
+                for (const s of covSubs) {
+                    kws.push(...(s.femaleKeywords || s.keywords || []).slice(0, 3));
+                }
+            }
+            kws = [...new Set(kws.map((k) => String(k).trim()).filter(Boolean))].slice(0, 15);
+            const kwEl = document.getElementById('admin-keyword');
+            const lt = document.getElementById('admin-list-type');
+            const st = document.getElementById('admin-sort-type');
+            const rc = document.getElementById('admin-require-commission');
+            if (kwEl) kwEl.value = kws.join(', ');
+            if (lt) lt.value = '1';
+            if (st) st.value = '5';
+            if (rc) rc.checked = true;
+            updateExplorerKwCount();
+            updateExplorerModeHint();
+            document.getElementById('admin-keyword')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast(`${kws.length} keywords de ${cat.label} no Explorador`, 'success');
         }
 
         // Unified compatibility clipboard copier helper

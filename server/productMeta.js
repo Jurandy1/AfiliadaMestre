@@ -31,6 +31,14 @@ const SUB_TITLE_RULES = {
   protecao: (title) => /\b(capinha|pel[ií]cula|case)\b/i.test(title),
   energia: (title) => /\b(power\s*bank|carregador|cabo)\b/i.test(title),
   cozinha: (title) => /\b(air\s*fryer|panela|utens[ií]lio|cozinha)\b/i.test(title),
+  higiene_bebe: (title) => /\b(fralda|len[cç]o\s*umedecido|pomada\s*assadura|shampoo\s*beb[eê])\b/i.test(title),
+  enxoval: (title) => /\b(enxoval|manta\s*beb[eê]|trocador|bolsa\s*maternidade)\b/i.test(title),
+  maternidade_roupa: (title) => /\b(gestante|amamenta[cç][aã]o|maternidade)\b/i.test(title),
+  suplementos: (title) => /\b(col[aá]geno|vitamina|omega|multivitam[ií]nico|whey)\b/i.test(title),
+  higiene_intima: (title) => /\b(absorvente|protetor\s*di[aá]rio|\b[ií]ntim)\b/i.test(title),
+  papelaria: (title) => /\b(caderno|caneta|planner|adesivo|washi|scrapbook)\b/i.test(title),
+  viagem: (title) => /\b(viagem|necessaire|organizador\s*mala|travesseiro\s*viagem)\b/i.test(title),
+  presentes_fem: (title) => /\b(kit\s*presente|caixa\s*presente|kit\s*spa|caneca)\b/i.test(title),
 };
 
 function tokenize(text) {
