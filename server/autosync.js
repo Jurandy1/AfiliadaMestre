@@ -1,8 +1,7 @@
 "use strict";
 
 // Alimentação automática — fila de cobertura 95% feminino / 5% geral.
-// Prioriza buracos em moda/beleza e listType comissão + top performance.
-// Todo produto salvo sai com shortlink shope.ee + Sub IDs.
+// Alterna coverage ↔ refresh-top; bias listType 1; minCommissionPct.
 
 const {
   fetchProductOffers,
@@ -17,8 +16,30 @@ const {
 } = require("./supabase");
 const { saveOffersWithShortlinks, generateShortlinksForRows } = require("./shortlinks");
 const { buildCoverageQueue, DEFAULT_FEMALE_PERCENT } = require("./coverage");
+const { refreshTopOffers, DEFAULT_MIN_COMMISSION_PCT } = require("./quality");
+
+function clampNum(v, def, min, max) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return def;
+  return Math.min(Math.max(n, min), max);
+}
 
 const FEMALE_PERCENT = clampNum(process.env.AUTO_SYNC_FEMALE_PERCENT, DEFAULT_FEMALE_PERCENT, 80, 99);
+const MIN_COMMISSION_PCT = clampNum(
+  process.env.SYNC_MIN_COMMISSION_PCT,
+  DEFAULT_MIN_COMMISSION_PCT,
+  0,
+  50
+);
+
+/** Bias: mais ciclos de maior comissão (listType 1). */
+const BIASED_ROTATION = [
+  SYNC_ROTATION.find((m) => m.listType === 1) || SYNC_ROTATION[0],
+  SYNC_ROTATION.find((m) => m.listType === 1) || SYNC_ROTATION[0],
+  SYNC_ROTATION.find((m) => m.listType === 2) || SYNC_ROTATION[1],
+  SYNC_ROTATION.find((m) => m.listType === 1) || SYNC_ROTATION[0],
+  SYNC_ROTATION.find((m) => m.listType === 0) || SYNC_ROTATION[2],
+].filter(Boolean);
 
 const config = {
   enabled: /^(1|true|on|yes)$/i.test(String(process.env.AUTO_SYNC ?? "0")),
@@ -27,9 +48,10 @@ const config = {
   limit: clampNum(process.env.AUTO_SYNC_LIMIT, 20, 5, 50),
   pruneDays: clampNum(process.env.AUTO_PRUNE_DAYS, 60, 0, 365),
   requestGapMs: clampNum(process.env.AUTO_SYNC_GAP_MS, 400, 100, 5000),
-  // Extra: limpa residual sem shortlink além dos salvos nesta rodada
   shortlinkBackfillPerRun: clampNum(process.env.AUTO_SYNC_SHORTLINKS, 50, 0, 200),
+  refreshTopPerRun: clampNum(process.env.AUTO_SYNC_REFRESH_TOP, 40, 0, 80),
   femalePercent: FEMALE_PERCENT,
+  minCommissionPct: MIN_COMMISSION_PCT,
 };
 
 const state = {
@@ -40,20 +62,16 @@ const state = {
   cursor: 0,
   rotationCursor: 0,
   queue: [],
+  priorityQueue: [],
   queueBuiltAt: 0,
   runs: 0,
   totalUpserts: 0,
   lastResult: null,
   lastError: null,
+  lastPhase: null,
 };
 
 let timer = null;
-
-function clampNum(v, def, min, max) {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return def;
-  return Math.min(Math.max(n, min), max);
-}
 
 function credsReady() {
   const shopee = !!(process.env.SHOPEE_APP_ID && process.env.SHOPEE_SECRET);
@@ -64,9 +82,37 @@ function credsReady() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function nextMode() {
-  const mode = SYNC_ROTATION[state.rotationCursor % SYNC_ROTATION.length];
-  state.rotationCursor = (state.rotationCursor + 1) % SYNC_ROTATION.length;
+  const modes = BIASED_ROTATION.length ? BIASED_ROTATION : SYNC_ROTATION;
+  const mode = modes[state.rotationCursor % modes.length];
+  state.rotationCursor = (state.rotationCursor + 1) % modes.length;
   return mode;
+}
+
+function prioritizeJobs(jobs = []) {
+  const cleaned = (Array.isArray(jobs) ? jobs : [])
+    .map((j) => ({
+      keyword: String(j.keyword || "").trim(),
+      category: j.category || null,
+      subcategory: j.subcategory || null,
+      audience: j.audience || "feminino",
+      source: j.source || "conversion",
+      gap: Number(j.gap) || 0,
+    }))
+    .filter((j) => j.keyword);
+  if (!cleaned.length) return { added: 0, queueSize: state.priorityQueue.length };
+  const seen = new Set(state.priorityQueue.map((j) => `${j.category}:${j.subcategory}:${j.keyword}`));
+  let added = 0;
+  for (const j of cleaned) {
+    const key = `${j.category}:${j.subcategory}:${j.keyword}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    state.priorityQueue.push(j);
+    added += 1;
+  }
+  if (state.priorityQueue.length > 40) {
+    state.priorityQueue = state.priorityQueue.slice(-40);
+  }
+  return { added, queueSize: state.priorityQueue.length };
 }
 
 async function ensureQueue(force = false) {
@@ -75,13 +121,33 @@ async function ensureQueue(force = false) {
     return state.queue;
   }
   const { queue } = await buildCoverageQueue({ femalePercent: config.femalePercent });
-  state.queue = queue;
+  state.queue = [...state.priorityQueue, ...queue];
+  state.priorityQueue = [];
   state.queueBuiltAt = Date.now();
   state.cursor = 0;
   return state.queue;
 }
 
-async function runOnce({ manual = false, forceMode = null } = {}) {
+async function runRefreshTopPhase() {
+  if (!config.refreshTopPerRun) return null;
+  try {
+    const result = await refreshTopOffers({
+      limit: config.refreshTopPerRun,
+      minRating: MIN_RATING,
+      minSales: MIN_SALES,
+      minCommissionPct: config.minCommissionPct,
+    });
+    console.log(
+      `[autosync] refresh-top updated=${result.updated} purged=${result.purged} requested=${result.requested}`
+    );
+    return result;
+  } catch (e) {
+    console.warn("[autosync] refresh-top falhou:", e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+async function runOnce({ manual = false, forceMode = null, forcePhase = null } = {}) {
   if (state.running) return { skipped: "already-running" };
   if (!credsReady()) {
     state.lastError = "Credenciais Shopee/Supabase ausentes";
@@ -92,16 +158,45 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
   const startedAt = new Date();
   const processed = [];
   let upserts = 0;
-    let shortlinksGenerated = 0;
+  let shortlinksGenerated = 0;
   let shortlinksFailed = 0;
   let skippedExistingTotal = 0;
-  const mode = forceMode || nextMode();
+  let refreshTop = null;
+
+  const phase =
+    forcePhase
+    || (state.runs % 2 === 1 && config.refreshTopPerRun > 0 ? "refresh-top" : "coverage");
+  state.lastPhase = phase;
 
   try {
+    if (phase === "refresh-top") {
+      refreshTop = await runRefreshTopPhase();
+      state.runs += 1;
+      state.lastRunAt = startedAt.toISOString();
+      state.lastError = null;
+      state.lastResult = {
+        ok: true,
+        manual,
+        phase: "refresh-top",
+        refreshTop,
+        durationMs: Date.now() - startedAt.getTime(),
+      };
+      return state.lastResult;
+    }
+
+    const mode = forceMode || nextMode();
     const queue = await ensureQueue(manual);
     if (!queue.length) {
+      refreshTop = await runRefreshTopPhase();
       state.lastError = null;
-      state.lastResult = { ok: true, processed: [], upserts: 0, note: "fila vazia" };
+      state.lastResult = {
+        ok: true,
+        processed: [],
+        upserts: 0,
+        note: "fila vazia",
+        refreshTop,
+        phase: "coverage",
+      };
       return state.lastResult;
     }
 
@@ -111,19 +206,26 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
       const job = queue[idx];
       state.cursor = (state.cursor + 1) % Math.max(1, queue.length);
       const { keyword, category, subcategory } = job;
+      const gapPages = Number(job.gap) >= 20 ? 2 : 1;
       try {
-        const offer = await fetchProductOffers({
-          keyword,
-          limit: config.limit,
-          page: 1,
-          listType: mode.listType,
-          sortType: mode.sortType,
-          minRating: MIN_RATING,
-          minSales: MIN_SALES,
-          requireCommission: true,
-        });
-        const nodes = offer.nodes || [];
-        const rows = nodes
+        let pageNodes = [];
+        for (let page = 1; page <= gapPages; page += 1) {
+          const offer = await fetchProductOffers({
+            keyword,
+            limit: config.limit,
+            page,
+            listType: mode.listType,
+            sortType: mode.sortType,
+            minRating: MIN_RATING,
+            minSales: MIN_SALES,
+            requireCommission: true,
+            minCommissionPct: mode.listType === 1 ? config.minCommissionPct : 0,
+          });
+          pageNodes = pageNodes.concat(offer.nodes || []);
+          if (!offer.hasNextPage) break;
+          if (page < gapPages) await sleep(config.requestGapMs);
+        }
+        const rows = pageNodes
           .map((n) =>
             mapOfferToRow(n, keyword, mode.listType, {
               forceCategory: category || null,
@@ -158,6 +260,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           mode: mode.label,
           listType: mode.listType,
           sortType: mode.sortType,
+          pages: gapPages,
         });
       } catch (e) {
         processed.push({
@@ -173,7 +276,6 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
       if (i < config.batch - 1) await sleep(config.requestGapMs);
     }
 
-    // Residual: qualquer oferta antiga ainda sem shortlink
     if (config.shortlinkBackfillPerRun > 0) {
       try {
         const missing = await listOffersMissingShortlink({ limit: config.shortlinkBackfillPerRun });
@@ -181,9 +283,6 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           const extra = await generateShortlinksForRows(missing, { gapMs: 100 });
           shortlinksGenerated += extra.generated || 0;
           shortlinksFailed += extra.failed || 0;
-          if (extra.generated) {
-            console.log(`[autosync] shortlinks residual: ${extra.generated}`);
-          }
         }
       } catch (e) {
         console.warn("[autosync] backfill shortlink falhou:", e.message);
@@ -206,9 +305,11 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
     state.lastResult = {
       ok: true,
       manual,
+      phase: "coverage",
       mode: mode.label,
       listType: mode.listType,
       sortType: mode.sortType,
+      minCommissionPct: config.minCommissionPct,
       femalePercentTarget: config.femalePercent,
       feedMode: "coverage-95-5",
       processed,
@@ -221,7 +322,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
       durationMs: Date.now() - startedAt.getTime(),
     };
     console.log(
-      `[autosync] ${mode.label} upserts=${upserts} shortlinks=${shortlinksGenerated} batch=${processed.length} female%=${config.femalePercent}`
+      `[autosync] ${mode.label} upserts=${upserts} shortlinks=${shortlinksGenerated} batch=${processed.length}`
     );
     return state.lastResult;
   } catch (err) {
@@ -236,6 +337,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
 async function runTopPerformance() {
   return runOnce({
     manual: true,
+    forcePhase: "coverage",
     forceMode: SYNC_ROTATION.find((m) => m.listType === 2) || SYNC_ROTATION[0],
   });
 }
@@ -249,9 +351,13 @@ function getStatus() {
     limit: config.limit,
     pruneDays: config.pruneDays,
     shortlinkBackfillPerRun: config.shortlinkBackfillPerRun,
+    refreshTopPerRun: config.refreshTopPerRun,
+    minCommissionPct: config.minCommissionPct,
     femalePercentTarget: config.femalePercent,
     feedMode: "coverage-95-5",
     homePolicy: "100% feminino",
+    lastPhase: state.lastPhase,
+    priorityQueueSize: state.priorityQueue.length,
     queueSize: state.queue.length,
     cursor: state.cursor,
     runs: state.runs,
@@ -261,7 +367,7 @@ function getStatus() {
     lastPruneAt: state.lastPruneAt,
     lastError: state.lastError,
     lastResult: state.lastResult,
-    modes: SYNC_ROTATION,
+    modes: BIASED_ROTATION,
   };
 }
 
@@ -288,12 +394,8 @@ function start() {
     console.log("[autosync] pausado (AUTO_SYNC=0)");
     return;
   }
-  if (!credsReady()) {
-    console.warn("[autosync] credenciais ausentes — scheduler não iniciado");
-    return;
-  }
   console.log(
-    `[autosync] ativo · a cada ${config.intervalMin}min · lote ${config.batch} · female ${config.femalePercent}% · shortlinks on-save`
+    `[autosync] ativo a cada ${config.intervalMin}min · batch=${config.batch} · refreshTop=${config.refreshTopPerRun} · minComm=${config.minCommissionPct}%`
   );
   scheduleNext();
 }
@@ -304,5 +406,6 @@ module.exports = {
   runOnce,
   runTopPerformance,
   getStatus,
+  prioritizeJobs,
   ensureQueue,
 };

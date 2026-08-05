@@ -3,6 +3,7 @@
 const path = require("path");
 const express = require("express");
 const cors = require("cors");
+const compression = require("compression");
 const dotenv = require("dotenv");
 
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
@@ -48,6 +49,12 @@ const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly,
 const { buildCoverageReport, buildCoverageQueue } = require("./coverage");
 const { refillVitrine } = require("./refillVitrine");
 const { scanDuplicates, removeDuplicates } = require("./duplicates");
+const {
+  scanWeakOffers,
+  purgeWeakOffers,
+  refreshTopOffers,
+  DEFAULT_MIN_COMMISSION_PCT,
+} = require("./quality");
 const { productMatchesSubcategory } = require("./productMeta");
 const { SITE_SUBID, buildProductSubIds, buildTrackedSubIds, sanitizeSubId } = require("./tracking");
 const {
@@ -62,6 +69,7 @@ const ROOT = path.join(__dirname, "..");
 const VITRINE_HTML = path.join(ROOT, "uploads", "painel_e_vitrine_afiliado_mestre.html");
 const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || "").trim();
 
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
@@ -91,7 +99,7 @@ const CATEGORIAS_TTL_MS = 5 * 60 * 1000;
 // Cache pequeno para /api/ofertas/db, indexado pela query string.
 // Alivia Supabase quando o usuário toca a mesma categoria repetidas vezes.
 const ofertasCache = new Map();
-const OFERTAS_TTL_MS = 60 * 1000;
+const OFERTAS_TTL_MS = 150 * 1000;
 const OFERTAS_CACHE_MAX = 40;
 
 function setCacheHeaders(res, { maxAge = 60, sMaxAge = 300, swr = 600 } = {}) {
@@ -421,7 +429,7 @@ app.get("/api/ofertas/meta", (_req, res) => {
 
 /**
  * Lê ofertas do Supabase.
- * Query: keyword, category, limit, offset, sort=recent|sales|discount|rating|ending
+ * Query: keyword, category, limit, offset, sort=money|recent|sales|discount|rating|ending
  */
 app.get("/api/ofertas/db", async (req, res) => {
   try {
@@ -432,7 +440,9 @@ app.get("/api/ofertas/db", async (req, res) => {
     const itemIdsRaw = String(req.query.itemIds || req.query.produtos || "").trim();
     const limit = Number(req.query.limit) || 60;
     const offset = Number(req.query.offset) || 0;
-    const sort = String(req.query.sort || "recent").trim();
+    // Home / catálogo geral: moneyScore. Categorias específicas mantêm recent se não pedirem sort.
+    const sortRaw = String(req.query.sort || "").trim();
+    const sort = sortRaw || (!category || category === "todos" ? "money" : "recent");
 
     const multiIds = itemIdsRaw
       ? itemIdsRaw.split(/[,|]+/).map((s) => s.trim()).filter(Boolean)
@@ -455,7 +465,7 @@ app.get("/api/ofertas/db", async (req, res) => {
     const cacheKey = `${keyword}|${category}|${subcategory}|${limit}|${offset}|${sort}`;
     const cached = ofertasCache.get(cacheKey);
     if (cached && Date.now() - cached.at < OFERTAS_TTL_MS) {
-      setCacheHeaders(res, { maxAge: 30, sMaxAge: 60, swr: 300 });
+      setCacheHeaders(res, { maxAge: 45, sMaxAge: 120, swr: 600 });
       return res.json({ ...cached.data, cached: true });
     }
 
@@ -476,7 +486,7 @@ app.get("/api/ofertas/db", async (req, res) => {
       ofertasCache.delete(oldestKey);
     }
 
-    setCacheHeaders(res, { maxAge: 30, sMaxAge: 60, swr: 300 });
+    setCacheHeaders(res, { maxAge: 45, sMaxAge: 120, swr: 600 });
     res.json(payload);
   } catch (err) {
     console.error("[/api/ofertas/db]", err.message);
@@ -904,6 +914,7 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
       minRating: MIN_RATING,
       minSales: MIN_SALES,
       requireCommission: true,
+      minCommissionPct: DEFAULT_MIN_COMMISSION_PCT,
       gapMs: DEFAULT_BATCH_GAP_MS,
     });
 
@@ -992,6 +1003,16 @@ app.get("/api/cron/sync", async (_req, res) => {
       return res.json({ ok: true, skipped: "auto-sync-paused" });
     }
     const result = await autosync.runOnce({ manual: true });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Força refresh dos top moneyScore (cron/manual). */
+app.get("/api/cron/refresh-top", async (_req, res) => {
+  try {
+    const result = await autosync.runOnce({ manual: true, forcePhase: "refresh-top" });
     res.json({ ok: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1248,6 +1269,124 @@ app.get("/api/conversions", async (req, res) => {
 });
 
 /**
+ * Agrupa conversões por canal (utmContent Sub ID slot 2) e por item.
+ * Útil para decidir onde investir tráfego.
+ */
+app.get("/api/conversions/summary", requireAdmin, async (req, res) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const now = Math.floor(Date.now() / 1000);
+    const report = await fetchConversionReport({
+      purchaseTimeStart: now - days * 24 * 3600,
+      purchaseTimeEnd: now,
+      limit: 50,
+    });
+    let nodes = Array.isArray(report.nodes) ? report.nodes : [];
+    const marker = SITE_SUBID.toLowerCase();
+    nodes = nodes.filter((c) => String(c.utmContent || "").toLowerCase().includes(marker));
+
+    const byChannel = new Map();
+    const byItem = new Map();
+    for (const c of nodes) {
+      const parts = String(c.utmContent || "").split(/[|,]/).map((s) => s.trim()).filter(Boolean);
+      const channel = (parts[1] || "organico").toLowerCase();
+      const commission = Number(String(c.totalCommission || "").replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+      const ch = byChannel.get(channel) || { channel, conversions: 0, commission: 0 };
+      ch.conversions += 1;
+      ch.commission += commission;
+      byChannel.set(channel, ch);
+
+      for (const order of c.orders || []) {
+        for (const item of order.items || []) {
+          const id = String(item.itemId || "");
+          if (!id) continue;
+          const prev = byItem.get(id) || {
+            itemId: id,
+            itemName: item.itemName || "",
+            qty: 0,
+            commission: 0,
+          };
+          prev.qty += Number(item.qty) || 1;
+          prev.commission += Number(item.itemTotalCommission) || 0;
+          if (!prev.itemName && item.itemName) prev.itemName = item.itemName;
+          byItem.set(id, prev);
+        }
+      }
+    }
+
+    const channels = [...byChannel.values()].sort((a, b) => b.commission - a.commission);
+    const topItems = [...byItem.values()].sort((a, b) => b.commission - a.commission).slice(0, 30);
+    res.json({
+      ok: true,
+      days,
+      channels,
+      topItems,
+      conversions: nodes.length,
+    });
+  } catch (err) {
+    console.error("[/api/conversions/summary]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/**
+ * Lê winners do conversionReport e empurra keywords para a fila prioritária do autosync.
+ */
+app.post("/api/conversions/prioritize", requireAdmin, async (req, res) => {
+  try {
+    const days = Math.min(Math.max(Number(req.body?.days) || 30, 1), 90);
+    const now = Math.floor(Date.now() / 1000);
+    const report = await fetchConversionReport({
+      purchaseTimeStart: now - days * 24 * 3600,
+      purchaseTimeEnd: now,
+      orderStatus: "COMPLETED",
+      limit: 50,
+    });
+    let nodes = Array.isArray(report.nodes) ? report.nodes : [];
+    const marker = SITE_SUBID.toLowerCase();
+    nodes = nodes.filter((c) => String(c.utmContent || "").toLowerCase().includes(marker));
+
+    const jobs = [];
+    const seen = new Set();
+    for (const c of nodes) {
+      for (const order of c.orders || []) {
+        for (const item of order.items || []) {
+          const name = String(item.itemName || "").trim();
+          if (!name) continue;
+          const cat = categoryForKeyword(name) || "todos";
+          // Usa as 4 primeiras palavras do nome como keyword de reforço
+          const keyword = name.split(/\s+/).slice(0, 4).join(" ").toLowerCase();
+          const key = `${cat}::${keyword}`;
+          if (seen.has(key) || keyword.length < 8) continue;
+          seen.add(key);
+          jobs.push({
+            keyword,
+            category: cat !== "todos" ? cat : null,
+            subcategory: null,
+            audience: "feminino",
+            source: "conversion",
+            gap: 25,
+          });
+        }
+      }
+    }
+
+    const result = autosync.prioritizeJobs(jobs.slice(0, 25));
+    res.json({
+      ok: true,
+      days,
+      fromConversions: nodes.length,
+      jobsQueued: result.added,
+      priorityQueueSize: result.queueSize,
+      samples: jobs.slice(0, 10),
+    });
+  } catch (err) {
+    console.error("[/api/conversions/prioritize]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/**
  * Limpa o cache da vitrine e realimenta categorias.
  * Body: { limit?, pages?, clear?, maxItems? }
  * maxItems: para ao atingir N itens únicos (ex.: 2000 para demo).
@@ -1364,6 +1503,67 @@ app.post("/api/ofertas/duplicates/remove", requireAdmin, async (req, res) => {
   }
 });
 
+/** Preview de ofertas fracas (nota/vendas/comissão abaixo do filtro). */
+app.get("/api/ofertas/weak", requireAdmin, async (req, res) => {
+  try {
+    const max = Math.min(Math.max(Number(req.query.max) || 5000, 100), 10000);
+    const report = await scanWeakOffers({
+      max,
+      minRating: MIN_RATING,
+      minSales: MIN_SALES,
+    });
+    res.json({ ok: true, ...report });
+  } catch (err) {
+    console.error("[/api/ofertas/weak]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Remove ofertas fracas do catálogo legado. */
+app.post("/api/ofertas/purge-weak", requireAdmin, async (req, res) => {
+  try {
+    const max = Math.min(Math.max(Number(req.body?.max) || 5000, 100), 10000);
+    const dryRun = !!req.body?.dryRun;
+    const result = await purgeWeakOffers({
+      max,
+      dryRun,
+      minRating: MIN_RATING,
+      minSales: MIN_SALES,
+    });
+    if (!dryRun && result.removed) {
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
+      coverageCache = { at: 0, data: null };
+    }
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/ofertas/purge-weak]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Reconsulta top moneyScore na Shopee e atualiza (bypass skipExisting). */
+app.post("/api/ofertas/refresh-top", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.body?.limit) || 40, 10), 80);
+    const result = await refreshTopOffers({
+      limit,
+      minRating: MIN_RATING,
+      minSales: MIN_SALES,
+      minCommissionPct: req.body?.minCommissionPct != null
+        ? Number(req.body.minCommissionPct)
+        : DEFAULT_MIN_COMMISSION_PCT,
+    });
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    coverageCache = { at: 0, data: null };
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/ofertas/refresh-top]", err.message);
+    res.status(err.status || 500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
+});
+
 /**
  * Landing page ultra-leve do produto — abre o "popup" ANTES da vitrine carregar.
  * Usada em links de campanha compartilhados no Facebook/Instagram/WhatsApp.
@@ -1448,7 +1648,7 @@ app.get("/p/:itemId", async (req, res) => {
       utm_medium: attribution.medium,
     }).toString();
 
-    res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    res.set("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=1800");
     res.send(renderFastPopup({
       product,
       buyHref,

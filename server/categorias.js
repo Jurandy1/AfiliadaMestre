@@ -48,7 +48,7 @@ const CATEGORIAS = [
   {
     id: "moda",
     label: "Moda Feminina",
-    icon: "fa-tshirt",
+    icon: "fa-shirt",
     color: "pink",
     subcategories: [
       { id: "vestidos", label: "Vestidos & Saias", keywords: ["vestido longo feminino", "vestido midi feminino", "vestido curto feminino", "saia midi feminina", "saia plissada feminina"] },
@@ -119,7 +119,7 @@ const CATEGORIAS = [
   {
     id: "acessorios",
     label: "Acessórios",
-    icon: "fa-clock",
+    icon: "fa-gem",
     color: "yellow",
     subcategories: [
       { id: "joias", label: "Joias", keywords: ["brincos pingente dourado", "colar feminino", "conjunto brinco e colar feminino", "pulseira feminina", "anel feminino"] },
@@ -268,7 +268,7 @@ const CATEGORIAS = [
   {
     id: "celular",
     label: "Celular",
-    icon: "fa-mobile-alt",
+    icon: "fa-mobile-screen-button",
     color: "cyan",
     subcategories: [
       {
@@ -372,7 +372,7 @@ const CATEGORIAS = [
   {
     id: "infantil",
     label: "Infantil",
-    icon: "fa-child",
+    icon: "fa-child-reaching",
     color: "indigo",
     subcategories: [
       {
@@ -418,7 +418,7 @@ const CATEGORIAS = [
   {
     id: "utilidades",
     label: "Utilidades",
-    icon: "fa-tools",
+    icon: "fa-toolbox",
     color: "teal",
     subcategories: [
       {

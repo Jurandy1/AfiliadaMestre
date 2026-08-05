@@ -158,8 +158,8 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
   const safeLimit = Math.min(Math.max(Number(limit) || 60, 1), 200);
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
-  function buildPath(order) {
-    let path = `/ofertas?select=*&order=${order}&limit=${safeLimit}&offset=${safeOffset}`;
+  function buildPath(order, lim = safeLimit, off = safeOffset) {
+    let path = `/ofertas?select=*&order=${order}&limit=${lim}&offset=${off}`;
     const kw = String(keyword || "").trim();
     const cat = String(category || "").trim();
     const sub = String(subcategory || "").trim();
@@ -174,6 +174,35 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
     return path;
   }
 
+  // money: puxa pool maior e ordena por moneyScore numérico em memória
+  if (sort === "money") {
+    const pool = Math.min(Math.max(safeOffset + safeLimit * 3, 120), 400);
+    let rows = [];
+    try {
+      rows = await supabaseRequest(
+        buildPath("commission_rate.desc.nullslast,rating_star.desc.nullslast", pool, 0),
+        { method: "GET", useService: true }
+      );
+    } catch (_) {
+      rows = await supabaseRequest(buildPath("updated_at.desc", pool, 0), { method: "GET", useService: true });
+    }
+    const list = Array.isArray(rows) ? rows : [];
+    list.sort((a, b) => {
+      const sa = computeMoneyScore({
+        commissionRate: a.commission_rate,
+        sales: a.sales,
+        ratingStar: a.rating_star,
+      });
+      const sb = computeMoneyScore({
+        commissionRate: b.commission_rate,
+        sales: b.sales,
+        ratingStar: b.rating_star,
+      });
+      return sb - sa;
+    });
+    return list.slice(safeOffset, safeOffset + safeLimit);
+  }
+
   let order = "updated_at.desc";
   if (sort === "sales") order = "sales.desc.nullslast,updated_at.desc";
   else if (sort === "discount") order = "price_discount_rate.desc.nullslast,updated_at.desc";
@@ -183,7 +212,6 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
   try {
     return await supabaseRequest(buildPath(order), { method: "GET", useService: true });
   } catch (err) {
-    // Coluna period_end pode ainda não existir
     if (sort === "ending") {
       return supabaseRequest(buildPath("updated_at.desc"), { method: "GET", useService: true });
     }
