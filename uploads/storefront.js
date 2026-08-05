@@ -281,24 +281,173 @@
         ];
 
         const ADMIN_TOKEN_KEY = "afiliada_mestre_admin_token";
+        const ADMIN_REFRESH_KEY = "afiliada_mestre_admin_refresh";
+        const ADMIN_USER_KEY = "afiliada_mestre_admin_user";
         let currentNavSection = "destaque";
+        let adminAuthReady = false;
+        let adminLoggedIn = false;
 
         function getAdminToken() {
             try { return sessionStorage.getItem(ADMIN_TOKEN_KEY) || ""; } catch (_) { return ""; }
         }
-        function ensureAdminToken() {
-            if (!isAdminMode()) return getAdminToken();
-            let t = getAdminToken();
-            if (t) return t;
-            t = window.prompt("Token do admin (ADMIN_TOKEN do .env). Deixe vazio se não configurou:") || "";
-            try { if (t) sessionStorage.setItem(ADMIN_TOKEN_KEY, t); } catch (_) {}
-            return t;
+        function getAdminRefreshToken() {
+            try { return sessionStorage.getItem(ADMIN_REFRESH_KEY) || ""; } catch (_) { return ""; }
+        }
+        function setAdminSession(token, refreshToken, user) {
+            try {
+                if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+                else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+                if (refreshToken) sessionStorage.setItem(ADMIN_REFRESH_KEY, refreshToken);
+                else if (!token) sessionStorage.removeItem(ADMIN_REFRESH_KEY);
+                if (user) sessionStorage.setItem(ADMIN_USER_KEY, user);
+                else if (!token) sessionStorage.removeItem(ADMIN_USER_KEY);
+            } catch (_) {}
+        }
+        function getAdminUser() {
+            try { return sessionStorage.getItem(ADMIN_USER_KEY) || ""; } catch (_) { return ""; }
+        }
+        function showAdminLogin(message) {
+            const screen = document.getElementById("admin-login-screen");
+            const panel = document.getElementById("admin-panel-root");
+            if (screen) {
+                screen.classList.remove("hidden");
+                screen.classList.add("flex");
+            }
+            if (panel) {
+                panel.classList.add("hidden");
+                panel.classList.remove("flex");
+            }
+            const err = document.getElementById("admin-login-error");
+            if (err) {
+                if (message) {
+                    err.textContent = message;
+                    err.classList.remove("hidden");
+                } else {
+                    err.textContent = "";
+                    err.classList.add("hidden");
+                }
+            }
+            document.getElementById("admin-login-pass")?.focus();
+        }
+        function hideAdminLogin() {
+            const screen = document.getElementById("admin-login-screen");
+            if (screen) {
+                screen.classList.add("hidden");
+                screen.classList.remove("flex");
+            }
+        }
+        async function refreshAdminSession() {
+            const refreshToken = getAdminRefreshToken();
+            if (!refreshToken) return false;
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/refresh`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refreshToken }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.token) return false;
+                setAdminSession(data.token, data.refreshToken, data.user);
+                adminLoggedIn = true;
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+        async function checkAdminSession() {
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+                const token = getAdminToken();
+                try {
+                    const headers = {};
+                    if (token) headers["X-Admin-Token"] = token;
+                    const res = await fetch(`${API_BASE}/api/admin/me`, { headers });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data.ok) {
+                        adminLoggedIn = true;
+                        if (data.user) {
+                            try { sessionStorage.setItem(ADMIN_USER_KEY, data.user); } catch (_) {}
+                        }
+                        return true;
+                    }
+                } catch (_) {}
+                if (attempt === 0 && await refreshAdminSession()) continue;
+                break;
+            }
+            adminLoggedIn = false;
+            return false;
+        }
+        async function submitAdminLogin(event) {
+            if (event) event.preventDefault();
+            const userEl = document.getElementById("admin-login-user");
+            const passEl = document.getElementById("admin-login-pass");
+            const btn = document.getElementById("admin-login-submit");
+            const err = document.getElementById("admin-login-error");
+            const email = (userEl?.value || "").trim().toLowerCase();
+            const password = passEl?.value || "";
+            if (!email || !password) {
+                if (err) { err.textContent = "Informe e-mail e senha."; err.classList.remove("hidden"); }
+                return false;
+            }
+            if (btn) { btn.disabled = true; btn.textContent = "Entrando…"; }
+            if (err) err.classList.add("hidden");
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.token) {
+                    throw new Error(data.error || "E-mail ou senha incorretos.");
+                }
+                setAdminSession(data.token, data.refreshToken, data.user || email);
+                adminLoggedIn = true;
+                if (passEl) passEl.value = "";
+                hideAdminLogin();
+                initAdminUi({ force: true });
+                showToast("Login ok", "success");
+            } catch (e) {
+                adminLoggedIn = false;
+                if (err) {
+                    err.textContent = e.message || "Falha no login";
+                    err.classList.remove("hidden");
+                }
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = "Entrar"; }
+            }
+            return false;
+        }
+        function logoutAdmin() {
+            const token = getAdminToken();
+            const headers = token ? { "X-Admin-Token": token } : {};
+            fetch(`${API_BASE}/api/admin/logout`, { method: "POST", headers }).catch(() => {});
+            setAdminSession("", "", "");
+            adminLoggedIn = false;
+            showAdminLogin();
+            showToast("Você saiu do painel", "success");
         }
         async function adminFetch(url, opts = {}) {
-            const headers = Object.assign({}, opts.headers || {});
-            const token = ensureAdminToken();
-            if (token) headers["X-Admin-Token"] = token;
-            return fetch(url, { ...opts, headers });
+            const request = async () => {
+                const headers = Object.assign({}, opts.headers || {});
+                const token = getAdminToken();
+                if (token) headers["X-Admin-Token"] = token;
+                return fetch(url, { ...opts, headers });
+            };
+            let res = await request();
+            if (res.status === 401 && await refreshAdminSession()) {
+                res = await request();
+            }
+            if (res.status === 401 && isAdminMode()) {
+                setAdminSession("", "", "");
+                adminLoggedIn = false;
+                showAdminLogin("Sessão expirada. Entre novamente.");
+            }
+            return res;
+        }
+
+        // Mantido por compatibilidade com código antigo; nunca mais abre prompt.
+        function ensureAdminToken() {
+            return getAdminToken();
         }
 
         function formatSold(n) {
@@ -367,21 +516,42 @@
             applyRoute({ fromNav: true });
         }
 
-        function initAdminUi() {
+        async function initAdminUi(opts = {}) {
             const panel = document.getElementById("admin-panel-root");
-            if (!panel || !isAdminMode()) {
+            const login = document.getElementById("admin-login-screen");
+            if (!isAdminMode()) {
                 if (panel) {
                     panel.classList.add("hidden");
                     panel.classList.remove("flex");
+                }
+                if (login) {
+                    login.classList.add("hidden");
+                    login.classList.remove("flex");
                 }
                 document.body.classList.remove("admin-mode");
                 return;
             }
 
             document.body.classList.add("admin-mode");
-            panel.classList.remove("hidden");
-            panel.classList.add("flex");
             document.title = "Admin — Afiliada Mestre";
+
+            if (!opts.force) {
+                const ok = await checkAdminSession();
+                adminAuthReady = true;
+                if (!ok) {
+                    showAdminLogin();
+                    return;
+                }
+            } else {
+                adminAuthReady = true;
+                adminLoggedIn = true;
+            }
+
+            hideAdminLogin();
+            if (panel) {
+                panel.classList.remove("hidden");
+                panel.classList.add("flex");
+            }
 
             const badge = document.getElementById("admin-api-badge");
             if (badge) badge.classList.remove("hidden");
@@ -3205,12 +3375,12 @@ async function loadOffersFromSupabase(opts = {}) {
                 });
                 const data = await res.json().catch(() => ({}));
                 if (res.status === 401 || res.status === 403) {
-                    throw new Error('token de admin inválido — clique em "Entrar" no painel');
+                    throw new Error('Faça login no painel para salvar no banco');
                 }
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 showToast('Campanha salva no banco (Supabase)!', 'success');
             } catch (err) {
-                showToast(`Salva só neste navegador — ${err.message}`, 'error');
+                showToast(`Salva só neste navegador — faça login no painel`, 'error');
             }
             renderSavedCampaigns();
         }

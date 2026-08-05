@@ -386,6 +386,37 @@
     </div>
 
     <!-- ADMIN PANEL — página dedicada (?admin=1) -->
+    <!-- LOGIN DO PAINEL (substitui o prompt de ADMIN_TOKEN) -->
+    <div id="admin-login-screen" class="hidden fixed inset-0 z-[60] items-center justify-center p-4"
+         style="background: radial-gradient(circle at top, #fff4ec 0%, #f8fafc 45%, #e2e8f0 100%);">
+        <form id="admin-login-form" onsubmit="return submitAdminLogin(event)"
+              class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-200 p-6 space-y-4">
+            <div class="text-center space-y-2">
+                <img src="/uploads/logo.png" alt="Afiliada Mestre" class="h-12 w-auto mx-auto">
+                <h2 class="text-lg font-black text-slate-800">Entrar no painel</h2>
+                <p class="text-xs text-slate-500">Acesso restrito da Afiliada Mestre</p>
+            </div>
+            <div class="space-y-1.5">
+                <label for="admin-login-user" class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">E-mail</label>
+                <input id="admin-login-user" name="email" type="email" autocomplete="username" required
+                       class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-shopee-orange"
+                       placeholder="seuemail@exemplo.com">
+            </div>
+            <div class="space-y-1.5">
+                <label for="admin-login-pass" class="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Senha</label>
+                <input id="admin-login-pass" name="password" type="password" autocomplete="current-password" required
+                       class="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-shopee-orange"
+                       placeholder="••••••••">
+            </div>
+            <p id="admin-login-error" class="hidden text-xs text-red-600 font-semibold"></p>
+            <button type="submit" id="admin-login-submit"
+                    class="w-full py-2.5 rounded-lg bg-shopee-orange hover:bg-shopee-orangeHover text-white font-bold text-sm transition">
+                Entrar
+            </button>
+            <a href="/" class="block text-center text-xs text-slate-400 hover:text-shopee-orange font-semibold">← Voltar à vitrine</a>
+        </form>
+    </div>
+
     <div id="admin-panel-root" class="hidden flex min-h-screen w-full">
         <div id="admin-sidebar-backdrop" onclick="toggleAdminSidebar(false)" class="fixed inset-0 bg-black/50 z-40 lg:hidden hidden"></div>
 
@@ -439,6 +470,9 @@
                 <a href="/" class="admin-nav-item !text-emerald-400 hover:!bg-emerald-500/10">
                     <i class="fas fa-store w-5 text-center"></i> Ver vitrine pública
                 </a>
+                <button type="button" onclick="logoutAdmin()" class="admin-nav-item !text-red-300 hover:!bg-red-500/10 w-full text-left">
+                    <i class="fas fa-right-from-bracket w-5 text-center"></i> Sair
+                </button>
                 <p class="text-[9px] text-slate-500 px-2">Clientes não veem este painel</p>
             </div>
         </aside>

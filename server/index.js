@@ -67,21 +67,155 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3789;
 const ROOT = path.join(__dirname, "..");
 const VITRINE_HTML = path.join(ROOT, "uploads", "painel_e_vitrine_afiliado_mestre.html");
-const ADMIN_TOKEN = String(process.env.ADMIN_TOKEN || "").trim();
+const ADMIN_EMAILS = new Set(
+  String(process.env.ADMIN_EMAIL || process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-/** Protege rotas de escrita do admin. Se ADMIN_TOKEN não estiver no .env, libera (dev local). */
-function requireAdmin(req, res, next) {
-  if (!ADMIN_TOKEN) return next();
+function extractAdminToken(req) {
   const header = String(req.headers["x-admin-token"] || "").trim();
   const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
-  const token = header || bearer || String(req.query.adminToken || "").trim();
-  if (token && token === ADMIN_TOKEN) return next();
-  return res.status(401).json({ error: "Não autorizado. Configure ADMIN_TOKEN e envie X-Admin-Token.", code: "ADMIN_AUTH" });
+  return header || bearer || String(req.query.adminToken || "").trim();
 }
+
+function adminEmailAllowed(email) {
+  return ADMIN_EMAILS.size > 0 && ADMIN_EMAILS.has(String(email || "").toLowerCase());
+}
+
+async function supabaseAuth(pathname, { method = "POST", body, accessToken } = {}) {
+  const { url, anonKey } = getConfig();
+  if (!anonKey) {
+    const err = new Error("Configure SUPABASE_ANON_KEY para usar o login.");
+    err.status = 503;
+    throw err;
+  }
+  const response = await fetch(`${url}/auth/v1${pathname}`, {
+    method,
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${accessToken || anonKey}`,
+      "Content-Type": "application/json",
+    },
+    body: body == null ? undefined : JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(data?.msg || data?.message || data?.error_description || "Falha na autenticação.");
+    err.status = response.status;
+    throw err;
+  }
+  return data;
+}
+
+const adminAuthCache = new Map();
+async function getAdminUser(accessToken) {
+  if (!accessToken) return null;
+  const cached = adminAuthCache.get(accessToken);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
+  const user = await supabaseAuth("/user", { method: "GET", accessToken });
+  if (!adminEmailAllowed(user?.email)) return null;
+  adminAuthCache.set(accessToken, { user, expiresAt: Date.now() + 2 * 60 * 1000 });
+  if (adminAuthCache.size > 100) adminAuthCache.clear();
+  return user;
+}
+
+/** Protege as rotas do painel com uma sessão emitida pelo Supabase Auth. */
+async function requireAdmin(req, res, next) {
+  if (!ADMIN_EMAILS.size) {
+    return res.status(503).json({
+      error: "Configure ADMIN_EMAIL no servidor.",
+      code: "ADMIN_AUTH_CONFIG",
+    });
+  }
+  try {
+    const user = await getAdminUser(extractAdminToken(req));
+    if (user) {
+      req.adminUser = user;
+      return next();
+    }
+  } catch (_) {}
+  return res.status(401).json({ error: "Sessão inválida ou expirada.", code: "ADMIN_AUTH" });
+}
+
+app.post("/api/admin/login", async (req, res) => {
+  const email = String(req.body?.email || req.body?.username || "").trim().toLowerCase();
+  const password = String(req.body?.password || "").trim();
+  if (!email || !password) {
+    return res.status(400).json({ error: "Informe e-mail e senha.", code: "ADMIN_AUTH" });
+  }
+  if (!adminEmailAllowed(email)) {
+    return res.status(401).json({ error: "E-mail sem acesso ao painel.", code: "ADMIN_AUTH" });
+  }
+  try {
+    const session = await supabaseAuth("/token?grant_type=password", {
+      body: { email, password },
+    });
+    if (!adminEmailAllowed(session?.user?.email)) {
+      return res.status(401).json({ error: "E-mail sem acesso ao painel.", code: "ADMIN_AUTH" });
+    }
+    return res.json({
+      ok: true,
+      token: session.access_token,
+      refreshToken: session.refresh_token,
+      expiresIn: session.expires_in,
+      user: session.user?.email,
+    });
+  } catch (err) {
+    return res.status(err.status === 400 ? 401 : (err.status || 500)).json({
+      error: err.status === 400 ? "E-mail ou senha incorretos." : err.message,
+      code: "ADMIN_AUTH",
+    });
+  }
+});
+
+app.post("/api/admin/refresh", async (req, res) => {
+  const refreshToken = String(req.body?.refreshToken || "").trim();
+  if (!refreshToken) {
+    return res.status(400).json({ error: "Refresh token ausente.", code: "ADMIN_AUTH" });
+  }
+  try {
+    const session = await supabaseAuth("/token?grant_type=refresh_token", {
+      body: { refresh_token: refreshToken },
+    });
+    if (!adminEmailAllowed(session?.user?.email)) {
+      return res.status(401).json({ error: "E-mail sem acesso ao painel.", code: "ADMIN_AUTH" });
+    }
+    return res.json({
+      ok: true,
+      token: session.access_token,
+      refreshToken: session.refresh_token,
+      expiresIn: session.expires_in,
+      user: session.user?.email,
+    });
+  } catch (err) {
+    return res.status(401).json({ error: "Sessão expirada. Entre novamente.", code: "ADMIN_AUTH" });
+  }
+});
+
+app.get("/api/admin/me", async (req, res) => {
+  try {
+    const user = await getAdminUser(extractAdminToken(req));
+    if (user) return res.json({ ok: true, user: user.email, authRequired: true });
+  } catch (_) {
+    // A resposta abaixo mantém os detalhes da autenticação fora do cliente.
+  }
+  return res.status(401).json({ ok: false, authRequired: true, code: "ADMIN_AUTH" });
+});
+
+app.post("/api/admin/logout", async (req, res) => {
+  const token = extractAdminToken(req);
+  adminAuthCache.delete(token);
+  if (token) {
+    await supabaseAuth("/logout", { accessToken: token }).catch(() => {});
+  }
+  res.json({ ok: true });
+});
 
 function sendVitrine(_req, res) {
   res.sendFile(VITRINE_HTML);
