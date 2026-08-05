@@ -46,6 +46,7 @@ const {
 const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly, sortCategoriesForHome, DEFAULT_FEMALE_PERCENT, normalizeKeywordEntry, isFemaleAudience } = require("./categorias");
 const { buildCoverageReport, buildCoverageQueue } = require("./coverage");
 const { refillVitrine } = require("./refillVitrine");
+const { scanDuplicates, removeDuplicates } = require("./duplicates");
 const { productMatchesSubcategory } = require("./productMeta");
 const { SITE_SUBID, buildProductSubIds, buildTrackedSubIds, sanitizeSubId } = require("./tracking");
 const {
@@ -1326,6 +1327,35 @@ app.delete("/api/ofertas", requireAdmin, async (req, res) => {
     res.json({ ok: true, removed });
   } catch (err) {
     console.error("[/api/ofertas DELETE]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Preview de duplicados (mesma loja+nome / mesmo link). */
+app.get("/api/ofertas/duplicates", requireAdmin, async (req, res) => {
+  try {
+    const max = Math.min(Math.max(Number(req.query.max) || 5000, 100), 10000);
+    const report = await scanDuplicates({ max });
+    res.json({ ok: true, ...report });
+  } catch (err) {
+    console.error("[/api/ofertas/duplicates]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Remove duplicados — mantém o melhor de cada grupo (shortlink + score). */
+app.post("/api/ofertas/duplicates/remove", requireAdmin, async (req, res) => {
+  try {
+    const max = Math.min(Math.max(Number(req.body?.max) || 5000, 100), 10000);
+    const dryRun = req.body?.dryRun === true;
+    const result = await removeDuplicates({ max, dryRun });
+    if (!dryRun && result.removed) {
+      categoriasCache = { at: 0, data: null };
+      ofertasCache.clear();
+    }
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/ofertas/duplicates/remove]", err.message);
     res.status(err.status || 500).json({ error: err.message });
   }
 });

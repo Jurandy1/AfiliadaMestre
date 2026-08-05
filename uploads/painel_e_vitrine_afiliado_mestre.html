@@ -378,6 +378,9 @@
                 <button type="button" data-admin-view="produtos" onclick="switchAdminView('produtos')" class="admin-nav-item" id="nav-produtos">
                     <i class="fas fa-box-open w-5 text-center"></i> Produtos
                 </button>
+                <button type="button" data-admin-view="duplicados" onclick="switchAdminView('duplicados')" class="admin-nav-item" id="nav-duplicados">
+                    <i class="fas fa-clone w-5 text-center"></i> Remover duplicados
+                </button>
                 <div class="admin-nav-group">
                     <div class="admin-nav-group-label">
                         <i class="fas fa-bullhorn w-5 text-center"></i> Campanhas
@@ -835,6 +838,28 @@
                     </div>
                 </div>
 
+        </section>
+
+        <!-- VIEW: Remover duplicados -->
+        <section id="admin-view-duplicados" class="admin-view space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-clone text-rose-500 mr-1"></i> Remover duplicados</h4>
+                        <p class="text-[10px] text-slate-500 mt-1">Detecta mesma loja + nome (ou mesmo link) e mantém o melhor (shortlink + comissão + vendas)</p>
+                        <p id="duplicates-status-line" class="text-[11px] text-slate-700 font-semibold mt-2">Clique em Analisar para escanear o catálogo.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="scanCatalogDuplicates()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">
+                            <i class="fas fa-magnifying-glass mr-1"></i> Analisar
+                        </button>
+                        <button type="button" id="btn-remove-duplicates" onclick="removeCatalogDuplicates()" disabled class="px-3 py-2 rounded-lg bg-rose-600 text-white text-[11px] font-bold hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="fas fa-trash mr-1"></i> Remover duplicados
+                        </button>
+                    </div>
+                </div>
+                <div id="duplicates-table" class="p-4 text-[11px] text-slate-400 max-h-[28rem] overflow-y-auto">Nenhuma análise ainda.</div>
+            </div>
         </section>
 
         <!-- VIEW: Produtos -->
@@ -1776,6 +1801,7 @@
             dashboard: { title: "Dashboard", subtitle: "Visão geral do catálogo e vendas" },
             catalogo: { title: "Catálogo & Sync", subtitle: "Buscar ofertas, sincronizar categorias e alimentação automática" },
             produtos: { title: "Produtos", subtitle: "Gerencie o catálogo e selecione itens para campanhas" },
+            duplicados: { title: "Remover duplicados", subtitle: "Limpa produtos repetidos (mesma loja/nome ou mesmo link)" },
             campanhas: { title: "Campanhas", subtitle: "Links rastreáveis para Facebook, Instagram e outros canais" },
             "campanha-desempenho": { title: "Desempenho da campanha", subtitle: "Vendas, comissões e pedidos agrupados por campanha (API Shopee)" },
             desempenho: { title: "Desempenho geral", subtitle: "Conversões e comissões da API Shopee (Sub ID afiliada_mestre)" },
@@ -1836,6 +1862,8 @@
                 if (!adminCatalogLoaded || productsDatabase.length <= PAGE_SIZE) {
                     loadAdminCatalogFull({ silent: true });
                 }
+            } else if (view === "duplicados") {
+                scanCatalogDuplicates();
             } else if (view === "campanhas") {
                 renderSavedCampaigns();
                 updateCampaignLinkPreview();
@@ -5911,6 +5939,73 @@ async function loadOffersFromSupabase(opts = {}) {
                 showToast(err.message || 'Falha na cobertura', 'error');
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-fill-drip mr-1"></i> Preencher buracos'; }
+            }
+        }
+
+        async function scanCatalogDuplicates() {
+            const line = document.getElementById('duplicates-status-line');
+            const table = document.getElementById('duplicates-table');
+            const btn = document.getElementById('btn-remove-duplicates');
+            if (line) line.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Analisando catálogo…';
+            if (btn) btn.disabled = true;
+            try {
+                const res = await adminFetch(`${API_BASE}/api/ofertas/duplicates?max=5000`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                window.__duplicatesReport = data;
+                const groups = data.duplicates || [];
+                if (line) {
+                    line.innerHTML = groups.length
+                        ? `Escaneados <strong>${data.scanned}</strong> · <strong class="text-rose-600">${data.toRemove}</strong> para remover em <strong>${data.groups}</strong> grupos`
+                        : `Escaneados <strong>${data.scanned}</strong> · <span class="text-emerald-600">nenhum duplicado encontrado</span>`;
+                }
+                if (btn) btn.disabled = !(data.toRemove > 0);
+                if (!table) return;
+                if (!groups.length) {
+                    table.innerHTML = '<p class="text-emerald-600 font-semibold">Catálogo limpo — sem duplicados detectados.</p>';
+                    return;
+                }
+                table.innerHTML = groups.map((g) => `
+                    <div class="mb-3 border border-slate-100 rounded-lg p-3">
+                        <p class="font-bold text-slate-800 text-[11px] mb-1">Manter · ${escapeHtml(g.keep.title || '')}</p>
+                        <p class="text-[10px] text-emerald-700 mb-2">#${g.keep.itemId} · ${escapeHtml(g.keep.shopName || 'loja')} · ${g.keep.shortLink ? 'shope.ee' : 'sem shortlink'} · score ${g.keep.score}</p>
+                        <p class="text-[10px] text-rose-600 font-bold mb-1">Remover (${g.remove.length}):</p>
+                        <ul class="space-y-1 text-slate-600">${g.remove.map((r) =>
+                            `<li class="truncate">#${r.itemId} · ${escapeHtml(r.title || '')}</li>`
+                        ).join('')}</ul>
+                    </div>`).join('');
+            } catch (err) {
+                if (line) line.innerHTML = `<span class="text-rose-500">${escapeHtml(err.message)}</span>`;
+                if (table) table.innerHTML = '<p class="text-rose-500">Falha ao analisar.</p>';
+            }
+        }
+
+        async function removeCatalogDuplicates() {
+            const report = window.__duplicatesReport;
+            if (!report?.toRemove) return showToast('Analise primeiro', 'error');
+            if (!confirm(`Remover ${report.toRemove} produto(s) duplicado(s)? O melhor de cada grupo será mantido.`)) return;
+            const btn = document.getElementById('btn-remove-duplicates');
+            const line = document.getElementById('duplicates-status-line');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Removendo…'; }
+            try {
+                const res = await adminFetch(`${API_BASE}/api/ofertas/duplicates/remove`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ max: 5000 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Removidos ${data.removed} duplicados · ${data.kept} mantidos`, 'success');
+                if (line) line.innerHTML = `Removidos <strong>${data.removed}</strong> · restam ~<strong>${data.kept}</strong> no catálogo`;
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                await loadCategoriesFromApi({ silent: true });
+                loadAdminStats();
+                loadShortlinkStatus();
+                await scanCatalogDuplicates();
+            } catch (err) {
+                showToast(err.message || 'Falha ao remover', 'error');
+            } finally {
+                if (btn) btn.innerHTML = '<i class="fas fa-trash mr-1"></i> Remover duplicados';
             }
         }
 
