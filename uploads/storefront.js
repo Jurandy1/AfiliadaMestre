@@ -8,7 +8,10 @@
         let apiLive = false;
         let lastApiSource = "mock";
         let currentPage = 0;
-        const PAGE_SIZE = 36;
+        // Mobile carrega menos cards na 1ª tela (menos HTML + fotos disputando 4G).
+        const PAGE_SIZE = (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches)
+            ? 24
+            : 36;
         let hasMore = false;
         let loadingMore = false;
 
@@ -871,9 +874,11 @@
             return SUBCATEGORY_ICONS[catId]?.[subId] || categoryIconClass(catId);
         }
 
-        window.onload = async function() {
+        // DOMContentLoaded (não window.onload): não espera fontes/imagens do CDN
+        // antes de buscar ofertas — corta ~0,5–2s no mobile.
+        async function bootStorefront() {
             captureTrafficAttribution();
-            window.addEventListener('popstate', () => applyRoute({ fromNav: true }));
+            window.addEventListener("popstate", () => applyRoute({ fromNav: true }));
             initAdminUi();
             initDatabase();
             initCountdown();
@@ -881,33 +886,57 @@
             renderSubcategories();
             renderStoreProducts();
             renderPopularTerms();
-            renderConsoleProducts();
-            loadHeroProducts();
-            if (isAdminMode()) {
+            // Hero com o que já está no cache local — sem 2º fetch ainda.
+            loadHeroProducts({ fromCacheOnly: true });
+
+            const admin = isAdminMode();
+            if (admin) {
+                renderConsoleProducts();
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
                 loadShortlinkStatus();
                 loadConversions({ reset: true });
             }
-            const health = await checkApiHealth();
 
+            const health = await checkApiHealth();
             if (health && health.supabaseConfigured) {
-                await loadCategoriesFromApi({ silent: true });
-                if (isAdminMode()) {
-                    await loadAdminCatalogFull({ silent: true });
+                if (admin) {
+                    await Promise.all([
+                        loadCategoriesFromApi({ silent: true }),
+                        loadAdminCatalogFull({ silent: true }),
+                    ]);
                 } else {
-                    await loadOffersFromSupabase({ silent: true, reset: true });
+                    // Categorias + ofertas em paralelo (antes era sequencial).
+                    await Promise.all([
+                        loadCategoriesFromApi({ silent: true }),
+                        loadOffersFromSupabase({ silent: true, reset: true }),
+                    ]);
+                    loadHeroProducts({ fromCacheOnly: true });
+                    scheduleHomeSections();
                     preloadCategoryCovers();
-                    renderHomeSections();
-                    await loadHeroProducts();
                 }
-            } else if (isAdminMode()) {
+            } else if (admin) {
                 showToast("Backend offline — rode: npm start", "error");
             }
             await applyRoute({ fromNav: false });
             await applyCampaignLanding();
-        };
+        }
+
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => { bootStorefront().catch(() => {}); });
+        } else {
+            bootStorefront().catch(() => {});
+        }
+
+        function scheduleHomeSections() {
+            const run = () => renderHomeSections();
+            if (typeof requestIdleCallback === "function") {
+                requestIdleCallback(run, { timeout: 1200 });
+            } else {
+                setTimeout(run, 200);
+            }
+        }
 
         function setApiStatus(text, live) {
             apiLive = !!live;
@@ -964,11 +993,17 @@
             if (!isAdminMode() && productsDatabase.length > 400) {
                 productsDatabase = productsDatabase.slice(-400);
             }
-            try {
-                if (productsDatabase.length <= 400) {
-                    localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
-                }
-            } catch (_) {}
+            // JSON.stringify de centenas de produtos trava o main thread no 4G —
+            // grava em idle para não atrasar o primeiro paint.
+            const persist = () => {
+                try {
+                    if (productsDatabase.length <= 400) {
+                        localStorage.setItem("afiliado_mestre_db_v1", JSON.stringify(productsDatabase));
+                    }
+                } catch (_) {}
+            };
+            if (typeof requestIdleCallback === "function") requestIdleCallback(persist, { timeout: 2500 });
+            else setTimeout(persist, 400);
             if (!skipRender) {
                 renderStoreProducts();
                 scheduleChromeRender();
@@ -1522,7 +1557,9 @@ async function loadOffersFromSupabase(opts = {}) {
                 const ok = applyProducts(data.products, "supabase", { append: !reset });
                 hasMore = (data.products || []).length >= limit;
                 renderLoadMoreBtn();
-                if (reset && ok && hasMore) prefetchNextPageIdle();
+                // Prefetch da página 2 só depois do usuário rolar — no mobile
+                // competia com as fotos da 1ª tela.
+                if (reset && ok && hasMore) setupPrefetchOnScroll();
                 if (!opts.silent) {
                     showToast(ok ? `Supabase: ${data.count} ofertas` : "Banco vazio para esse filtro — rode um Sync", ok ? "success" : "error");
                 }
@@ -1652,6 +1689,20 @@ async function loadOffersFromSupabase(opts = {}) {
             infiniteScrollObs.observe(btn);
         }
 
+        let prefetchScrollArmed = false;
+        function setupPrefetchOnScroll() {
+            if (prefetchScrollArmed || !hasMore) return;
+            prefetchScrollArmed = true;
+            const arm = () => {
+                window.removeEventListener("scroll", arm);
+                prefetchNextPageIdle();
+            };
+            window.addEventListener("scroll", arm, { passive: true, once: true });
+            setTimeout(() => {
+                if (hasMore && !loadingMore) prefetchNextPageIdle();
+            }, 5000);
+        }
+
         function prefetchNextPageIdle() {
             if (!hasMore || loadingMore || !apiLive) return;
             const run = () => {
@@ -1659,9 +1710,9 @@ async function loadOffersFromSupabase(opts = {}) {
                 loadMoreProducts().catch(() => {});
             };
             if (typeof requestIdleCallback === 'function') {
-                requestIdleCallback(run, { timeout: 4000 });
+                requestIdleCallback(run, { timeout: 8000 });
             } else {
-                setTimeout(run, 2500);
+                setTimeout(run, 4000);
             }
         }
 
@@ -1683,7 +1734,7 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         // Inicializa o estado. Só usa cache do localStorage OU mock enquanto a API não responde;
-        // window.onload em seguida vai sobrescrever com dados reais do Supabase.
+        // bootStorefront em seguida sobrescreve com dados reais do Supabase.
         function initDatabase() {
             try {
                 const cache = localStorage.getItem('afiliado_mestre_db_v1');
@@ -1866,7 +1917,7 @@ async function loadOffersFromSupabase(opts = {}) {
             scrollToStoreGrid();
         }
 
-        async function loadHeroProducts() {
+        async function loadHeroProducts(opts = {}) {
             const track = document.getElementById('hero-products-track');
             if (!track) return;
 
@@ -1900,12 +1951,15 @@ async function loadOffersFromSupabase(opts = {}) {
                 return true;
             };
 
+            // Home: usa o que já veio do sort=money — evita um 2º /api/ofertas/db.
+            if (opts.fromCacheOnly || renderHeroCards(productsDatabase)) return;
+
             try {
-                const res = await fetch(`${API_BASE}/api/ofertas/db?limit=36&sort=discount`);
+                const res = await fetch(`${API_BASE}/api/ofertas/db?limit=24&sort=discount`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const list = Array.isArray(data.products) ? data.products : [];
-                if (list.length) applyProducts(list, 'hero', { append: true });
+                if (list.length) applyProducts(list, 'hero', { append: true, skipRender: true });
                 if (!renderHeroCards(list.length ? list : productsDatabase)) {
                     renderHeroCards(productsDatabase);
                 }
@@ -2620,20 +2674,44 @@ async function loadOffersFromSupabase(opts = {}) {
             }
             // Só o primeiro bloco entra como eager: no 4G, dezenas de imagens em
             // fetchpriority=high disputam banda e atrasam justo as que estão na tela.
-            box.innerHTML = blocks.map((b, blockIndex) => `
+            const perBlock = (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches)
+                ? 4
+                : 6;
+            // Mobile: menos seções na 1ª pintura (o resto sobe no idle).
+            const maxBlocks = (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches)
+                ? 4
+                : blocks.length;
+            box.innerHTML = blocks.slice(0, maxBlocks).map((b, blockIndex) => `
                 <section class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-base md:text-lg font-black text-slate-800">${escapeHtml(b.title)}</h3>
                         <a href="${b.href}" class="text-xs font-bold text-shopee-orange hover:underline" onclick="event.preventDefault(); navigateTo('${b.href}')">Ver todos →</a>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                        ${b.items.slice(0, 6).map((p, i) => productCardHTML(p, {
+                        ${b.items.slice(0, perBlock).map((p, i) => productCardHTML(p, {
                             index: blockIndex === 0 ? i : 99,
                             section: b.section,
                         })).join('')}
                     </div>
                 </section>
             `).join('');
+            if (maxBlocks < blocks.length) {
+                const rest = () => {
+                    box.insertAdjacentHTML("beforeend", blocks.slice(maxBlocks).map((b) => `
+                        <section class="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-base md:text-lg font-black text-slate-800">${escapeHtml(b.title)}</h3>
+                                <a href="${b.href}" class="text-xs font-bold text-shopee-orange hover:underline" onclick="event.preventDefault(); navigateTo('${b.href}')">Ver todos →</a>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                                ${b.items.slice(0, perBlock).map((p) => productCardHTML(p, { index: 99, section: b.section })).join('')}
+                            </div>
+                        </section>
+                    `).join(""));
+                };
+                if (typeof requestIdleCallback === "function") requestIdleCallback(rest, { timeout: 3000 });
+                else setTimeout(rest, 800);
+            }
         }
 
         // Render Products in the Public Storefront Grid

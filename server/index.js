@@ -218,6 +218,11 @@ app.post("/api/admin/logout", async (req, res) => {
 });
 
 function sendVitrine(_req, res) {
+  // HTML muda com deploys: cache curto no browser, um pouco maior na CDN/edge.
+  res.set(
+    "Cache-Control",
+    "public, max-age=30, s-maxage=120, stale-while-revalidate=600"
+  );
   res.sendFile(VITRINE_HTML);
 }
 
@@ -2168,8 +2173,20 @@ app.get("/uploads/painel_e_vitrine_afiliado_mestre.html", (req, res) => {
   return res.redirect(301, `/${rest ? `?${rest}` : ""}`);
 });
 
-app.use("/uploads", express.static(path.join(ROOT, "uploads")));
-app.use(express.static(ROOT, { index: false }));
+app.use("/uploads", express.static(path.join(ROOT, "uploads"), {
+  maxAge: "7d",
+  etag: true,
+  lastModified: true,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "public, max-age=30, s-maxage=120, stale-while-revalidate=600");
+    } else if (/\.(js|css)$/i.test(filePath)) {
+      // storefront.js muda em todo deploy — 1h + SWR basta sem hash no nome.
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+    }
+  },
+}));
+app.use(express.static(ROOT, { index: false, maxAge: "1d" }));
 
 const APP_PAGE_RE = /^\/(categoria(\/[^/]+){0,2}|relampago|mais-vendidos|maiores-descontos|melhor-avaliados|lojas-oficiais|admin(\/[\w-]+)?)\/?$/;
 
