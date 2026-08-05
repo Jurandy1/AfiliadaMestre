@@ -3,3 +3,9 @@ node_modules/
 .DS_Store
 *.log
 .thumbnail
+
+# Local secrets & scratch — nunca commitar
+_railway_vars.txt
+*_vars.txt
+_design_import/
+_design_import_v2/

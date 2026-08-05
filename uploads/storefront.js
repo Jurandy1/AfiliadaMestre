@@ -415,6 +415,8 @@
             campanhas: { title: "Campanhas", subtitle: "Links rastreáveis para Facebook, Instagram e outros canais" },
             "campanha-desempenho": { title: "Desempenho da campanha", subtitle: "Vendas, comissões e pedidos agrupados por campanha (API Shopee)" },
             desempenho: { title: "Desempenho geral", subtitle: "Conversões e comissões da API Shopee (Sub ID afiliada_mestre)" },
+            "meu-site": { title: "Meu Site — vendas rastreadas", subtitle: "Só vendas com SITE_SUBID (afiliadamestre) — separadas de outras fontes" },
+            ferramentas: { title: "Ferramentas", subtitle: "Links em lote · Decodificar · Reverificar item · Feed em massa" },
         };
 
         function toggleAdminSidebar(forceOpen) {
@@ -481,6 +483,10 @@
                 loadCampaignPerformance({ reset: true });
             } else if (view === "desempenho") {
                 loadConversions({ reset: true });
+            } else if (view === "meu-site") {
+                loadMeuSiteSummary();
+            } else if (view === "ferramentas") {
+                // Nada a carregar de imediato — todos os cards são acionados pelo usuário.
             }
         }
 
@@ -3841,6 +3847,203 @@ async function loadOffersFromSupabase(opts = {}) {
             renderCampaignPerformance();
         }
 
+        // ======= MEU SITE (SITE_SUBID = "afiliadamestre") =======
+        const BRL = (v) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const PCT = (v) => (Number.isFinite(Number(v)) ? Number(v).toFixed(1) + "%" : "0%");
+
+        async function loadMeuSiteSummary() {
+            if (!isAdminMode()) return;
+            const daysSel = document.getElementById("ms-days");
+            const onlyMe = document.getElementById("ms-only-me");
+            const days = Number(daysSel?.value || 30);
+            const onlyMeuSite = !!(onlyMe?.checked ?? true);
+            const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+            setText("ms-net", "Carregando…");
+            try {
+                const res = await adminFetch(`${API_BASE}/api/admin/meu-site/summary?days=${days}&onlyMeuSite=${onlyMeuSite}`);
+                const data = await res.json();
+                if (!res.ok || !data?.ok) throw new Error(data?.error || "falhou");
+                const t = data.totals || {};
+                setText("ms-net", BRL(t.net));
+                setText("ms-gross", BRL(t.gross));
+                setText("ms-orders", String(t.orders || 0));
+                setText("ms-ticket", BRL(t.avgTicket));
+                setText("ms-cancel-pct", PCT(t.cancelledPct));
+                setText("ms-fraud-pct", PCT(t.fraudPct));
+                setText("ms-sample", String(data.sampleSize || 0));
+                const win = data.window || {};
+                const fmt = (iso) => iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+                setText("ms-window", `${fmt(win.from)} → ${fmt(win.to)}`);
+                const health = (t.cancelledPct || 0) + (t.fraudPct || 0);
+                setText("ms-health", health < 5 ? "✅ Saudável" : health < 15 ? "⚠️ Atenção" : "🚨 Crítico");
+
+                const renderTop = (id, rows, fmtRow) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    if (!rows?.length) { el.innerHTML = '<p class="p-3 text-slate-400 text-center">Sem dados</p>'; return; }
+                    el.innerHTML = rows.map(fmtRow).join("");
+                };
+                renderTop("ms-top-items", data.topItems, (r) => `
+                    <div class="flex items-center justify-between gap-2 py-1.5 px-2 border-b border-slate-50 last:border-0">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-slate-700 truncate text-[11px]">${(r.itemName || "sem nome").replace(/</g, "&lt;")}</p>
+                            <p class="text-slate-400 text-[10px]">${r.orders} vendas · id ${r.itemId}</p>
+                        </div>
+                        <p class="text-emerald-600 font-bold whitespace-nowrap">${BRL(r.net)}</p>
+                    </div>
+                `);
+                renderTop("ms-top-shops", data.topShops, (r) => `
+                    <div class="flex items-center justify-between gap-2 py-1.5 px-2 border-b border-slate-50 last:border-0">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-slate-700 truncate text-[11px]">${(r.shopName || "loja").replace(/</g, "&lt;")}</p>
+                            <p class="text-slate-400 text-[10px]">${r.orders} vendas</p>
+                        </div>
+                        <p class="text-emerald-600 font-bold whitespace-nowrap">${BRL(r.net)}</p>
+                    </div>
+                `);
+                renderTop("ms-top-campaigns", data.topCampaigns, (r) => `
+                    <div class="flex items-center justify-between gap-2 py-1.5 px-2 border-b border-slate-50 last:border-0">
+                        <p class="text-slate-700 truncate text-[11px]">${(r.campaign || "—").replace(/</g, "&lt;")}</p>
+                        <p class="text-emerald-600 font-bold whitespace-nowrap">${BRL(r.net)}</p>
+                    </div>
+                `);
+            } catch (err) {
+                setText("ms-net", "Erro");
+                showToast("Falha ao carregar: " + err.message, "error");
+            }
+        }
+        document.getElementById("ms-days")?.addEventListener("change", loadMeuSiteSummary);
+        document.getElementById("ms-only-me")?.addEventListener("change", loadMeuSiteSummary);
+
+        async function pullConversionsNow() {
+            if (!isAdminMode()) return;
+            showToast("Puxando conversões da Shopee…", "info");
+            try {
+                const res = await adminFetch(`${API_BASE}/api/cron/conversions?sinceMin=2880`);
+                const data = await res.json();
+                if (!data?.ok) throw new Error(data?.error || "falhou");
+                const r = data.result || {};
+                showToast(`Salvo ${r.saved || 0} conversão(ões) (${r.pages || 0} páginas)`, "success");
+                loadMeuSiteSummary();
+            } catch (err) { showToast("Erro: " + err.message, "error"); }
+        }
+
+        async function reprocessSubIdsDry() {
+            if (!isAdminMode()) return;
+            try {
+                const res = await adminFetch(`${API_BASE}/api/admin/meu-site/reprocess-subids`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ limit: 500, dryRun: true }),
+                });
+                const data = await res.json();
+                if (!data?.ok) throw new Error(data?.error || "falhou");
+                showToast(`${data.candidates || 0} produtos precisam reprocessar sub_ids`, "info");
+            } catch (err) { showToast("Erro: " + err.message, "error"); }
+        }
+
+        async function reprocessSubIdsRun() {
+            if (!isAdminMode()) return;
+            if (!confirm("Reprocessa até 500 produtos: regera sub_ids e short_link. Continuar?")) return;
+            showToast("Reprocessando… pode levar 1-2 min", "info");
+            try {
+                const res = await adminFetch(`${API_BASE}/api/admin/meu-site/reprocess-subids`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ limit: 500, dryRun: false }),
+                });
+                const data = await res.json();
+                if (!data?.ok) throw new Error(data?.error || "falhou");
+                const s = data.shortlinks || {};
+                showToast(`Reprocessado: ${data.saved || 0} salvos, ${s.generated || 0} shortlinks gerados`, "success");
+            } catch (err) { showToast("Erro: " + err.message, "error"); }
+        }
+
+        // ======= FERRAMENTAS =======
+        async function runReverify() {
+            if (!isAdminMode()) return;
+            const itemId = Number(document.getElementById("reverify-item-id")?.value);
+            const out = document.getElementById("reverify-result");
+            if (!Number.isSafeInteger(itemId) || itemId <= 0) { showToast("item_id inválido", "warning"); return; }
+            out.innerHTML = '<p class="text-slate-400">Puxando da Shopee…</p>';
+            try {
+                const res = await adminFetch(`${API_BASE}/api/admin/reverify`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ itemId }),
+                });
+                const d = await res.json();
+                if (!d?.ok) throw new Error(d?.error || "falhou");
+                if (d.hidden) {
+                    out.innerHTML = `<p class="text-amber-600">Shopee não devolveu detalhe — item ocultado da vitrine.</p>`;
+                } else {
+                    const p = d.patch || {};
+                    out.innerHTML = `
+                        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded">
+                            <p class="font-bold text-emerald-700 mb-2">✅ Atualizado</p>
+                            <ul class="text-[11px] space-y-1">
+                                ${p.sales != null ? `<li>Vendas: <b>${p.sales}</b></li>` : ""}
+                                ${p.rating_star != null ? `<li>Avaliação: <b>${p.rating_star}</b></li>` : ""}
+                                ${p.commission_rate != null ? `<li>Comissão: <b>${p.commission_rate}</b></li>` : ""}
+                                ${p.price_min != null ? `<li>Preço mín: <b>R$ ${p.price_min}</b></li>` : ""}
+                                ${p.price_max != null ? `<li>Preço máx: <b>R$ ${p.price_max}</b></li>` : ""}
+                            </ul>
+                        </div>`;
+                }
+                showToast("Item reverificado", "success");
+            } catch (err) {
+                out.innerHTML = `<p class="text-red-600">Erro: ${err.message}</p>`;
+            }
+        }
+
+        async function runFeed(kind) {
+            if (!isAdminMode()) return;
+            const out = document.getElementById("feed-result");
+            out.innerHTML = `<p class="text-slate-400">Rodando ${kind}… (pode levar 30-55s)</p>`;
+            try {
+                const res = await adminFetch(`${API_BASE}/api/cron/${kind}?force=1`);
+                const d = await res.json();
+                if (!d?.ok) throw new Error(d?.error || "falhou");
+                const r = d.result || {};
+                out.innerHTML = `
+                    <div class="p-3 bg-slate-50 rounded">
+                        <p class="font-bold mb-1">${r.feedMode || kind} · ${r.feed?.date || "—"}</p>
+                        <ul class="text-[11px] space-y-1">
+                            <li>Páginas: <b>${r.pages || 0}</b></li>
+                            <li>Vistos: <b>${r.seen || 0}</b> · Qualidade OK: <b>${r.quality || 0}</b></li>
+                            <li>Salvos: <b>${r.saved || 0}</b> · Ocultados (DELETE): <b>${r.deleted || 0}</b></li>
+                            <li>Shortlinks gerados: <b>${r.linked || 0}</b> · Pendentes: <b>${r.pending || 0}</b></li>
+                            <li>Duração: <b>${((r.ms || 0) / 1000).toFixed(1)}s</b> ${r.rateLimited ? '· <span class="text-red-500">rate-limited</span>' : ""} ${r.timedOut ? '· <span class="text-amber-500">time-out</span>' : ""}</li>
+                        </ul>
+                        ${r.skipped ? `<p class="text-amber-600 mt-2">${r.note}</p>` : ""}
+                    </div>`;
+                showToast(`Feed ${kind}: ${r.saved || 0} salvos`, "success");
+            } catch (err) {
+                out.innerHTML = `<p class="text-red-600">Erro: ${err.message}</p>`;
+            }
+        }
+
+        async function runRefreshMetrics() {
+            if (!isAdminMode()) return;
+            const out = document.getElementById("feed-result");
+            out.innerHTML = '<p class="text-slate-400">Reverificando métricas…</p>';
+            try {
+                const res = await adminFetch(`${API_BASE}/api/cron/refresh-metrics?batch=60&staleHours=12`);
+                const d = await res.json();
+                if (!d?.ok) throw new Error(d?.error || "falhou");
+                const m = d.metrics || {};
+                out.innerHTML = `
+                    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded">
+                        <p class="font-bold text-emerald-700 mb-1">Reverificação de métricas</p>
+                        <ul class="text-[11px] space-y-1">
+                            <li>Pedidos: <b>${m.requested || 0}</b> · Atualizados: <b>${m.refreshed || 0}</b> · Ocultados: <b>${m.hidden || 0}</b></li>
+                            <li>Duração: <b>${((m.ms || 0) / 1000).toFixed(1)}s</b></li>
+                            ${d.links ? `<li>Shortlinks pendentes retry: <b>${d.links.generated || 0}</b></li>` : ""}
+                        </ul>
+                    </div>`;
+                showToast(`Reverificados: ${m.refreshed || 0}`, "success");
+            } catch (err) {
+                out.innerHTML = `<p class="text-red-600">Erro: ${err.message}</p>`;
+            }
+        }
+
         async function loadConversions({ reset = false, advance = false } = {}) {
             const list = document.getElementById('conversion-list');
             if (!list || !isAdminMode()) return;
@@ -4368,82 +4571,81 @@ async function loadOffersFromSupabase(opts = {}) {
             document.getElementById('new-product-form-card').classList.add('hidden');
         }
 
-        // Save custom product
-        function saveNewProduct() {
-            const title = document.getElementById('add-title').value.trim();
-            const oldPrice = parseFloat(document.getElementById('add-old-price').value);
-            const newPrice = parseFloat(document.getElementById('add-new-price').value);
-            const category = document.getElementById('add-category').value;
-            const stock = parseInt(document.getElementById('add-stock').value) || 0;
-            const affLink = document.getElementById('add-aff-link').value.trim();
-            const imgUrl = document.getElementById('add-img-url').value.trim();
-            const desc = document.getElementById('add-desc').value.trim();
+        // Salva produto manual — SEMPRE via API oficial da Shopee, com SITE_SUBID + shortlink real.
+        async function saveNewProduct() {
+            const sourceUrl = document.getElementById('add-source-url')?.value.trim() || '';
+            const category = document.getElementById('add-category')?.value || '';
+            const subcategory = document.getElementById('add-subcategory')?.value.trim() || '';
+            const imgUrl = document.getElementById('add-img-url')?.value.trim() || '';
+            const btn = document.getElementById('btn-save-product');
+            const out = document.getElementById('add-product-result');
 
-            if (!title || isNaN(newPrice)) {
-                showToast("Preencha ao menos o Título e o Preço com Desconto!", "error");
+            if (!sourceUrl) {
+                showToast('Cola a URL do produto na Shopee.', 'error');
                 return;
             }
 
-            // Calculations
-            const finalOldPrice = isNaN(oldPrice) ? newPrice * 1.5 : oldPrice;
-            const discountPct = Math.round(((finalOldPrice - newPrice) / finalOldPrice) * 100);
-            const generatedId = Date.now();
+            if (btn) { btn.disabled = true; btn.textContent = 'Buscando na Shopee…'; }
+            if (out) out.innerHTML = '<p class="text-slate-500">Puxando dados oficiais…</p>';
 
-            // Default mock commissions
-            const estShopeeRate = 0.045; // 4.5% standard platform
-            const estSellerRate = 0.055; // 5.5% average extra shop offer
-            const totalRateStr = `${((estShopeeRate + estSellerRate) * 100).toFixed(1)}%`;
-            
-            const shopeeCommVal = newPrice * estShopeeRate;
-            const sellerCommVal = newPrice * estSellerRate;
-            const totalCommVal = shopeeCommVal + sellerCommVal;
+            try {
+                const res = await adminFetch(`${API_BASE}/api/admin/produto-manual`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sourceUrl,
+                        category: category || undefined,
+                        subcategory: subcategory || undefined,
+                        imageUrl: imgUrl || undefined,
+                    }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data?.ok) {
+                    throw new Error(data?.error || `HTTP ${res.status}`);
+                }
 
-            const placeholderImgs = [
-                "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=400",
-                "https://images.unsplash.com/photo-1572635196237-14b3f281503f?auto=format&fit=crop&q=80&w=400",
-                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=400"
-            ];
-            const finalImage = imgUrl || placeholderImgs[Math.floor(Math.random() * placeholderImgs.length)];
+                const p = data.product || {};
+                const priceMinBRL = BRL(p.priceMin);
+                const priceMaxBRL = p.priceMax && p.priceMax > p.priceMin ? ` — ${BRL(p.priceMax)}` : '';
+                if (out) {
+                    out.innerHTML = `
+                        <div class="mt-2 p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800">
+                            <p class="font-bold mb-1">Publicado com sucesso na vitrine.</p>
+                            <ul class="space-y-1">
+                                <li><strong>Produto:</strong> ${(p.title || '—').replace(/</g, '&lt;')}</li>
+                                <li><strong>Loja:</strong> ${(p.shopName || '—').replace(/</g, '&lt;')}</li>
+                                <li><strong>Preço:</strong> ${priceMinBRL}${priceMaxBRL}</li>
+                                <li><strong>Comissão:</strong> ${p.commissionRate || '—'}</li>
+                                <li><strong>Categoria:</strong> ${p.category || 'todos'}${p.subcategory ? ' / ' + p.subcategory : ''}</li>
+                                <li><strong>Link de afiliada (SITE_SUBID incluído):</strong>
+                                    <a href="${data.shortLink || '#'}" target="_blank" class="text-shopee-orange font-mono break-all">${data.shortLink || 'gerando…'}</a>
+                                </li>
+                            </ul>
+                            ${data.alreadyExisted ? '<p class="mt-2 text-amber-700">Este produto já existia na vitrine — dados foram atualizados.</p>' : ''}
+                        </div>`;
+                }
 
-            const newProdObj = {
-                id: generatedId,
-                title: title,
-                category: category,
-                oldPrice: finalOldPrice,
-                newPrice: newPrice,
-                discount: `${discountPct}%`,
-                stars: 4.5,
-                reviews: Math.floor(Math.random() * 50 + 10),
-                sales: `${Math.floor(Math.random() * 120 + 15)} vendidos`,
-                image: finalImage,
-                affiliateLink: affLink || "https://shope.ee/mestre-custom",
-                isFlashSale: stock > 0,
-                flashStock: stock,
-                commissionRate: totalRateStr,
-                sellerCommission: `R$ ${sellerCommVal.toFixed(2)}`,
-                shopeeCommission: `R$ ${shopeeCommVal.toFixed(2)}`,
-                totalCommission: `R$ ${totalCommVal.toFixed(2)}`,
-                desc: desc || "Lindo achado adicionado diretamente pelo painel master. Pronto para ser promovido nas suas redes com ótimas taxas de lucro."
-            };
+                // Limpa formulário
+                document.getElementById('add-source-url').value = '';
+                document.getElementById('add-subcategory').value = '';
+                document.getElementById('add-img-url').value = '';
 
-            productsDatabase.unshift(newProdObj);
-            localStorage.setItem('afiliado_mestre_db_v1', JSON.stringify(productsDatabase));
+                // Recarrega vitrine (produto já está persistido no Supabase)
+                await loadOffersFromSupabase({ silent: true, reset: true });
+                if (isAdminMode()) {
+                    loadAdminStats();
+                    if (typeof loadAdminCatalogFull === 'function') {
+                        loadAdminCatalogFull({ silent: true, force: true }).catch(() => {});
+                    }
+                }
 
-            // Reload UI
-            renderConsoleProducts();
-            renderStoreProducts();
-            if (isAdminMode()) loadAdminStats();
-            closeNewProductForm();
-
-            // Clear inputs
-            document.getElementById('add-title').value = '';
-            document.getElementById('add-old-price').value = '';
-            document.getElementById('add-new-price').value = '';
-            document.getElementById('add-stock').value = '';
-            document.getElementById('add-desc').value = '';
-            document.getElementById('add-img-url').value = '';
-
-            showToast("✨ Novo produto integrado e publicado com sucesso!", "success");
+                showToast('Produto publicado na vitrine com link de afiliada.', 'success');
+            } catch (err) {
+                if (out) out.innerHTML = `<p class="mt-2 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700">${(err.message || 'erro').replace(/</g, '&lt;')}</p>`;
+                showToast(err.message || 'Falha ao publicar', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = 'Publicar na vitrine'; }
+            }
         }
 
         // ---- Painel admin: estatísticas reais + auto-sync ----

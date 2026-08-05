@@ -115,10 +115,22 @@ async function purgeWeakOffers({
   };
 }
 
-/** Lista top item_ids por moneyScore (calculado). */
+/** Lista top item_ids por moneyScore + boost de conversão real do meu site. */
 async function listTopMoneyItemIds({ limit = 40 } = {}) {
   const cap = Math.min(Math.max(Number(limit) || 40, 10), 80);
-  // Puxa um pool maior ordenado por comissão (proxy) e reordena por moneyScore.
+
+  // 1. Boost: item_ids que JÁ CONVERTERAM no meu site (últimos 30d) vêm na frente.
+  //    Sem esperar heurística — refresha o que está fazendo dinheiro.
+  let convertedIds = [];
+  try {
+    const { topSignalsFromMySite } = require("./conversions");
+    const signals = await topSignalsFromMySite({ days: 30, limit: Math.floor(cap / 2) });
+    convertedIds = Array.isArray(signals?.topItemIds) ? signals.topItemIds : [];
+  } catch (_) {
+    // Tabela conversions ainda não existe → segue sem boost.
+  }
+
+  // 2. Score sintético sobre o catálogo (fallback / complemento).
   const rows = await supabaseRequest(
     `/ofertas?select=item_id,sales,rating_star,commission_rate&order=commission_rate.desc.nullslast&limit=${Math.min(cap * 4, 200)}`,
     { method: "GET", useService: true }
@@ -134,8 +146,18 @@ async function listTopMoneyItemIds({ limit = 40 } = {}) {
     }))
     .filter((x) => Number.isSafeInteger(x.itemId) && x.itemId > 0)
     .sort((a, b) => b.score - a.score);
+
   const seen = new Set();
   const out = [];
+  // 3. Convertidos primeiro
+  for (const id of convertedIds) {
+    if (Number.isSafeInteger(id) && id > 0 && !seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+      if (out.length >= cap) return out;
+    }
+  }
+  // 4. Depois moneyScore alto
   for (const x of scored) {
     if (seen.has(x.itemId)) continue;
     seen.add(x.itemId);
@@ -191,8 +213,17 @@ async function refreshTopOffers({
   }
 
   let updated = 0;
+  let linkStats = { generated: 0, pending: 0, skipped: 0 };
   if (toUpsert.length) {
-    const saved = await upsertOfertas(toUpsert);
+    // Invariante A: garante SITE_SUBID + short_link antes do upsert (mesmo em refresh).
+    const { ensureLinkedRows } = require("./linking");
+    const linkResult = await ensureLinkedRows(toUpsert, { regenerate: false });
+    linkStats = {
+      generated: linkResult.generated,
+      pending: linkResult.pending,
+      skipped: linkResult.skipped,
+    };
+    const saved = await upsertOfertas(linkResult.rows);
     updated = Array.isArray(saved) ? saved.length : toUpsert.length;
   }
 
@@ -209,6 +240,7 @@ async function refreshTopOffers({
     purged,
     ids,
     minCommissionPct,
+    shortlinks: linkStats,
   };
 }
 

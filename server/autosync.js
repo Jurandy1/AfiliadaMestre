@@ -289,6 +289,29 @@ async function runOnce({ manual = false, forceMode = null, forcePhase = null } =
       }
     }
 
+    // Invariante B — heartbeat: reverifica sales/rating de ~20 items por ciclo.
+    try {
+      const { refreshStaleMetrics } = require("./metricsRefresh");
+      const metrics = await refreshStaleMetrics({ batch: 20, staleHours: 12 });
+      if (metrics.refreshed) {
+        console.log(`[autosync] metrics-refresh refreshed=${metrics.refreshed} hidden=${metrics.hidden}`);
+      }
+    } catch (e) {
+      // Coluna sales_verified_at pode não existir ainda — não bloqueia o loop.
+      console.warn("[autosync] metrics-refresh falhou:", e.message);
+    }
+
+    // Invariante A — retenta shortlinks pending do ciclo anterior
+    try {
+      const { retryPendingShortlinks } = require("./linking");
+      const retry = await retryPendingShortlinks({ limit: 30 });
+      if (retry.generated) {
+        console.log(`[autosync] retry-pending generated=${retry.generated} pending=${retry.pending}`);
+      }
+    } catch (e) {
+      console.warn("[autosync] retry-pending falhou:", e.message);
+    }
+
     if (config.pruneDays > 0) {
       try {
         const removed = await pruneOlderThan(config.pruneDays);

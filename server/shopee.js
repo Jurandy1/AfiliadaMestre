@@ -622,22 +622,43 @@ async function fetchConversionReport({
         clickTime
         conversionId
         totalCommission
+        netCommission
         sellerCommission
         shopeeCommissionCapped
+        mcnManagementFee
+        mcnManagementFeeRate
+        linkedMcnName
         buyerType
         device
+        productType
         utmContent
+        referrer
         orders {
           orderId
           orderStatus
+          shopType
           items {
+            shopId
+            shopName
+            completeTime
             itemId
             itemName
-            shopName
             itemPrice
+            actualAmount
+            refundAmount
             qty
+            imageUrl
             itemTotalCommission
+            itemSellerCommission
+            itemSellerCommissionRate
+            itemShopeeCommissionCapped
+            itemShopeeCommissionRate
+            fraudStatus
+            fraudReason
             attributionType
+            channelType
+            campaignPartnerName
+            campaignType
           }
         }
       }
@@ -653,6 +674,87 @@ async function fetchConversionReport({
   return data?.conversionReport || { nodes: [], pageInfo: {} };
 }
 
+/**
+ * validatedReport — comissão validada após MCN fee, snapshot mensal/semanal.
+ * validationId é fornecido pelo painel Shopee quando uma "validação" é fechada.
+ */
+async function fetchValidatedReport({
+  validationId,
+  limit = 50,
+  scrollId = "",
+} = {}) {
+  const vid = Number(validationId);
+  if (!Number.isSafeInteger(vid) || vid <= 0) {
+    const err = new Error("validationId obrigatório");
+    err.status = 400;
+    throw err;
+  }
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
+  const args = [
+    `validationId: ${vid}`,
+    `limit: ${safeLimit}`,
+  ];
+  if (scrollId) args.push(`scrollId: ${JSON.stringify(String(scrollId))}`);
+
+  const query = `{
+    validatedReport(${args.join(", ")}) {
+      nodes {
+        purchaseTime
+        clickTime
+        conversionId
+        totalCommission
+        netCommission
+        sellerCommission
+        shopeeCommissionCapped
+        mcnManagementFee
+        mcnManagementFeeRate
+        linkedMcnName
+        buyerType
+        device
+        productType
+        utmContent
+        referrer
+        orders {
+          orderId
+          orderStatus
+          shopType
+          items {
+            shopId
+            shopName
+            completeTime
+            itemId
+            itemName
+            itemPrice
+            actualAmount
+            refundAmount
+            qty
+            imageUrl
+            itemTotalCommission
+            itemSellerCommission
+            itemSellerCommissionRate
+            itemShopeeCommissionCapped
+            itemShopeeCommissionRate
+            fraudStatus
+            fraudReason
+            attributionType
+            channelType
+            campaignPartnerName
+            campaignType
+          }
+        }
+      }
+      pageInfo {
+        limit
+        hasNextPage
+        scrollId
+      }
+    }
+  }`;
+
+  const data = await shopeeGraphql(query);
+  return data?.validatedReport || { nodes: [], pageInfo: {} };
+}
+
 function sanitizeSubIdsForShopee(subIds = null) {
   const { SITE_SUBID, buildProductSubIds } = require("./tracking");
   const fallback = buildProductSubIds("geral", null);
@@ -660,7 +762,13 @@ function sanitizeSubIdsForShopee(subIds = null) {
     .map((s) => String(s).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40))
     .filter(Boolean)
     .slice(0, 5);
-  return clean.length ? clean : [SITE_SUBID, "organico", "vitrine", "geral", "produto"];
+  const finalArr = clean.length ? clean : [SITE_SUBID, "organico", "vitrine", "geral", "produto"];
+  // Invariante A: slot 1 SEMPRE = SITE_SUBID. Se não veio, empurra e trunca em 5.
+  if (finalArr[0] !== SITE_SUBID) {
+    finalArr.unshift(SITE_SUBID);
+    if (finalArr.length > 5) finalArr.length = 5;
+  }
+  return finalArr;
 }
 
 /** URL cru da Shopee para generateShortLink (não usar s.shopee / shope.ee). */
@@ -910,6 +1018,7 @@ module.exports = {
   fetchProductDetailsByIds,
   fetchShopeeOffers,
   fetchConversionReport,
+  fetchValidatedReport,
   generateShortLink,
   generateBatchShortLink,
   resolveProductOriginUrl,

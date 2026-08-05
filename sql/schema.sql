@@ -33,6 +33,8 @@ alter table public.ofertas add column if not exists subcategory text;
 alter table public.ofertas add column if not exists product_options jsonb;
 alter table public.ofertas add column if not exists sub_ids text[];
 alter table public.ofertas add column if not exists hidden boolean default false;
+alter table public.ofertas add column if not exists sales_verified_at timestamptz;
+alter table public.ofertas add column if not exists short_link_pending boolean default false;
 
 create index if not exists ofertas_updated_at_idx on public.ofertas (updated_at desc);
 create index if not exists ofertas_keyword_idx on public.ofertas (keyword);
@@ -40,6 +42,8 @@ create index if not exists ofertas_category_idx on public.ofertas (category);
 create index if not exists ofertas_period_end_idx on public.ofertas (period_end);
 create index if not exists ofertas_subcategory_idx on public.ofertas (category, subcategory);
 create index if not exists ofertas_sub_ids_idx on public.ofertas using gin (sub_ids);
+create index if not exists ofertas_sales_verified_at_idx on public.ofertas (sales_verified_at nulls first);
+create index if not exists ofertas_short_link_pending_idx on public.ofertas (short_link_pending) where short_link_pending = true;
 
 alter table public.ofertas enable row level security;
 

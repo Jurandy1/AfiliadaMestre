@@ -428,6 +428,12 @@
                 <button type="button" data-admin-view="desempenho" onclick="switchAdminView('desempenho')" class="admin-nav-item" id="nav-desempenho">
                     <i class="fas fa-chart-line w-5 text-center"></i> Desempenho geral
                 </button>
+                <button type="button" data-admin-view="meu-site" onclick="switchAdminView('meu-site')" class="admin-nav-item" id="nav-meu-site">
+                    <i class="fas fa-sack-dollar w-5 text-center text-emerald-500"></i> Meu Site (vendas)
+                </button>
+                <button type="button" data-admin-view="ferramentas" onclick="switchAdminView('ferramentas')" class="admin-nav-item" id="nav-ferramentas">
+                    <i class="fas fa-toolbox w-5 text-center"></i> Ferramentas
+                </button>
             </nav>
             <div class="p-3 border-t border-slate-800 space-y-2">
                 <a href="/" class="admin-nav-item !text-emerald-400 hover:!bg-emerald-500/10">
@@ -923,71 +929,58 @@
                 </div>
             </div>
 
-                <!-- Add Custom Product Inline Form (collapsible/visible) -->
+                <!-- Adicionar produto manual — puxa dados reais da Shopee via API -->
                 <div id="new-product-form-card" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden">
                     <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
                         <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
-                            <i class="fas fa-plus-circle text-shopee-orange"></i> Adicionar Achadinho Customizado
+                            <i class="fas fa-plus-circle text-shopee-orange"></i> Adicionar produto pela URL Shopee
                         </h4>
                         <button onclick="closeNewProductForm()" class="text-slate-400 hover:text-slate-600">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                     <div class="p-4 space-y-3 text-xs">
-                        <div class="grid grid-cols-1 gap-2">
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">Título do Produto</label>
-                                <input type="text" id="add-title" placeholder="Ex: Fone de Ouvido Profissional Gamer" class="w-full p-2 border rounded outline-shopee-orange">
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-slate-600 font-bold mb-1">Preço Original (R$)</label>
-                                    <input type="number" step="0.01" id="add-old-price" placeholder="120.00" class="w-full p-2 border rounded outline-shopee-orange">
-                                </div>
-                                <div>
-                                    <label class="block text-slate-600 font-bold mb-1">Preço c/ Desconto (R$)</label>
-                                    <input type="number" step="0.01" id="add-new-price" placeholder="59.90" class="w-full p-2 border rounded outline-shopee-orange">
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-slate-600 font-bold mb-1">Categoria</label>
-                                    <select id="add-category" class="w-full p-2 border rounded outline-shopee-orange">
-                                        <option value="moda">Moda Feminina</option>
-                                        <option value="beleza">Beleza</option>
-                                        <option value="acessorios">Acessórios</option>
-                                        <option value="maternidade">Mãe & Bebê</option>
-                                        <option value="fitness">Fitness</option>
-                                        <option value="casa">Casa</option>
-                                        <option value="pet">Pet Shop</option>
-                                        <option value="eletronicos">Eletrônicos</option>
-                                        <option value="celular">Celular</option>
-                                        <option value="infantil">Infantil</option>
-                                        <option value="utilidades">Utilidades</option>
-                                        <option value="automotivo">Automotivo</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-slate-600 font-bold mb-1">Estoque Flash % (Se relâmpago)</label>
-                                    <input type="number" id="add-stock" placeholder="Deixe 0 para oferta normal" class="w-full p-2 border rounded outline-shopee-orange">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">Link de Afiliado Customizado</label>
-                                <input type="text" id="add-aff-link" value="https://shope.ee/mestre-exemplo" class="w-full p-2 border rounded outline-shopee-orange font-mono bg-amber-50">
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">URL da Imagem</label>
-                                <input type="text" id="add-img-url" placeholder="Deixe em branco para usar placeholder dinâmico" class="w-full p-2 border rounded outline-shopee-orange font-mono">
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 font-bold mb-1">Por que é um bom achadinho? (Descrição)</label>
-                                <textarea id="add-desc" rows="3" placeholder="Insira os principais detalhes do produto..." class="w-full p-2 border rounded outline-shopee-orange"></textarea>
-                            </div>
-                            <button onclick="saveNewProduct()" class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white font-bold py-2.5 rounded-lg shadow-md transition text-xs uppercase tracking-wider mt-1">
-                                Salvar e Publicar na Vitrine
-                            </button>
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3 text-[11px] text-blue-800">
+                            <p class="font-bold mb-1">Como funciona</p>
+                            <p>Cola a URL do produto na Shopee. O sistema puxa nome, preço, comissão, avaliação e imagem <strong>direto da API oficial</strong>, gera o link de afiliada com seu SITE_SUBID e publica na vitrine.</p>
                         </div>
+                        <div>
+                            <label class="block text-slate-600 font-bold mb-1">URL do produto na Shopee (obrigatória)</label>
+                            <input type="url" id="add-source-url" placeholder="https://shopee.com.br/product/123456/789012" class="w-full p-2 border border-slate-200 rounded outline-shopee-orange font-mono">
+                            <p class="text-[10px] text-slate-400 mt-1">Aceita os formatos <code>/product/SHOPID/ITEMID</code> e <code>/produto-i.SHOPID.ITEMID</code>.</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Categoria da vitrine (opcional)</label>
+                                <select id="add-category" class="w-full p-2 border border-slate-200 rounded outline-shopee-orange">
+                                    <option value="">Automática (pelo título)</option>
+                                    <option value="moda">Moda Feminina</option>
+                                    <option value="beleza">Beleza</option>
+                                    <option value="acessorios">Acessórios</option>
+                                    <option value="maternidade">Mãe &amp; Bebê</option>
+                                    <option value="fitness">Fitness</option>
+                                    <option value="casa">Casa</option>
+                                    <option value="pet">Pet Shop</option>
+                                    <option value="eletronicos">Eletrônicos</option>
+                                    <option value="celular">Celular</option>
+                                    <option value="infantil">Infantil</option>
+                                    <option value="utilidades">Utilidades</option>
+                                    <option value="automotivo">Automotivo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-600 font-bold mb-1">Subcategoria (opcional)</label>
+                                <input type="text" id="add-subcategory" placeholder="ex: vestidos, batom, tenis" class="w-full p-2 border border-slate-200 rounded outline-shopee-orange">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 font-bold mb-1">Imagem customizada (opcional)</label>
+                            <input type="url" id="add-img-url" placeholder="Deixe em branco para usar a imagem oficial da Shopee" class="w-full p-2 border border-slate-200 rounded outline-shopee-orange font-mono">
+                        </div>
+                        <button onclick="saveNewProduct()" id="btn-save-product" class="w-full bg-shopee-orange hover:bg-shopee-orangeHover text-white font-bold py-2.5 rounded-lg shadow-md transition text-xs uppercase tracking-wider mt-1">
+                            Publicar na vitrine
+                        </button>
+                        <div id="add-product-result" class="text-[11px]"></div>
                     </div>
                 </div>
 
@@ -1342,6 +1335,149 @@
                 </button>
             </div>
         </div>
+        </section>
+
+        <!-- VIEW: Meu Site (vendas rastreadas por SITE_SUBID) -->
+        <section id="admin-view-meu-site" class="admin-view space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                            <i class="fas fa-sack-dollar text-emerald-500"></i> Meu Site — vendas rastreadas
+                        </h4>
+                        <p class="text-[10px] text-slate-400 mt-1">
+                            Filtro fixo <code class="bg-slate-100 px-1 rounded">sub_id1 = afiliadamestre</code>. Outras fontes ficam de fora.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs">
+                        <select id="ms-days" class="p-2 border rounded-lg">
+                            <option value="1">Hoje</option>
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="30" selected>Últimos 30 dias</option>
+                            <option value="60">Últimos 60 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                        </select>
+                        <label class="text-[11px] text-slate-500 flex items-center gap-1">
+                            <input type="checkbox" id="ms-only-me" checked class="rounded">
+                            Só meu site
+                        </label>
+                        <button onclick="loadMeuSiteSummary()" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold">
+                            <i class="fas fa-rotate mr-1"></i> Atualizar
+                        </button>
+                        <button onclick="pullConversionsNow()" title="Puxa conversões da Shopee agora" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700">
+                            <i class="fas fa-cloud-arrow-down mr-1"></i> Puxar Shopee
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-slate-100">
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-emerald-700">Comissão líquida</p>
+                        <p id="ms-net" class="text-xl font-black text-emerald-700">R$ 0,00</p>
+                        <p class="text-[10px] text-emerald-600 mt-0.5">após MCN fee</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Comissão bruta</p>
+                        <p id="ms-gross" class="text-lg font-black text-slate-800">R$ 0,00</p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Pedidos</p>
+                        <p id="ms-orders" class="text-xl font-black text-slate-800">0</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5">ticket médio: <span id="ms-ticket">R$ 0,00</span></p>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-[9px] uppercase font-bold text-slate-400">Saúde</p>
+                        <p id="ms-health" class="text-sm font-black text-slate-800">—</p>
+                        <p class="text-[10px] text-slate-500 mt-0.5"><span id="ms-cancel-pct">0%</span> cancel · <span id="ms-fraud-pct">0%</span> fraude</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-100">
+                            <p class="text-[10px] uppercase font-bold text-slate-600">Top 10 produtos</p>
+                        </div>
+                        <div id="ms-top-items" class="p-2 text-[11px] text-slate-500">—</div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-100">
+                            <p class="text-[10px] uppercase font-bold text-slate-600">Top 10 lojas</p>
+                        </div>
+                        <div id="ms-top-shops" class="p-2 text-[11px] text-slate-500">—</div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-100">
+                            <p class="text-[10px] uppercase font-bold text-slate-600">Top 10 campanhas (sub_id3)</p>
+                        </div>
+                        <div id="ms-top-campaigns" class="p-2 text-[11px] text-slate-500">—</div>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-[10px] text-slate-500">
+                        Janela: <span id="ms-window">—</span> · Amostra: <span id="ms-sample">0</span>
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="reprocessSubIdsDry()" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold hover:bg-slate-200">
+                            <i class="fas fa-magnifying-glass mr-1"></i> Ver quantos precisam reprocessar
+                        </button>
+                        <button onclick="reprocessSubIdsRun()" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i> Reprocessar sub_ids antigos
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW: Ferramentas (Links em lote + Decoder + Reverificar item + Feed) -->
+        <section id="admin-view-ferramentas" class="admin-view space-y-6">
+
+            <!-- Reverificar 1 item -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-4 border-b border-slate-200">
+                    <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                        <i class="fas fa-arrows-rotate text-emerald-500"></i> Reverificar item — número de venda errado?
+                    </h4>
+                    <p class="text-[10px] text-slate-400 mt-1">
+                        Puxa direto da Shopee: sales, avaliação, comissão, preço. Corrige valores desatualizados.
+                    </p>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="number" id="reverify-item-id" placeholder="item_id"
+                            class="p-2 border border-slate-200 rounded text-xs w-40 font-mono">
+                        <button onclick="runReverify()" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700">
+                            <i class="fas fa-rotate mr-1"></i> Reverificar agora
+                        </button>
+                    </div>
+                    <div id="reverify-result" class="text-[11px]"></div>
+                </div>
+            </div>
+
+            <!-- Feed em massa -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 p-4 border-b border-slate-200">
+                    <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
+                        <i class="fas fa-cloud-arrow-down text-purple-500"></i> Feed em massa (getItemFeedData)
+                    </h4>
+                    <p class="text-[10px] text-slate-400 mt-1">
+                        Puxa catálogo inteiro em blocos de 500 (muito mais barato que sync por keyword). FULL diário · DELTA horário.
+                    </p>
+                </div>
+                <div class="p-4 flex flex-wrap gap-2">
+                    <button onclick="runFeed('feed-full')" class="px-3 py-2 rounded-lg bg-purple-600 text-white text-[11px] font-bold hover:bg-purple-700">
+                        <i class="fas fa-download mr-1"></i> Rodar FULL agora
+                    </button>
+                    <button onclick="runFeed('feed-delta')" class="px-3 py-2 rounded-lg bg-purple-500 text-white text-[11px] font-bold hover:bg-purple-600">
+                        <i class="fas fa-bolt mr-1"></i> Rodar DELTA agora
+                    </button>
+                    <button onclick="runRefreshMetrics()" class="px-3 py-2 rounded-lg bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600">
+                        <i class="fas fa-arrows-rotate mr-1"></i> Reverificar métricas (batch)
+                    </button>
+                </div>
+                <div id="feed-result" class="p-4 text-[11px]"></div>
+            </div>
+
         </section>
 
             </main>

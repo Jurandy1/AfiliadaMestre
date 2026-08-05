@@ -1019,6 +1019,230 @@ app.get("/api/cron/refresh-top", async (_req, res) => {
   }
 });
 
+/** Invariante B — reverifica sales/rating/comissão dos produtos com metricas antigas. */
+app.get("/api/cron/refresh-metrics", async (req, res) => {
+  try {
+    const { refreshStaleMetrics } = require("./metricsRefresh");
+    const { retryPendingShortlinks } = require("./linking");
+    const batch = Math.min(Math.max(Number(req.query.batch) || 60, 5), 200);
+    const staleHours = Math.min(Math.max(Number(req.query.staleHours) || 12, 1), 168);
+    const metrics = await refreshStaleMetrics({ batch, staleHours });
+    // Aproveita a janela pra retry dos shortlinks pending
+    const links = await retryPendingShortlinks({ limit: 50 }).catch(() => null);
+    res.json({ ok: true, metrics, links });
+  } catch (err) {
+    console.error("[/api/cron/refresh-metrics]", err.message);
+    res.status(500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
+});
+
+/**
+ * Admin — adiciona 1 produto manual à vitrine.
+ * Recebe URL Shopee (obrigatória) OU { shopId, itemId }.
+ * Puxa dados reais da API (comissão/sales/rating/preço), depois passa por
+ * saveOffersWithShortlinks (Invariante A → SITE_SUBID no slot 1 + short_link real).
+ * Overrides opcionais: category, subcategory (senão usa taxonomia automática).
+ */
+app.post("/api/admin/produto-manual", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    let itemId = Number(body.itemId);
+    let shopId = Number(body.shopId);
+
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) {
+      const raw = String(body.sourceUrl || body.url || "").trim();
+      if (!raw) {
+        return res.status(400).json({ error: "URL Shopee do produto é obrigatória (ex: shopee.com.br/product/SHOPID/ITEMID)" });
+      }
+      // shopee.com.br/product/{shop}/{item} ou shopee.com.br/{slug}-i.{shop}.{item}
+      const m1 = raw.match(/shopee\.com\.br\/product\/(\d+)\/(\d+)/i);
+      const m2 = raw.match(/-i\.(\d+)\.(\d+)/i);
+      if (m1) { shopId = Number(m1[1]); itemId = Number(m1[2]); }
+      else if (m2) { shopId = Number(m2[1]); itemId = Number(m2[2]); }
+      else {
+        return res.status(400).json({
+          error: "URL não reconhecida. Use o formato: https://shopee.com.br/product/SHOPID/ITEMID ou https://shopee.com.br/produto-i.SHOPID.ITEMID",
+        });
+      }
+    }
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) {
+      return res.status(400).json({ error: "item_id inválido" });
+    }
+
+    // Puxa dados reais da Shopee — comissão, sales, rating, preço, imagem
+    const nodes = await fetchProductDetailsByIds([itemId]);
+    const node = Array.isArray(nodes) && nodes.length ? nodes[0] : null;
+    if (!node || !node.offerLink) {
+      return res.status(404).json({
+        error: "Shopee não retornou este produto — verifique se o link é público, se o produto ainda está ativo e se sua conta de afiliada tem acesso.",
+      });
+    }
+
+    const keyword = String(body.keyword || node.productName || "").trim().toLowerCase().slice(0, 80);
+    const forceCategory = body.category && String(body.category) !== "todos" ? String(body.category) : null;
+    const forceSubcategory = body.subcategory ? String(body.subcategory) : null;
+    const row = mapOfferToRow(node, keyword, body.listType != null ? Number(body.listType) : null, {
+      forceCategory,
+      forceSubcategory: forceCategory ? forceSubcategory : null,
+    });
+    // Overrides opcionais do admin (imagem custom / preço promocional que o admin quer destacar)
+    if (body.imageUrl && /^https?:/i.test(String(body.imageUrl))) {
+      row.image_url = String(body.imageUrl).trim();
+    }
+
+    if (!row.item_id || !row.offer_link) {
+      return res.status(500).json({ error: "Dados incompletos da Shopee — não foi possível criar a oferta" });
+    }
+
+    // Passa por saveOffersWithShortlinks → ensureLinkedRows → SITE_SUBID + shortlink garantidos
+    const out = await saveOffersWithShortlinks([row], { withShortlinks: true, skipExisting: false, gapMs: 100 });
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+
+    res.json({
+      ok: true,
+      itemId: row.item_id,
+      shopId: row.shop_id,
+      saved: out.saved,
+      alreadyExisted: out.skippedExisting > 0,
+      shortLink: out.rows?.[0]?.short_link || null,
+      subIds: out.rows?.[0]?.sub_ids || null,
+      product: {
+        title: row.product_name,
+        image: row.image_url,
+        priceMin: row.price_min,
+        priceMax: row.price_max,
+        commissionRate: row.commission_rate,
+        sales: row.sales,
+        ratingStar: row.rating_star,
+        shopName: row.shop_name,
+        category: row.category,
+        subcategory: row.subcategory,
+      },
+    });
+  } catch (err) {
+    console.error("[/api/admin/produto-manual]", err.message);
+    res.status(err.status || 500).json({
+      error: err.message,
+      rateLimited: !!err.rateLimited,
+      details: err.payload || null,
+    });
+  }
+});
+
+/** Admin — reverifica UM item específico (venda/nota errada). */
+app.post("/api/admin/reverify", requireAdmin, async (req, res) => {
+  try {
+    const { reverifyItem } = require("./metricsRefresh");
+    const itemId = Number(req.body?.itemId || req.query?.itemId);
+    const result = await reverifyItem(itemId);
+    ofertasCache.clear();
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/admin/reverify]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Cron — puxa conversionReport das últimas 48h. */
+app.get("/api/cron/conversions", async (req, res) => {
+  try {
+    const { pullConversionReport } = require("./conversions");
+    const sinceMin = Math.min(Math.max(Number(req.query.sinceMin) || 60 * 48, 15), 60 * 24 * 30);
+    const result = await pullConversionReport({ sinceMin });
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error("[/api/cron/conversions]", err.message);
+    res.status(500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
+});
+
+/** Cron — puxa validatedReport (precisa validationId). */
+app.post("/api/cron/validated", requireAdmin, async (req, res) => {
+  try {
+    const { pullValidatedReport } = require("./conversions");
+    const validationId = Number(req.body?.validationId || req.query?.validationId);
+    const result = await pullValidatedReport({ validationId });
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error("[/api/cron/validated]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Admin — Painel do Meu Site. onlyMeuSite=true por padrão (filtro SITE_SUBID). */
+app.get("/api/admin/meu-site/summary", requireAdmin, async (req, res) => {
+  try {
+    const { summary } = require("./conversions");
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+    const onlyMeuSite = String(req.query.onlyMeuSite ?? "true") !== "false";
+    const from = req.query.from ? String(req.query.from) : undefined;
+    const to = req.query.to ? String(req.query.to) : undefined;
+    const result = await summary({ from, to, days, onlyMeuSite });
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/admin/meu-site/summary]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Admin — reprocessa sub_ids de ofertas antigas sem SITE_SUBID no slot 1. */
+app.post("/api/admin/meu-site/reprocess-subids", requireAdmin, async (req, res) => {
+  try {
+    const { reprocessSubIds } = require("./conversions");
+    const limit = Math.min(Math.max(Number(req.body?.limit) || 100, 1), 500);
+    const dryRun = !!req.body?.dryRun;
+    const result = await reprocessSubIds({ limit, dryRun });
+    ofertasCache.clear();
+    res.json(result);
+  } catch (err) {
+    console.error("[/api/admin/meu-site/reprocess-subids]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+/** Cron — feed FULL (1x/dia). Varre catálogo aprovado em páginas de 500. */
+app.get("/api/cron/feed-full", async (req, res) => {
+  try {
+    const { runFullFeedSync } = require("./feedSync");
+    const force = String(req.query.force || "").trim() === "1";
+    const result = await runFullFeedSync({ forceReprocess: force });
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error("[/api/cron/feed-full]", err.message);
+    res.status(500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
+});
+
+/** Cron — feed DELTA (1x/h). NEW/UPDATE upsert; DELETE marca hidden. */
+app.get("/api/cron/feed-delta", async (req, res) => {
+  try {
+    const { runDeltaFeedSync } = require("./feedSync");
+    const force = String(req.query.force || "").trim() === "1";
+    const result = await runDeltaFeedSync({ forceReprocess: force });
+    categoriasCache = { at: 0, data: null };
+    ofertasCache.clear();
+    res.json({ ok: true, result });
+  } catch (err) {
+    console.error("[/api/cron/feed-delta]", err.message);
+    res.status(500).json({ error: err.message, rateLimited: !!err.rateLimited });
+  }
+});
+
+/** Admin — decodifica um shortlink/URL Shopee e diz se é do meu site. */
+app.get("/api/admin/link/decode", requireAdmin, async (req, res) => {
+  try {
+    const { decodeSubIdsFromUrl } = require("./conversions");
+    const url = String(req.query?.url || "").trim();
+    if (!url) return res.status(400).json({ error: "url obrigatório" });
+    res.json(decodeSubIdsFromUrl(url));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** Campanhas de rastreio salvas no Supabase */
 app.get("/api/campanhas-rastreio", async (_req, res) => {
   try {
@@ -1071,9 +1295,14 @@ app.post("/api/shortlink", async (req, res) => {
   try {
     const originUrl = String(req.body?.originUrl || "").trim();
     if (!originUrl) return res.status(400).json({ error: "originUrl obrigatório" });
-    const subIds = Array.isArray(req.body?.subIds) && req.body.subIds.length
+    const { SITE_SUBID } = require("./tracking");
+    let subIds = Array.isArray(req.body?.subIds) && req.body.subIds.length
       ? req.body.subIds.map(String)
       : buildProductSubIds("geral", req.body?.itemId);
+    // Invariante A: slot 1 sempre SITE_SUBID — mesmo quando cliente manda subIds custom.
+    if (subIds[0] !== SITE_SUBID) {
+      subIds = [SITE_SUBID, ...subIds].slice(0, 5);
+    }
     const itemId = req.body?.itemId != null ? Number(req.body.itemId) : null;
     const shortLink = await generateShortLink(originUrl, subIds);
     if (shortLink && itemId) {
@@ -1432,10 +1661,22 @@ app.post("/api/ofertas/refresh", requireAdmin, async (req, res) => {
       if (row.item_id && row.offer_link) rows.push(row);
     }
     if (!rows.length) return res.status(404).json({ error: "Nenhum produto atualizado pela Shopee" });
-    const saved = await upsertOfertas(rows);
+    // Invariante A: garante sub_ids[0] = SITE_SUBID e short_link antes do upsert.
+    const { ensureLinkedRows } = require("./linking");
+    const linkResult = await ensureLinkedRows(rows, { regenerate: false });
+    const saved = await upsertOfertas(linkResult.rows);
     categoriasCache = { at: 0, data: null };
     ofertasCache.clear();
-    res.json({ ok: true, requested: ids.length, saved: Array.isArray(saved) ? saved.length : rows.length });
+    res.json({
+      ok: true,
+      requested: ids.length,
+      saved: Array.isArray(saved) ? saved.length : rows.length,
+      shortlinks: {
+        generated: linkResult.generated,
+        pending: linkResult.pending,
+        skipped: linkResult.skipped,
+      },
+    });
   } catch (err) {
     console.error("[/api/ofertas/refresh]", err.message);
     res.status(err.status || 500).json({ error: err.message, rateLimited: !!err.rateLimited });
@@ -1641,7 +1882,7 @@ app.get("/p/:itemId", async (req, res) => {
     const discountHtml = product.discountPct
       ? `<span class="discount-badge">-${product.discountPct}%</span>` : "";
     const shopHtml = product.shopName
-      ? `<div class="shop"><i>🏪</i> ${escapeHtmlSSR(product.shopName)}</div>` : "";
+      ? `<div class="shop">Vendido por <strong>${escapeHtmlSSR(product.shopName)}</strong></div>` : "";
     const backHref = "/?" + new URLSearchParams({
       utm_campaign: attribution.campaign,
       utm_source: attribution.channel,
@@ -1681,7 +1922,6 @@ function renderFastPopup({ product, buyHref, backHref, oldPriceHtml, discountHtm
   const desc = escapeHtmlSSR(product.desc || "");
   const stars = Math.max(1, Math.min(5, Math.round(Number(product.stars) || 4)));
   const salesTxt = escapeHtmlSSR(product.sales || "");
-  const ogUrl = "https://shope.ee";
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -1699,66 +1939,83 @@ function renderFastPopup({ product, buyHref, backHref, oldPriceHtml, discountHtm
 ${image ? `<link rel="preload" as="image" href="${image}">` : ""}
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
-.card{background:#fff;border-radius:18px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(15,23,42,.25);overflow:hidden;animation:pop .18s ease-out}
-@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-.head{background:linear-gradient(135deg,#ee4d2d,#f97316);color:#fff;padding:10px 14px;font-size:12px;font-weight:800;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px}
-.close{background:rgba(255,255,255,.2);border:0;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:16px;text-decoration:none;display:flex;align-items:center;justify-content:center}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#0f172a}
+body{background:#f8fafc;overflow:hidden}
+.store-bg{position:fixed;inset:0;width:100%;height:100%;border:0;z-index:0;background:#f8fafc}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.card{position:relative;background:#fff;border:1px solid #e2e8f0;border-radius:16px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(15,23,42,.35);overflow:hidden;animation:pop .18s ease-out;z-index:11}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+.head{background:#fff;color:#0f172a;padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0}
+.head span{color:#475569}
+.close{background:#f1f5f9;border:0;color:#475569;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;text-decoration:none;display:flex;align-items:center;justify-content:center;transition:background .12s}
+.close:hover{background:#e2e8f0;color:#0f172a}
 .img-wrap{position:relative;aspect-ratio:1;background:#f8fafc;overflow:hidden}
 .img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
-.discount-badge{position:absolute;top:10px;right:10px;background:#fbbf24;color:#78350f;padding:5px 10px;border-radius:8px;font-weight:800;font-size:12px}
-.body{padding:16px}
-.cat{display:inline-block;background:#fef3c7;color:#78350f;font-size:10px;font-weight:800;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-bottom:8px}
-h1{font-size:15px;line-height:1.35;margin-bottom:6px;font-weight:700}
-.stars{color:#f59e0b;font-size:12px;margin-bottom:8px}
-.stars span{color:#94a3b8;margin-left:6px}
-.price-box{background:#fef7f0;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.discount-badge{position:absolute;top:12px;right:12px;background:#ee4d2d;color:#fff;padding:5px 10px;border-radius:8px;font-weight:700;font-size:12px;letter-spacing:.3px}
+.body{padding:18px}
+.cat{display:inline-block;background:#f1f5f9;color:#475569;font-size:10px;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-bottom:10px;letter-spacing:.4px}
+h1{font-size:15px;line-height:1.4;margin-bottom:8px;font-weight:600;color:#0f172a}
+.stars{color:#f59e0b;font-size:12px;margin-bottom:10px;letter-spacing:1px}
+.stars span{color:#94a3b8;margin-left:6px;letter-spacing:0}
+.price-box{background:#fafafa;border:1px solid #f1f5f9;border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .old-price{font-size:11px;color:#94a3b8;text-decoration:line-through}
 .new-price{font-size:26px;font-weight:800;color:#ee4d2d;line-height:1.1;margin-top:2px}
-.desc{font-size:12px;color:#475569;line-height:1.55;background:#f8fafc;padding:9px 11px;border-radius:10px;margin-bottom:10px}
-.shop{font-size:11px;color:#64748b;margin-bottom:10px}
-.shop i{font-style:normal;margin-right:4px}
-.cta{display:block;width:100%;background:#ee4d2d;color:#fff;text-align:center;padding:14px;border-radius:12px;font-weight:800;font-size:14px;text-decoration:none;text-transform:uppercase;letter-spacing:.4px;box-shadow:0 6px 16px rgba(238,77,45,.35)}
+.desc{font-size:12px;color:#475569;line-height:1.55;padding:9px 11px;border-left:3px solid #e2e8f0;margin-bottom:12px}
+.shop{font-size:11px;color:#64748b;margin-bottom:12px}
+.shop strong{color:#0f172a;font-weight:600}
+.cta{display:block;width:100%;background:#ee4d2d;color:#fff;text-align:center;padding:14px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;letter-spacing:.4px;transition:background .12s;border:0;cursor:pointer}
+.cta:hover{background:#d94220}
 .cta:active{transform:translateY(1px)}
-.more{display:block;text-align:center;margin-top:10px;color:#64748b;font-size:11px;text-decoration:none;padding:8px}
+.more{display:block;text-align:center;margin-top:12px;color:#64748b;font-size:11px;text-decoration:none;padding:6px;cursor:pointer;background:none;border:0;width:100%}
 .more:hover{color:#ee4d2d}
-.foot{padding:6px 14px 12px;font-size:9px;color:#94a3b8;text-align:center;line-height:1.5}
+.foot{padding:8px 16px 14px;font-size:10px;color:#94a3b8;text-align:center;line-height:1.5;border-top:1px solid #f1f5f9}
 </style>
 </head>
 <body>
-<main class="card" role="main">
-  <header class="head">
-    <span>🛍️ Oferta selecionada</span>
-    <a class="close" href="${backHref}" aria-label="Fechar">×</a>
-  </header>
-  <div class="img-wrap">
-    ${image ? `<img src="${image}" alt="${title}" fetchpriority="high">` : ""}
-    ${discountHtml}
-  </div>
-  <div class="body">
-    ${category ? `<div class="cat">${category}</div>` : ""}
-    <h1>${title}</h1>
-    <div class="stars">${"★".repeat(stars)}${"☆".repeat(5 - stars)} ${salesTxt ? `<span>(${salesTxt})</span>` : ""}</div>
-    <div class="price-box">
-      ${oldPriceHtml}
-      <div class="new-price">${priceNewFmt}</div>
+<iframe class="store-bg" src="${escapeHtmlSSR(backHref)}" title="Vitrine Afiliada Mestre" loading="eager" referrerpolicy="no-referrer"></iframe>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="p-title">
+  <main class="card" role="main">
+    <header class="head">
+      <span>Oferta selecionada</span>
+      <a class="close" href="${backHref}" id="btn-close" aria-label="Fechar">&times;</a>
+    </header>
+    <div class="img-wrap">
+      ${image ? `<img src="${image}" alt="${title}" fetchpriority="high">` : ""}
+      ${discountHtml}
     </div>
-    ${desc ? `<div class="desc">${desc}</div>` : ""}
-    ${shopHtml}
-    <a class="cta" href="${escapeHtmlSSR(buyHref)}" target="_blank" rel="noopener noreferrer">Comprar na Shopee →</a>
-    <a class="more" href="${backHref}">Ver mais ofertas na vitrine</a>
-  </div>
-  <div class="foot">Link de afiliado. Ao comprar você apoia o site sem custo extra.</div>
-</main>
+    <div class="body">
+      ${category ? `<div class="cat">${category}</div>` : ""}
+      <h1 id="p-title">${title}</h1>
+      <div class="stars">${"★".repeat(stars)}${"☆".repeat(5 - stars)} ${salesTxt ? `<span>(${salesTxt})</span>` : ""}</div>
+      <div class="price-box">
+        ${oldPriceHtml}
+        <div class="new-price">${priceNewFmt}</div>
+      </div>
+      ${desc ? `<div class="desc">${desc}</div>` : ""}
+      ${shopHtml}
+      <a class="cta" href="${escapeHtmlSSR(buyHref)}" target="_blank" rel="nofollow sponsored noopener">Comprar na Shopee</a>
+      <button type="button" class="more" id="btn-more">Ver mais ofertas</button>
+    </div>
+    <div class="foot">Link de afiliada. Ao comprar você apoia o site sem custo extra.</div>
+  </main>
+</div>
 <script>
-  // Prefetch vitrine sob demanda (idle) para acelerar quem fechar o popup
-  if ('requestIdleCallback' in window) {
-    requestIdleCallback(function(){
-      var l = document.createElement('link');
-      l.rel = 'prefetch'; l.href = ${JSON.stringify(backHref)};
-      document.head.appendChild(l);
-    }, { timeout: 3000 });
+(function(){
+  // Fecha overlay in-page — a vitrine já está carregada atrás no iframe,
+  // então basta esconder o overlay pra o cliente enxergar a home pronta.
+  function closeOverlay(){
+    var ov = document.getElementById('overlay');
+    if (ov) ov.style.display = 'none';
+    document.body.style.overflow = 'auto';
   }
+  var btnClose = document.getElementById('btn-close');
+  var btnMore  = document.getElementById('btn-more');
+  var overlay  = document.getElementById('overlay');
+  if (btnClose) btnClose.addEventListener('click', function(e){ e.preventDefault(); closeOverlay(); });
+  if (btnMore)  btnMore.addEventListener('click',  function(e){ e.preventDefault(); closeOverlay(); });
+  if (overlay)  overlay.addEventListener('click',  function(e){ if (e.target === overlay) closeOverlay(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeOverlay(); });
+})();
 </script>
 </body>
 </html>`;

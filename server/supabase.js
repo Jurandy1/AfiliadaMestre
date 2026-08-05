@@ -101,6 +101,7 @@ async function supabaseCount(query = "") {
 
 async function upsertOfertas(rows) {
   if (!rows?.length) return [];
+  const { SITE_SUBID } = require("./tracking");
   const cleaned = rows.map((r) => {
     const copy = { ...r };
     if (copy.short_link == null) delete copy.short_link;
@@ -108,6 +109,9 @@ async function upsertOfertas(rows) {
     if (copy.product_options == null) delete copy.product_options;
     if (!Array.isArray(copy.sub_ids) || !copy.sub_ids.length) {
       copy.sub_ids = buildProductSubIds(copy.category, copy.item_id, copy.subcategory);
+    } else if (copy.sub_ids[0] !== SITE_SUBID) {
+      // Invariante A (defesa em profundidade): slot 1 sempre = SITE_SUBID
+      copy.sub_ids = [SITE_SUBID, ...copy.sub_ids].slice(0, 5);
     }
     return copy;
   });
