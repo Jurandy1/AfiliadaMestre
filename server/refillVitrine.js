@@ -32,6 +32,7 @@ async function refillVitrine({
   const byCategory = {};
   let keywordsRun = 0;
   let shortlinksGenerated = 0;
+  let skippedExisting = 0;
   let stoppedEarly = false;
 
   for (const { keyword, category, subcategory } of keywords) {
@@ -70,9 +71,10 @@ async function refillVitrine({
 
         if (rows.length) {
           const out = await saveOffersWithShortlinks(rows, { gapMs: 100 });
-          rows.forEach((r) => map.set(String(r.item_id), r));
+          out.rows.forEach((r) => map.set(String(r.item_id), r));
           kwCount += out.saved;
           shortlinksGenerated += out.shortlinks?.generated || 0;
+          skippedExisting += out.skippedExisting || 0;
         }
         if (!offer.pageInfo?.hasNextPage) break;
       } catch (e) {
@@ -91,6 +93,7 @@ async function refillVitrine({
     removed,
     refilled: map.size,
     shortlinksGenerated,
+    skippedExisting,
     maxItems: cap || null,
     stoppedEarly,
     keywordsRun,

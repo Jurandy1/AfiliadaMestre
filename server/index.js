@@ -153,11 +153,13 @@ app.get("/api/ofertas", async (req, res) => {
     const products = nodes.map((n) => mapOfferToProduct(n, keyword, offer.listType));
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (sync && nodes.length) {
       const rows = nodes.map((n) => mapOfferToRow(n, keyword, offer.listType)).filter((r) => r.item_id && r.offer_link);
       const out = await saveOffersWithShortlinks(rows);
       saved = out.saved;
+      skippedExisting = out.skippedExisting || 0;
       shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -174,6 +176,7 @@ app.get("/api/ofertas", async (req, res) => {
       rawCount: offer.rawCount ?? products.length,
       filteredOut: offer.filteredOut || 0,
       saved,
+      skippedExisting,
       shortlinks,
       hasNextPage: !!offer.hasNextPage,
       pageInfo: offer.pageInfo || {},
@@ -246,6 +249,7 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (sync && batch.nodes?.length) {
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
@@ -254,6 +258,7 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
         .filter((r) => r.item_id && r.offer_link);
       const out = await saveOffersWithShortlinks(rows);
       saved = out.saved;
+      skippedExisting = out.skippedExisting || 0;
       shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -275,6 +280,7 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      skippedExisting,
       shortlinks,
       rateLimited,
       empty: batch.count === 0,
@@ -374,8 +380,9 @@ app.post("/api/ofertas/save-bulk", requireAdmin, async (req, res) => {
     res.json({
       ok: true,
       requested: products.length + nodes.length,
-      unique: out.rows.length,
+      unique: rows.length,
       saved: out.saved,
+      skippedExisting: out.skippedExisting || 0,
       count: out.saved,
       shortlinks: out.shortlinks,
     });
@@ -563,10 +570,12 @@ app.post("/api/campanhas/import-products", requireAdmin, async (req, res) => {
       .filter((r) => r.item_id && r.offer_link);
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (rows.length) {
       const out = await saveOffersWithShortlinks(rows);
       saved = out.saved;
+      skippedExisting = out.skippedExisting || 0;
       shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -578,6 +587,7 @@ app.post("/api/campanhas/import-products", requireAdmin, async (req, res) => {
       matchId,
       raw: offer.rawCount,
       saved,
+      skippedExisting,
       shortlinks,
     });
   } catch (err) {
@@ -686,6 +696,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (batch.nodes?.length) {
       const planoByKw = new Map(
@@ -705,6 +716,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
       if (rows.length) {
         const out = await saveOffersWithShortlinks(rows);
         saved = out.saved;
+        skippedExisting = out.skippedExisting || 0;
         shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
@@ -723,6 +735,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      skippedExisting,
       shortlinks,
       report: batch.report,
       count: batch.count,
@@ -778,6 +791,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (batch.nodes?.length) {
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
@@ -794,6 +808,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
       if (rows.length) {
         const out = await saveOffersWithShortlinks(rows);
         saved = out.saved;
+        skippedExisting = out.skippedExisting || 0;
         shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
@@ -812,6 +827,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      skippedExisting,
       shortlinks,
       count: batch.count,
       report: batch.report,
@@ -892,6 +908,7 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
     );
 
     let saved = 0;
+    let skippedExisting = 0;
     let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (batch.nodes?.length) {
       const rows = batch.nodes
@@ -907,6 +924,7 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
       if (rows.length) {
         const out = await saveOffersWithShortlinks(rows);
         saved = out.saved;
+        skippedExisting = out.skippedExisting || 0;
         shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
@@ -923,6 +941,7 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
       sortType,
       jobsRun: jobs.length,
       saved,
+      skippedExisting,
       shortlinks,
       filteredOut: batch.filteredOut,
       processed: jobs.map((j) => ({

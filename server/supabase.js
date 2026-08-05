@@ -194,14 +194,33 @@ async function listOfertas({ limit = 60, offset = 0, keyword = "", category = ""
 async function getOffersByItemIds(itemIds = [], { full = false } = {}) {
   const ids = [...new Set(
     itemIds.map(Number).filter((id) => Number.isSafeInteger(id) && id > 0)
-  )].slice(0, 100);
+  )];
   if (!ids.length) return [];
-  const filter = encodeURIComponent(`(${ids.join(",")})`);
-  const select = full ? "*" : "item_id,image_url,category,product_name";
-  return supabaseRequest(
-    `/ofertas?select=${select}&item_id=in.${filter}`,
-    { method: "GET", useService: true }
-  );
+
+  // PostgREST in.(...) — fatia em blocos de 80 para não estourar URL
+  const CHUNK = 80;
+  const all = [];
+  const select = full ? "*" : "item_id,image_url,category,product_name,short_link";
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const slice = ids.slice(i, i + CHUNK);
+    const filter = encodeURIComponent(`(${slice.join(",")})`);
+    const rows = await supabaseRequest(
+      `/ofertas?select=${select}&item_id=in.${filter}`,
+      { method: "GET", useService: true }
+    );
+    if (Array.isArray(rows)) all.push(...rows);
+  }
+  return all;
+}
+
+/** Set de item_id já publicados (para anti-duplicação nos syncs). */
+async function existingItemIdSet(itemIds = []) {
+  const rows = await getOffersByItemIds(itemIds, { full: false });
+  const set = new Set();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (r?.item_id != null) set.add(String(r.item_id));
+  }
+  return set;
 }
 
 async function countByCategory() {
@@ -406,6 +425,7 @@ module.exports = {
   updateShortLink,
   listOfertas,
   getOffersByItemIds,
+  existingItemIdSet,
   countByCategory,
   countBySubcategory,
   countOfertas,

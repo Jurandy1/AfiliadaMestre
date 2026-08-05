@@ -90,8 +90,9 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
   const startedAt = new Date();
   const processed = [];
   let upserts = 0;
-  let shortlinksGenerated = 0;
+    let shortlinksGenerated = 0;
   let shortlinksFailed = 0;
+  let skippedExistingTotal = 0;
   const mode = forceMode || nextMode();
 
   try {
@@ -129,13 +130,16 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           .filter((r) => r.item_id && r.offer_link);
 
         let saved = 0;
+        let skipped = 0;
         let sl = { generated: 0, failed: 0 };
         if (rows.length) {
           const out = await saveOffersWithShortlinks(rows, { gapMs: 150 });
           saved = out.saved;
+          skipped = out.skippedExisting || 0;
           sl = out.shortlinks || sl;
           upserts += saved;
           state.totalUpserts += saved;
+          skippedExistingTotal += skipped;
           shortlinksGenerated += sl.generated || 0;
           shortlinksFailed += sl.failed || 0;
         }
@@ -146,6 +150,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           audience: job.audience,
           ok: true,
           count: saved,
+          skippedExisting: skipped,
           shortlinks: sl.generated || 0,
           mode: mode.label,
           listType: mode.listType,
@@ -207,6 +212,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
       upserts,
       shortlinksGenerated,
       shortlinksFailed,
+      skippedExisting: skippedExistingTotal,
       queueSize: queue.length,
       cursor: state.cursor,
       durationMs: Date.now() - startedAt.getTime(),

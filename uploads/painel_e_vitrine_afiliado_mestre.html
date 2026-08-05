@@ -2094,7 +2094,8 @@
                 if (!silent) {
                     const filtered = data.filteredOut ? ` · ${data.filteredOut} filtrados` : "";
                     const sl = data.shortlinks?.generated ? ` · ${data.shortlinks.generated} shortlinks` : "";
-                    showToast(`✓ ${data.saved || data.count} em "${catId}"${sl}${filtered}`, "success");
+                    const skip = data.skippedExisting ? ` · ${data.skippedExisting} já existiam` : "";
+                    showToast(`✓ ${data.saved || data.count} novos em "${catId}"${skip}${sl}${filtered}`, "success");
                 }
                 return data;
             } catch (err) {
@@ -2486,11 +2487,12 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const sl = data.shortlinks || {};
+                const skip = data.skippedExisting ? ` · ${data.skippedExisting} já existiam` : "";
                 const slMsg = sl.generated
                     ? ` · ${sl.generated} shortlinks prontos`
                     : (sl.failed ? ` · ${sl.failed} shortlinks falharam` : "");
-                showToast(`Salvos: ${data.saved} produtos${slMsg}`, "success");
-                setExplorerStatus("success", `<strong>${data.saved}</strong> produtos gravados com Sub IDs${sl.generated ? ` e <strong>${sl.generated}</strong> shope.ee gerados` : ""}.`);
+                showToast(`Salvos: ${data.saved} novos${skip}${slMsg}`, "success");
+                setExplorerStatus("success", `<strong>${data.saved}</strong> novos gravados${data.skippedExisting ? ` · <strong>${data.skippedExisting}</strong> ignorados (já postados)` : ""}${sl.generated ? ` · <strong>${sl.generated}</strong> shope.ee` : ""}.`);
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
@@ -5654,7 +5656,8 @@ async function loadOffersFromSupabase(opts = {}) {
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
                 const sl = data.result?.shortlinksGenerated ?? 0;
-                showToast(`Lote: ${ups} salvos · ${sl} shortlinks`, 'success');
+                const skip = data.result?.skippedExisting ?? 0;
+                showToast(`Lote: ${ups} novos · ${skip} já existiam · ${sl} shortlinks`, 'success');
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
@@ -5679,7 +5682,8 @@ async function loadOffersFromSupabase(opts = {}) {
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
                 const sl = data.result?.shortlinksGenerated ?? 0;
-                showToast(`Destaques: ${ups} salvos · ${sl} shortlinks`, 'success');
+                const skip = data.result?.skippedExisting ?? 0;
+                showToast(`Destaques: ${ups} novos · ${skip} já existiam · ${sl} shortlinks`, 'success');
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
@@ -5711,7 +5715,7 @@ async function loadOffersFromSupabase(opts = {}) {
             if (data) {
                 if (status) {
                     status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-emerald-50 border-emerald-200 text-emerald-800';
-                    status.innerHTML = `<strong>${data.saved || data.count || 0}</strong> salvos · <strong>${data.shortlinks?.generated || 0}</strong> shortlinks · ${data.keywordsRun || 0} keywords · filtrados ${data.filteredOut || 0}`;
+                    status.innerHTML = `<strong>${data.saved || data.count || 0}</strong> novos · <strong>${data.skippedExisting || 0}</strong> já existiam · <strong>${data.shortlinks?.generated || 0}</strong> shortlinks · ${data.keywordsRun || 0} keywords`;
                 }
                 await loadOffersFromSupabase({ silent: true, reset: true, category: catId });
                 await loadCategoriesFromApi({ silent: true });
@@ -5899,7 +5903,7 @@ async function loadOffersFromSupabase(opts = {}) {
                     );
                 }
                 if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
-                showToast(`Cobertura: ${data.saved} salvos · ${data.shortlinks?.generated || 0} shortlinks`, 'success');
+                showToast(`Cobertura: ${data.saved} novos · ${data.skippedExisting || 0} já existiam · ${data.shortlinks?.generated || 0} shortlinks`, 'success');
                 await loadCoverageReport();
                 loadShortlinkStatus();
                 await loadOffersFromSupabase({ silent: true, reset: true });

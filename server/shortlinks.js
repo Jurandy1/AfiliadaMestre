@@ -1,20 +1,27 @@
 "use strict";
 
 /**
- * Shortlinks obrigatórios: todo produto salvo na vitrine sai com shope.ee + Sub IDs.
+ * Shortlinks obrigatórios + anti-duplicação:
+ * produto já postado (mesmo item_id) não é regravado no sync.
  */
 
 const {
   generateBatchShortLink,
   resolveProductOriginUrl,
 } = require("./shopee");
-const { upsertOfertas, updateShortLink } = require("./supabase");
+const {
+  upsertOfertas,
+  updateShortLink,
+  getOffersByItemIds,
+} = require("./supabase");
 const { buildProductSubIds } = require("./tracking");
 
 function prepareOfferRows(rows = []) {
-  const out = [];
+  const byId = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row?.item_id || !row.offer_link) continue;
+    const id = String(row.item_id);
+    if (byId.has(id)) continue; // dedupe no próprio lote
     const copy = { ...row };
     if (!copy.product_link) {
       copy.product_link = resolveProductOriginUrl(copy) || null;
@@ -22,9 +29,9 @@ function prepareOfferRows(rows = []) {
     if (!Array.isArray(copy.sub_ids) || copy.sub_ids.length < 5) {
       copy.sub_ids = buildProductSubIds(copy.category, copy.item_id, copy.subcategory);
     }
-    out.push(copy);
+    byId.set(id, copy);
   }
-  return out;
+  return [...byId.values()];
 }
 
 /**
@@ -88,27 +95,75 @@ async function generateShortlinksForRows(rows = [], { gapMs = 400 } = {}) {
 }
 
 /**
- * Upsert + shortlinks na mesma operação — padrão para sync/autosync/cobertura/explorador.
+ * Upsert + shortlinks.
+ * skipExisting=true (padrão): não regrava item_id já publicado — evita duplicar na vitrine.
+ * Ainda gera shortlink para existentes que estejam sem shope.ee.
  */
-async function saveOffersWithShortlinks(rows = [], { withShortlinks = true, gapMs = 200 } = {}) {
+async function saveOffersWithShortlinks(
+  rows = [],
+  { withShortlinks = true, skipExisting = true, gapMs = 200 } = {}
+) {
   const prepared = prepareOfferRows(rows);
   if (!prepared.length) {
     return {
       saved: 0,
+      skippedExisting: 0,
       rows: [],
       shortlinks: { generated: 0, failed: 0, skipped: 0 },
     };
   }
 
-  const result = await upsertOfertas(prepared);
-  const saved = Array.isArray(result) ? result.length : prepared.length;
+  let toInsert = prepared;
+  let skippedExisting = 0;
+  let existingMissingShortlink = [];
+
+  if (skipExisting) {
+    const existingRows = await getOffersByItemIds(
+      prepared.map((r) => r.item_id),
+      { full: false }
+    );
+    const existing = new Map(
+      (Array.isArray(existingRows) ? existingRows : []).map((r) => [String(r.item_id), r])
+    );
+    toInsert = [];
+    for (const row of prepared) {
+      const prev = existing.get(String(row.item_id));
+      if (prev) {
+        skippedExisting += 1;
+        if (!prev.short_link) {
+          existingMissingShortlink.push({
+            ...row,
+            short_link: null,
+            // preserva dados de tracking já no banco quando possível
+            category: prev.category || row.category,
+          });
+        }
+      } else {
+        toInsert.push(row);
+      }
+    }
+  }
+
+  let saved = 0;
+  if (toInsert.length) {
+    const result = await upsertOfertas(toInsert);
+    saved = Array.isArray(result) ? result.length : toInsert.length;
+  }
 
   let shortlinks = { generated: 0, failed: 0, skipped: 0 };
   if (withShortlinks) {
-    shortlinks = await generateShortlinksForRows(prepared, { gapMs });
+    const forLinks = [...toInsert, ...existingMissingShortlink];
+    if (forLinks.length) {
+      shortlinks = await generateShortlinksForRows(forLinks, { gapMs });
+    }
   }
 
-  return { saved, rows: prepared, shortlinks };
+  return {
+    saved,
+    skippedExisting,
+    rows: toInsert,
+    shortlinks,
+  };
 }
 
 module.exports = {
