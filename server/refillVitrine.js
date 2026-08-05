@@ -1,13 +1,14 @@
 "use strict";
 
 const { fetchProductOffers, mapOfferToRow } = require("./shopee");
-const { upsertOfertas, clearAllOfertas } = require("./supabase");
+const { clearAllOfertas } = require("./supabase");
+const { saveOffersWithShortlinks } = require("./shortlinks");
 const { prioritizedKeywords, DEFAULT_FEMALE_PERCENT } = require("./categorias");
-const { SITE_SUBID } = require("./tracking");
 
 /**
  * Limpa (opcional) e realimenta a vitrine via API Shopee.
  * Usa keywords priorizadas ~95% feminino.
+ * Cada lote salvo já sai com shortlink.
  */
 async function refillVitrine({
   clear = true,
@@ -30,6 +31,7 @@ async function refillVitrine({
   const map = new Map();
   const byCategory = {};
   let keywordsRun = 0;
+  let shortlinksGenerated = 0;
   let stoppedEarly = false;
 
   for (const { keyword, category, subcategory } of keywords) {
@@ -67,9 +69,10 @@ async function refillVitrine({
           .filter((r) => r.item_id && r.offer_link);
 
         if (rows.length) {
-          await upsertOfertas(rows);
+          const out = await saveOffersWithShortlinks(rows, { gapMs: 100 });
           rows.forEach((r) => map.set(String(r.item_id), r));
-          kwCount += rows.length;
+          kwCount += out.saved;
+          shortlinksGenerated += out.shortlinks?.generated || 0;
         }
         if (!offer.pageInfo?.hasNextPage) break;
       } catch (e) {
@@ -87,12 +90,13 @@ async function refillVitrine({
     ok: true,
     removed,
     refilled: map.size,
+    shortlinksGenerated,
     maxItems: cap || null,
     stoppedEarly,
     keywordsRun,
-    keywordsTotal: keywords.length,
     byCategory,
-    siteSubId: SITE_SUBID,
+    femalePercentTarget: DEFAULT_FEMALE_PERCENT,
+    report,
   };
 }
 

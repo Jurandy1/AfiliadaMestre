@@ -530,7 +530,7 @@
                     <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex-1">
                             <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-venus text-pink-500 mr-1"></i> Cobertura feminina (95/5)</h4>
-                            <p class="text-[10px] text-slate-500 mt-1">Preenche buracos por categoria/sub · home 100% feminina · sync busca maior comissão</p>
+                            <p class="text-[10px] text-slate-500 mt-1">Preenche buracos por categoria/sub · home 100% feminina · sync + <strong>shortlink automático</strong></p>
                             <p id="coverage-status-line" class="text-[11px] text-slate-700 font-semibold mt-2"><i class="fas fa-spinner fa-spin mr-1"></i> Carregando cobertura…</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -550,7 +550,7 @@
                     <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
                         <div class="min-w-0 flex-1">
                             <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-bolt text-amber-500 mr-1"></i> Shortlinks pré-gerados</h4>
-                            <p class="text-[10px] text-slate-500 mt-1">Gera <strong>tudo que falta</strong> com Sub IDs oficiais. Produtos do Explorador já saem com shope.ee pronto.</p>
+                            <p class="text-[10px] text-slate-500 mt-1">Gera o que ainda falta. Sync, cobertura e auto-feed já salvam produtos <strong>com shope.ee</strong>.</p>
                             <p id="shortlink-status-line" class="text-[11px] text-slate-700 font-semibold mt-2"><i class="fas fa-spinner fa-spin mr-1"></i> Verificando…</p>
                             <div class="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                 <div id="shortlink-status-bar" class="h-full bg-emerald-500 transition-all" style="width:0%"></div>
@@ -767,7 +767,7 @@
                             <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
                                 <i class="fas fa-layer-group text-shopee-orange"></i> Sync por categoria
                             </h4>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Puxa todas as keywords da categoria escolhida e grava no Supabase</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Puxa keywords da categoria, grava no Supabase e gera <strong>shortlink</strong> na hora</p>
                         </div>
                         <span class="text-[9px] font-black uppercase tracking-wider text-slate-400 bg-white border border-slate-200 px-2 py-1 rounded-md">Lote por keywords</span>
                     </div>
@@ -806,7 +806,7 @@
                             <h4 class="font-bold text-xs text-slate-700 uppercase flex items-center gap-1.5">
                                 <i class="fas fa-robot text-shopee-orange"></i> Alimentação automática
                             </h4>
-                            <p class="text-[10px] text-slate-400 mt-0.5">Lotes leves em segundo plano — respeita AUTO_SYNC do .env</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Lotes leves · cobertura 95/5 · cada produto sai com shortlink shope.ee</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <span id="auto-enabled-badge" class="text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border bg-slate-100 text-slate-500 border-slate-200">—</span>
@@ -2093,7 +2093,8 @@
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 if (!silent) {
                     const filtered = data.filteredOut ? ` · ${data.filteredOut} filtrados` : "";
-                    showToast(`✓ ${data.count} produtos em "${catId}"${filtered}`, "success");
+                    const sl = data.shortlinks?.generated ? ` · ${data.shortlinks.generated} shortlinks` : "";
+                    showToast(`✓ ${data.saved || data.count} em "${catId}"${sl}${filtered}`, "success");
                 }
                 return data;
             } catch (err) {
@@ -5624,6 +5625,8 @@ async function loadOffersFromSupabase(opts = {}) {
                         `intervalo.....: ${s.intervalMin} min`,
                         `itens/keyword.: ${s.limit}`,
                         `modos.........: ${modes || 'comissão → top → recomendados'}`,
+                        `shortlinks....: on-save + residual ${s.shortlinkBackfillPerRun ?? 50}/run`,
+                        `última rodada.: ${(s.lastResult && s.lastResult.shortlinksGenerated != null) ? (s.lastResult.shortlinksGenerated + ' shortlinks') : '—'}`,
                         `execuções.....: ${s.runs}`,
                         `última........: ${fmtDateTime(s.lastRunAt)}`,
                         `próxima.......: ${fmtDateTime(s.nextRunAt)}`,
@@ -5650,12 +5653,14 @@ async function loadOffersFromSupabase(opts = {}) {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
-                showToast(`Lote concluído: ${ups} itens atualizados.`, 'success');
+                const sl = data.result?.shortlinksGenerated ?? 0;
+                showToast(`Lote: ${ups} salvos · ${sl} shortlinks`, 'success');
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+                loadShortlinkStatus();
             } catch (err) {
                 showToast(`Falha ao sincronizar: ${err.message}`, 'error');
             } finally {
@@ -5673,12 +5678,14 @@ async function loadOffersFromSupabase(opts = {}) {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 const ups = data.result?.upserts ?? 0;
-                showToast(`Destaques: ${ups} itens atualizados.`, 'success');
+                const sl = data.result?.shortlinksGenerated ?? 0;
+                showToast(`Destaques: ${ups} salvos · ${sl} shortlinks`, 'success');
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+                loadShortlinkStatus();
                 loadHeroProducts();
             } catch (err) {
                 showToast(`Falha nos destaques: ${err.message}`, 'error');
@@ -5704,12 +5711,13 @@ async function loadOffersFromSupabase(opts = {}) {
             if (data) {
                 if (status) {
                     status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-emerald-50 border-emerald-200 text-emerald-800';
-                    status.innerHTML = `<strong>${data.count}</strong> produtos · ${data.keywordsRun || 0} keywords · ${data.listTypeLabel || ''} · filtrados ${data.filteredOut || 0}`;
+                    status.innerHTML = `<strong>${data.saved || data.count || 0}</strong> salvos · <strong>${data.shortlinks?.generated || 0}</strong> shortlinks · ${data.keywordsRun || 0} keywords · filtrados ${data.filteredOut || 0}`;
                 }
                 await loadOffersFromSupabase({ silent: true, reset: true, category: catId });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
+                loadShortlinkStatus();
                 if (isAdminMode()) loadAdminCatalogFull({ silent: true, force: true });
             } else if (status) {
                 status.className = 'text-[11px] rounded-lg px-3 py-2 border bg-red-50 border-red-200 text-red-700';

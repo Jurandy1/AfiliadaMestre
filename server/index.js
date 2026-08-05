@@ -48,6 +48,10 @@ const { buildCoverageReport, buildCoverageQueue } = require("./coverage");
 const { refillVitrine } = require("./refillVitrine");
 const { productMatchesSubcategory } = require("./productMeta");
 const { SITE_SUBID, buildProductSubIds, buildTrackedSubIds, sanitizeSubId } = require("./tracking");
+const {
+  generateShortlinksForRows,
+  saveOffersWithShortlinks,
+} = require("./shortlinks");
 const autosync = require("./autosync");
 
 const app = express();
@@ -149,10 +153,12 @@ app.get("/api/ofertas", async (req, res) => {
     const products = nodes.map((n) => mapOfferToProduct(n, keyword, offer.listType));
 
     let saved = 0;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (sync && nodes.length) {
       const rows = nodes.map((n) => mapOfferToRow(n, keyword, offer.listType)).filter((r) => r.item_id && r.offer_link);
-      const result = await upsertOfertas(rows);
-      saved = Array.isArray(result) ? result.length : rows.length;
+      const out = await saveOffersWithShortlinks(rows);
+      saved = out.saved;
+      shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
     }
@@ -168,6 +174,7 @@ app.get("/api/ofertas", async (req, res) => {
       rawCount: offer.rawCount ?? products.length,
       filteredOut: offer.filteredOut || 0,
       saved,
+      shortlinks,
       hasNextPage: !!offer.hasNextPage,
       pageInfo: offer.pageInfo || {},
       filters: offer.filters || { minRating, minSales, requireCommission },
@@ -239,13 +246,15 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
     });
 
     let saved = 0;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (sync && batch.nodes?.length) {
       const kwById = new Map(batch.products.map((p) => [String(p.itemId || p.id), p.keyword || ""]));
       const rows = batch.nodes
         .map((n) => mapOfferToRow(n, kwById.get(String(n.itemId)) || cleaned[0], batch.listType))
         .filter((r) => r.item_id && r.offer_link);
-      const result = await upsertOfertas(rows);
-      saved = Array.isArray(result) ? result.length : rows.length;
+      const out = await saveOffersWithShortlinks(rows);
+      saved = out.saved;
+      shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
     }
@@ -266,6 +275,7 @@ app.post("/api/ofertas/batch", requireAdmin, async (req, res) => {
       filteredOut: batch.filteredOut,
       hasNextPage: batch.hasNextPage,
       saved,
+      shortlinks,
       rateLimited,
       empty: batch.count === 0,
       report: batch.report,
@@ -356,35 +366,18 @@ app.post("/api/ofertas/save-bulk", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Nenhum produto válido (itemId + offerLink)", code: "INVALID_PRODUCTS" });
     }
 
-    // Garante product_link cru + Sub IDs antes de gravar (tracking oficial Shopee)
-    for (const row of rows) {
-      if (!row.product_link) {
-        row.product_link = resolveProductOriginUrl(row) || null;
-      }
-      if (!Array.isArray(row.sub_ids) || row.sub_ids.length < 5) {
-        row.sub_ids = buildProductSubIds(row.category, row.item_id, row.subcategory);
-      }
-    }
-
-    const result = await upsertOfertas(rows);
-    const saved = Array.isArray(result) ? result.length : rows.length;
+    const withShortlinks = body.withShortlinks !== false;
+    const out = await saveOffersWithShortlinks(rows, { withShortlinks });
     categoriasCache = { at: 0, data: null };
     ofertasCache.clear();
-
-    // Já gera shope.ee com Sub IDs — produto sai pronto pro "Comprar" (sem perder comissão)
-    const withShortlinks = body.withShortlinks !== false;
-    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
-    if (withShortlinks && rows.length) {
-      shortlinks = await generateShortlinksForRows(rows);
-    }
 
     res.json({
       ok: true,
       requested: products.length + nodes.length,
-      unique: rows.length,
-      saved,
-      count: saved,
-      shortlinks,
+      unique: out.rows.length,
+      saved: out.saved,
+      count: out.saved,
+      shortlinks: out.shortlinks,
     });
   } catch (err) {
     console.error("[/api/ofertas/save-bulk]", err.message);
@@ -570,11 +563,11 @@ app.post("/api/campanhas/import-products", requireAdmin, async (req, res) => {
       .filter((r) => r.item_id && r.offer_link);
 
     let saved = 0;
-    let shortlinks = { generated: 0 };
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
     if (rows.length) {
-      const result = await upsertOfertas(rows);
-      saved = Array.isArray(result) ? result.length : rows.length;
-      shortlinks = await generateShortlinksForRows(rows);
+      const out = await saveOffersWithShortlinks(rows);
+      saved = out.saved;
+      shortlinks = out.shortlinks;
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
     }
@@ -710,9 +703,9 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
         })
         .filter((r) => r.item_id && r.offer_link);
       if (rows.length) {
-        const result = await upsertOfertas(rows);
-        saved = Array.isArray(result) ? result.length : rows.length;
-        shortlinks = await generateShortlinksForRows(rows);
+        const out = await saveOffersWithShortlinks(rows);
+        saved = out.saved;
+        shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -799,9 +792,9 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
         })
         .filter((r) => r.item_id && r.offer_link);
       if (rows.length) {
-        const result = await upsertOfertas(rows);
-        saved = Array.isArray(result) ? result.length : rows.length;
-        shortlinks = await generateShortlinksForRows(rows);
+        const out = await saveOffersWithShortlinks(rows);
+        saved = out.saved;
+        shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -912,9 +905,9 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
         })
         .filter((r) => r.item_id && r.offer_link);
       if (rows.length) {
-        const result = await upsertOfertas(rows);
-        saved = Array.isArray(result) ? result.length : rows.length;
-        shortlinks = await generateShortlinksForRows(rows);
+        const out = await saveOffersWithShortlinks(rows);
+        saved = out.saved;
+        shortlinks = out.shortlinks;
       }
       categoriasCache = { at: 0, data: null };
       ofertasCache.clear();
@@ -1050,62 +1043,6 @@ app.post("/api/shortlink", async (req, res) => {
     res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
   }
 });
-
-/**
- * Gera shortlinks shope.ee com Sub IDs oficiais para uma lista de rows.
- * Usa generateBatchShortLink (até 50 por request).
- */
-async function generateShortlinksForRows(rows = [], { gapMs = 400 } = {}) {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  let generated = 0;
-  let failed = 0;
-  let skipped = 0;
-  const list = Array.isArray(rows) ? rows : [];
-  const BATCH = 50;
-
-  for (let i = 0; i < list.length; i += BATCH) {
-    const chunk = list.slice(i, i + BATCH);
-    const links = [];
-    for (const row of chunk) {
-      const origin = resolveProductOriginUrl(row);
-      if (!origin) {
-        skipped += 1;
-        continue;
-      }
-      const subIds = Array.isArray(row.sub_ids) && row.sub_ids.length
-        ? row.sub_ids
-        : buildProductSubIds(row.category, row.item_id, row.subcategory);
-      links.push({ originUrl: origin, subIds, itemId: row.item_id });
-    }
-    if (!links.length) continue;
-
-    try {
-      const batch = await generateBatchShortLink(links);
-      for (const item of batch.links || []) {
-        if (item.success && item.shortLink && item.itemId) {
-          try {
-            await updateShortLink(item.itemId, item.shortLink);
-            generated += 1;
-          } catch (_) {
-            failed += 1;
-          }
-        } else {
-          failed += 1;
-        }
-      }
-      if (batch.rateLimited) {
-        return { generated, failed, skipped, rateLimited: true };
-      }
-    } catch (e) {
-      failed += links.length;
-      if (e.rateLimited) {
-        return { generated, failed, skipped, rateLimited: true };
-      }
-    }
-    if (i + BATCH < list.length) await sleep(gapMs);
-  }
-  return { generated, failed, skipped };
-}
 
 /**
  * Backfill de shortlinks: gera shope.ee para ofertas sem short_link cacheado.
