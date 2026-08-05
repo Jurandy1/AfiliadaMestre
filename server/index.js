@@ -1794,8 +1794,9 @@ app.get("*", (req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Afiliado Mestre rodando em http://localhost:${PORT}`);
+  // 0.0.0.0 é obrigatório no Railway/Docker — sem isso o healthcheck não alcança o app.
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Afiliado Mestre rodando em http://0.0.0.0:${PORT}`);
     console.log(`Vitrine: http://localhost:${PORT}/`);
     console.log(`Admin:   http://localhost:${PORT}/admin`);
     console.log(`Health:  http://localhost:${PORT}/api/health`);
