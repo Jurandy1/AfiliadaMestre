@@ -1,6 +1,6 @@
 "use strict";
 
-const { fetchProductOffers, mapOfferToRow } = require("./shopee");
+const { fetchProductOffers, mapOfferToRow, MIN_RATING, MIN_SALES } = require("./shopee");
 const { clearAllOfertas } = require("./supabase");
 const { saveOffersWithShortlinks } = require("./shortlinks");
 const { prioritizedKeywords, DEFAULT_FEMALE_PERCENT } = require("./categorias");
@@ -57,6 +57,8 @@ async function refillVitrine({
           page,
           listType: 1,
           sortType: 5,
+          minRating: MIN_RATING,
+          minSales: MIN_SALES,
           requireCommission: true,
         });
         const nodes = offer.nodes || [];

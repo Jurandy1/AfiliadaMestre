@@ -24,6 +24,7 @@ const {
   LIST_TYPE_LABELS,
   SORT_TYPE_LABELS,
   MIN_RATING,
+  MIN_SALES,
   DEFAULT_BATCH_GAP_MS,
 } = require("./shopee");
 const {
@@ -412,6 +413,7 @@ app.get("/api/ofertas/meta", (_req, res) => {
       listType: 0,
       sortType: 2,
       minRating: MIN_RATING,
+      minSales: MIN_SALES,
       gapMs: DEFAULT_BATCH_GAP_MS,
     },
   });
@@ -560,6 +562,7 @@ app.post("/api/campanhas/import-products", requireAdmin, async (req, res) => {
       sortType: 5,
       requireCommission: true,
       minRating: MIN_RATING,
+      minSales: MIN_SALES,
     });
 
     const rows = (offer.nodes || [])
@@ -657,7 +660,7 @@ app.post("/api/sync", requireAdmin, async (req, res) => {
     const listType = req.body?.listType != null ? Number(req.body.listType) : 1;
     const sortType = req.body?.sortType != null ? Number(req.body.sortType) : 5;
     const minRating = req.body?.minRating != null ? Number(req.body.minRating) : MIN_RATING;
-    const minSales = req.body?.minSales != null ? Number(req.body.minSales) : 0;
+    const minSales = req.body?.minSales != null ? Number(req.body.minSales) : MIN_SALES;
     const requireCommission = req.body?.requireCommission !== false;
     const pages = Math.min(Math.max(Number(req.body?.pages) || 1, 1), 5);
     let plano;
@@ -768,7 +771,7 @@ app.get("/api/sync/categoria/:id", requireAdmin, async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 5), 50);
     const pages = Math.min(Math.max(Number(req.query.pages) || 1, 1), 5);
     const minRating = req.query.minRating != null ? Number(req.query.minRating) : MIN_RATING;
-    const minSales = req.query.minSales != null ? Number(req.query.minSales) : 0;
+    const minSales = req.query.minSales != null ? Number(req.query.minSales) : MIN_SALES;
     const requireCommission =
       req.query.requireCommission == null
         ? true
@@ -899,6 +902,7 @@ app.post("/api/sync/coverage", requireAdmin, async (req, res) => {
       listType,
       sortType,
       minRating: MIN_RATING,
+      minSales: MIN_SALES,
       requireCommission: true,
       gapMs: DEFAULT_BATCH_GAP_MS,
     });

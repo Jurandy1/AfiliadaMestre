@@ -179,7 +179,7 @@
                     <a href="/melhor-avaliados" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Melhor Avaliados</a>
                     <a href="/lojas-oficiais" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Lojas Oficiais</a>
                     <a href="/relampago" class="text-white/90 hover:text-white hover:underline whitespace-nowrap">Relâmpago</a>
-                    <span class="ml-auto text-white/70">Site independente · comissão sem custo pra você</span>
+                    <span class="ml-auto text-white/85 font-semibold">Curadoria · compra 100% segura no app Shopee</span>
                 </div>
             </div>
             <div class="max-w-7xl mx-auto px-4">
@@ -218,6 +218,16 @@
                         </div>
                     </div>
                 </div>
+                <p class="md:hidden mt-2.5 text-center text-[10px] text-white/90 font-semibold leading-snug">
+                    Finalize a compra com segurança no app oficial da Shopee
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-amber-50 border-b border-amber-100 text-amber-950">
+            <div class="max-w-7xl mx-auto px-4 py-2 flex items-center justify-center gap-2 text-[11px] md:text-xs font-semibold text-center">
+                <i class="fas fa-shield-halved text-shopee-orange shrink-0"></i>
+                <span>Nenhum pagamento neste site — você é redirecionada para a Shopee com segurança.</span>
             </div>
         </div>
 
@@ -1364,6 +1374,9 @@
                 <img src="/uploads/logo-bg.png" alt="Afiliada Mestre" class="h-14 w-auto rounded-lg">
                 <p class="text-xs text-slate-500 leading-relaxed">
                     Seleção diária de ofertas da Shopee. Ao clicar, você é direcionado para a página oficial do produto.
+                </p>
+                <p class="text-[11px] font-semibold text-slate-700 leading-relaxed">
+                    Nenhum pagamento é feito neste site. Finalize a compra com 100% de segurança no app/site da Shopee.
                 </p>
             </div>
             <div>
@@ -3534,7 +3547,11 @@ async function loadOffersFromSupabase(opts = {}) {
             const disc = displayDiscount(p);
             const priceFormatted = Number(p.newPrice).toFixed(2).replace('.', ',');
             const rating = formatRating(p.stars);
+            const soldCount = parseSalesNumber(p);
             const sold = formatSold(p.salesRaw != null ? p.salesRaw : p.sales);
+            const salesBadge = soldCount >= 1000
+                ? `+${soldCount >= 10000 ? `${Math.floor(soldCount / 1000)} mil` : soldCount.toLocaleString('pt-BR')} vendidos`
+                : (soldCount >= 100 ? `+${soldCount} vendidos` : '');
             const shop = cleanShopName(p.shopName);
             const official = isOfficialShop(p.shopType);
             const subLabel = subcategoryLabelForProduct(p);
@@ -3547,6 +3564,7 @@ async function loadOffersFromSupabase(opts = {}) {
                         <span class="text-[7px] text-orange-600 font-bold uppercase block mt-0.5">OFF</span>
                     </div>` : ''}
                     ${official ? `<span class="absolute left-2 top-2 z-10 rounded bg-shopee-orange px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">Oficial</span>` : ''}
+                    ${salesBadge ? `<span class="absolute left-2 ${official ? 'top-8' : 'top-2'} z-10 rounded bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-sm">${escapeHtml(salesBadge)}</span>` : ''}
                     <div class="aspect-square bg-slate-50 relative overflow-hidden">
                         ${productImgHTML(p.image, {
                             eager: index < 8,
@@ -3555,18 +3573,21 @@ async function loadOffersFromSupabase(opts = {}) {
                     </div>
                     <div class="p-2.5 flex flex-col justify-between flex-1 space-y-1">
                         ${subLabel ? `<span class="self-start bg-orange-50 text-shopee-orange text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">${escapeHtml(subLabel)}</span>` : ''}
-                        <h4 class="text-xs text-slate-700 font-semibold line-clamp-2 min-h-[2rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
+                        <h4 class="text-[13px] text-slate-900 font-semibold line-clamp-2 min-h-[2.4rem] leading-snug group-hover:text-shopee-orange transition">${escapeHtml(p.title)}</h4>
                         ${renderOptionBadges(p, true)}
                         <div>
                             ${p.oldPrice > p.newPrice ? `<p class="text-[9px] text-slate-400 line-through leading-none">R$ ${Number(p.oldPrice).toFixed(2).replace('.', ',')}</p>` : ''}
                             <p class="text-shopee-orange text-base font-black mt-0.5">R$ ${priceFormatted}</p>
                         </div>
-                        <div class="flex items-center gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-50 mt-auto">
-                            ${rating ? `<span class="text-amber-500">★</span><span class="font-semibold text-slate-600">${rating}</span>` : ''}
+                        <div class="flex items-center gap-1 text-[10px] text-slate-500 pt-1 border-t border-slate-50">
+                            ${rating ? `<span class="text-amber-500">★</span><span class="font-semibold text-slate-700">${rating}</span>` : ''}
                             ${rating && sold ? `<span class="text-slate-300">·</span>` : ''}
                             ${sold ? `<span>${escapeHtml(sold)}</span>` : ''}
                         </div>
                         ${shop ? `<p class="text-[9px] text-slate-400 truncate">${escapeHtml(shop)}</p>` : ''}
+                        <span class="mt-auto pt-1.5 text-[11px] font-bold text-shopee-orange flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                            Ver oferta na Shopee <i class="fas fa-arrow-right text-[9px]"></i>
+                        </span>
                     </div>
                 </div>`;
         }
@@ -3984,6 +4005,7 @@ async function loadOffersFromSupabase(opts = {}) {
         function captureTrafficAttribution() {
             const params = new URLSearchParams(location.search);
             const channelRaw = params.get('utm_source')
+                || params.get('src')
                 || params.get('canal')
                 || params.get('source')
                 || params.get('ref')

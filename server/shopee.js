@@ -32,7 +32,9 @@ const SYNC_ROTATION = [
   { listType: 0, sortType: 2, label: "recomendados_vendidos", listTypeLabel: LIST_TYPE_LABELS[0], sortTypeLabel: SORT_TYPE_LABELS[2] },
 ];
 
-const MIN_RATING = Number(process.env.SYNC_MIN_RATING) || 4.0;
+const MIN_RATING = Number(process.env.SYNC_MIN_RATING) || 4.3;
+/** Mínimo de vendas no sync — evita produto “novo” com comissão alta e zero prova social. */
+const MIN_SALES = Number(process.env.SYNC_MIN_SALES) || 50;
 const DEFAULT_BATCH_GAP_MS = clampNum(process.env.SHOPEE_BATCH_GAP_MS, 350, 100, 5000);
 
 function clampNum(v, def, min, max) {
@@ -211,7 +213,7 @@ function isFlashActive(periodEnd, windowHours = 24) {
 
 function normalizeQualityFilters({
   minRating = MIN_RATING,
-  minSales = 0,
+  minSales = MIN_SALES,
   requireCommission = false,
   minCommissionPct = 0,
 } = {}) {
@@ -220,7 +222,8 @@ function normalizeQualityFilters({
   const minComm = Number(minCommissionPct);
   return {
     minRating: Number.isFinite(rating) && rating > 0 ? rating : MIN_RATING,
-    minSales: Number.isFinite(sales) && sales > 0 ? sales : 0,
+    // 0 explícito desliga o filtro (explorador); omitido usa MIN_SALES
+    minSales: Number.isFinite(sales) && sales >= 0 ? sales : MIN_SALES,
     requireCommission: !!requireCommission,
     minCommissionPct: Number.isFinite(minComm) && minComm > 0 ? minComm : 0,
   };
@@ -932,5 +935,6 @@ module.exports = {
   LIST_TYPE_LABELS,
   SORT_TYPE_LABELS,
   MIN_RATING,
+  MIN_SALES,
   DEFAULT_BATCH_GAP_MS,
 };

@@ -8,6 +8,8 @@ const {
   fetchProductOffers,
   mapOfferToRow,
   SYNC_ROTATION,
+  MIN_RATING,
+  MIN_SALES,
 } = require("./shopee");
 const {
   pruneOlderThan,
@@ -116,7 +118,8 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
           page: 1,
           listType: mode.listType,
           sortType: mode.sortType,
-          minRating: 4,
+          minRating: MIN_RATING,
+          minSales: MIN_SALES,
           requireCommission: true,
         });
         const nodes = offer.nodes || [];
