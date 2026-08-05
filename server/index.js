@@ -1331,7 +1331,7 @@ app.delete("/api/ofertas", requireAdmin, async (req, res) => {
   }
 });
 
-/** Preview de duplicados (mesma loja+nome / mesmo link). */
+/** Preview de duplicados (loja+nome idêntico / mesmo item ou link Shopee). */
 app.get("/api/ofertas/duplicates", requireAdmin, async (req, res) => {
   try {
     const max = Math.min(Math.max(Number(req.query.max) || 5000, 100), 10000);

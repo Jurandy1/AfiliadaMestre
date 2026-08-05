@@ -3,9 +3,12 @@
 /**
  * Detecta e remove produtos duplicados na vitrine.
  * Critérios (mesmo grupo = duplicata):
- *  1) mesmo shop_id + nome normalizado
- *  2) mesmo item_id embutido no product_link / offer_link (quando diferente do PK — raro)
- *  3) mesma image_url + prefixo do nome (quando sem shop_id)
+ *  1) mesmo shop_id + nome normalizado (idêntico)
+ *  2) mesmo item_id real extraído do product_link / offer_link
+ *  3) mesmo product_link canônico (sem query string)
+ *
+ * NÃO agrupa por loja sozinha — bug antigo extraía shop_id da URL
+ * como se fosse item_id e juntava a loja inteira num único cluster.
  *
  * Mantém o melhor: tem shortlink > maior moneyScore > mais vendas > mais recente.
  */
@@ -23,13 +26,54 @@ function normalizeText(s) {
     .trim();
 }
 
+/**
+ * Extrai o item_id real de URLs Shopee.
+ * Formatos: ...-i.{shopId}.{itemId} | /product/{shopId}/{itemId} | itemid=
+ * Nunca retorna o shopId no lugar do item.
+ */
 function extractItemIdFromUrl(url) {
-  const s = String(url || "");
-  const m = s.match(/(?:i\.|product\/|item[_-]?id[=/.-])(\d{6,})/i)
-    || s.match(/\.(\d{8,})(?:\?|$)/);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
+  const s = String(url || "").trim();
+  if (!s) return null;
+
+  // Nome-do-Produto-i.{shopId}.{itemId}
+  let m = s.match(/-i\.(\d+)\.(\d+)/i);
+  if (m) {
+    const itemId = Number(m[2]);
+    return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : null;
+  }
+
+  // /product/{shopId}/{itemId}
+  m = s.match(/\/product\/(\d+)\/(\d+)/i);
+  if (m) {
+    const itemId = Number(m[2]);
+    return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : null;
+  }
+
+  // query/fragment explícito
+  m = s.match(/[?&#](?:item[_-]?id|itemid)=(\d{6,})/i);
+  if (m) {
+    const itemId = Number(m[1]);
+    return Number.isSafeInteger(itemId) && itemId > 0 ? itemId : null;
+  }
+
+  return null;
+}
+
+function canonicalizeProductUrl(url) {
+  const s = String(url || "").trim();
+  if (!s || /^https?:\/\/s\.shopee\./i.test(s) || /shope\.ee\//i.test(s)) {
+    // shortlinks são únicos por destino — não servem para dedupe entre linhas
+    return "";
+  }
+  try {
+    const u = new URL(s);
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    const path = u.pathname.replace(/\/+$/, "");
+    if (!host || !path || path === "/") return "";
+    return `${host}${path}`;
+  } catch {
+    return s.split("?")[0].split("#")[0].replace(/\/+$/, "").toLowerCase();
+  }
 }
 
 function scoreRow(row) {
@@ -47,24 +91,27 @@ function scoreRow(row) {
 function dupeKeysFor(row) {
   const keys = [];
   const name = normalizeText(row.product_name);
-  const shopId = row.shop_id != null ? Number(row.shop_id) : null;
-  const img = String(row.image_url || "").split("?")[0].trim();
+  const shopId = row.shop_id != null && Number(row.shop_id) > 0 ? Number(row.shop_id) : null;
 
-  if (shopId && name.length >= 12) {
+  // 1) Mesma loja + nome idêntico (título completo)
+  if (shopId && name.length >= 16) {
     keys.push(`shop:${shopId}|name:${name}`);
   }
+
+  // 2) Mesmo produto na URL (item_id real — nunca shop_id)
   const fromProduct = extractItemIdFromUrl(row.product_link);
   const fromOffer = extractItemIdFromUrl(row.offer_link);
-  if (fromProduct && fromProduct !== Number(row.item_id)) {
-    keys.push(`urlitem:${fromProduct}`);
+  const urlItem = fromProduct || fromOffer;
+  if (urlItem) {
+    keys.push(`urlitem:${urlItem}`);
   }
-  if (fromOffer && fromOffer !== Number(row.item_id) && fromOffer !== fromProduct) {
-    keys.push(`urlitem:${fromOffer}`);
+
+  // 3) Mesmo link de produto canônico (sem shortlink)
+  const canon = canonicalizeProductUrl(row.product_link);
+  if (canon.length >= 24) {
+    keys.push(`link:${canon}`);
   }
-  if (!shopId && img && name.length >= 16) {
-    const prefix = name.split(" ").slice(0, 6).join(" ");
-    keys.push(`img:${img}|name:${prefix}`);
-  }
+
   return keys;
 }
 
@@ -94,14 +141,14 @@ function findDuplicateGroups(rows = []) {
 
   for (const row of rows) {
     if (!row?.item_id) continue;
-    byId.set(String(row.item_id), row);
+    const id = String(row.item_id);
+    byId.set(id, row);
     for (const key of dupeKeysFor(row)) {
       if (!groups.has(key)) groups.set(key, new Set());
-      groups.get(key).add(String(row.item_id));
+      groups.get(key).add(id);
     }
   }
 
-  // Merge overlapping groups (union-find lite)
   const parent = new Map();
   function find(x) {
     if (!parent.has(x)) parent.set(x, x);
@@ -218,4 +265,6 @@ module.exports = {
   removeDuplicates,
   findDuplicateGroups,
   normalizeText,
+  extractItemIdFromUrl,
+  canonicalizeProductUrl,
 };
