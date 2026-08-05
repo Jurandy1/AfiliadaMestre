@@ -612,13 +612,35 @@ async function fetchConversionReport({
   return data?.conversionReport || { nodes: [], pageInfo: {} };
 }
 
-async function generateShortLink(originUrl, subIds = null) {
+function sanitizeSubIdsForShopee(subIds = null) {
   const { SITE_SUBID, buildProductSubIds } = require("./tracking");
   const fallback = buildProductSubIds("geral", null);
   const clean = (Array.isArray(subIds) && subIds.length ? subIds : fallback)
     .map((s) => String(s).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40))
     .filter(Boolean)
     .slice(0, 5);
+  return clean.length ? clean : [SITE_SUBID, "organico", "vitrine", "geral", "produto"];
+}
+
+/** URL cru da Shopee para generateShortLink (não usar s.shopee / shope.ee). */
+function resolveProductOriginUrl(rowOrNode = {}) {
+  const productLink = String(rowOrNode.product_link || rowOrNode.productLink || "").trim();
+  if (productLink && /shopee\.com\.br/i.test(productLink) && !/s\.shopee\.|shope\.ee/i.test(productLink)) {
+    return productLink;
+  }
+  const shopId = Number(rowOrNode.shop_id ?? rowOrNode.shopId);
+  const itemId = Number(rowOrNode.item_id ?? rowOrNode.itemId);
+  if (Number.isSafeInteger(shopId) && shopId > 0 && Number.isSafeInteger(itemId) && itemId > 0) {
+    return `https://shopee.com.br/product/${shopId}/${itemId}`;
+  }
+  const offer = String(rowOrNode.offer_link || rowOrNode.offerLink || "").trim();
+  if (offer && /shopee\.com\.br/i.test(offer) && !/s\.shopee\.|shope\.ee/i.test(offer)) {
+    return offer;
+  }
+  return productLink || offer || "";
+}
+
+async function generateShortLink(originUrl, subIds = null) {
   const query = `
     mutation GenerateShortLink($originUrl: String!, $subIds: [String!]) {
       generateShortLink(input: { originUrl: $originUrl, subIds: $subIds }) {
@@ -628,9 +650,104 @@ async function generateShortLink(originUrl, subIds = null) {
   `;
   const data = await shopeeGraphql(query, {
     originUrl,
-    subIds: clean.length ? clean : [SITE_SUBID, "organico", "vitrine", "geral", "produto"],
+    subIds: sanitizeSubIdsForShopee(subIds),
   });
   return data?.generateShortLink?.shortLink || null;
+}
+
+/**
+ * Gera até 50 shortlinks por chamada (API oficial generateBatchShortLink).
+ * links: [{ originUrl, subIds?, itemId? }]
+ * Retorna [{ originUrl, shortLink, success, errorMessage, itemId }]
+ */
+async function generateBatchShortLink(links = []) {
+  const batch = (Array.isArray(links) ? links : [])
+    .map((l) => ({
+      originUrl: String(l.originUrl || "").trim(),
+      subIds: sanitizeSubIdsForShopee(l.subIds),
+      itemId: l.itemId != null ? Number(l.itemId) : null,
+    }))
+    .filter((l) => l.originUrl)
+    .slice(0, 50);
+
+  if (!batch.length) {
+    return { total: 0, successCount: 0, links: [] };
+  }
+
+  const query = `
+    mutation GenerateBatchShortLink($links: [GenerateShortLinkInput!]!) {
+      generateBatchShortLink(input: { links: $links }) {
+        total
+        successCount
+        links {
+          originUrl
+          shortLink
+          longLink
+          success
+          errorMessage
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await shopeeGraphql(query, {
+      links: batch.map(({ originUrl, subIds }) => ({ originUrl, subIds })),
+    });
+    const result = data?.generateBatchShortLink || { total: 0, successCount: 0, links: [] };
+    const outLinks = Array.isArray(result.links) ? result.links : [];
+    // Preserva itemId na ordem de envio
+    return {
+      total: Number(result.total) || batch.length,
+      successCount: Number(result.successCount) || outLinks.filter((x) => x.success).length,
+      links: batch.map((b, i) => {
+        const r = outLinks[i] || {};
+        return {
+          originUrl: r.originUrl || b.originUrl,
+          shortLink: r.shortLink || null,
+          longLink: r.longLink || null,
+          success: !!r.success && !!r.shortLink,
+          errorMessage: r.errorMessage || null,
+          itemId: b.itemId,
+        };
+      }),
+    };
+  } catch (err) {
+    // Fallback: gera um a um se a mutation batch não existir / falhar de schema
+    if (/GenerateShortLinkInput|Unknown type|Cannot query|generateBatchShortLink/i.test(String(err.message || ""))) {
+      const out = [];
+      let successCount = 0;
+      for (const b of batch) {
+        try {
+          const shortLink = await generateShortLink(b.originUrl, b.subIds);
+          const ok = !!shortLink;
+          if (ok) successCount += 1;
+          out.push({
+            originUrl: b.originUrl,
+            shortLink,
+            longLink: null,
+            success: ok,
+            errorMessage: ok ? null : "empty",
+            itemId: b.itemId,
+          });
+        } catch (e) {
+          out.push({
+            originUrl: b.originUrl,
+            shortLink: null,
+            longLink: null,
+            success: false,
+            errorMessage: e.message,
+            itemId: b.itemId,
+          });
+          if (e.rateLimited) {
+            return { total: batch.length, successCount, links: out, rateLimited: true };
+          }
+        }
+      }
+      return { total: batch.length, successCount, links: out };
+    }
+    throw err;
+  }
 }
 
 function mapOfferToProduct(node, keyword = "", listType = null, taxonomyOpts = null) {
@@ -718,7 +835,12 @@ function mapOfferToRow(node, keyword = "", listType = null, taxonomyOpts = null)
     shopee_commission_rate: node.shopeeCommissionRate != null ? String(node.shopeeCommissionRate) : null,
     commission: node.commission != null ? String(node.commission) : null,
     offer_link: node.offerLink || null,
-    product_link: node.productLink || null,
+    product_link: resolveProductOriginUrl({
+      productLink: node.productLink,
+      offerLink: node.offerLink,
+      shopId: node.shopId,
+      itemId,
+    }) || node.productLink || null,
     shop_id: node.shopId != null ? Number(node.shopId) : null,
     shop_name: node.shopName || null,
     shop_type: node.shopType != null ? Number(node.shopType) : null,
@@ -741,6 +863,8 @@ module.exports = {
   fetchShopeeOffers,
   fetchConversionReport,
   generateShortLink,
+  generateBatchShortLink,
+  resolveProductOriginUrl,
   mapOfferToProduct,
   mapOfferToRow,
   mapCampaignNode,

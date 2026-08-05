@@ -3,9 +3,10 @@
 // Alimentação automática leve (free-tier).
 // Rotaciona listType/sortType: recomendados+vendidos → top performance → maior comissão.
 
-const { fetchProductOffers, mapOfferToRow, SYNC_ROTATION } = require("./shopee");
-const { upsertOfertas, pruneOlderThan } = require("./supabase");
+const { fetchProductOffers, mapOfferToRow, SYNC_ROTATION, generateShortLink } = require("./shopee");
+const { upsertOfertas, pruneOlderThan, listOffersMissingShortlink, updateShortLink } = require("./supabase");
 const { allKeywords } = require("./categorias");
+const { buildProductSubIds } = require("./tracking");
 
 // Alimenta TODAS as categorias de forma justa (round-robin).
 // A proporção 90% feminina é aplicada só na exibição da vitrine.
@@ -19,6 +20,7 @@ const config = {
   limit: clampNum(process.env.AUTO_SYNC_LIMIT, 20, 5, 50),
   pruneDays: clampNum(process.env.AUTO_PRUNE_DAYS, 60, 0, 365),
   requestGapMs: clampNum(process.env.AUTO_SYNC_GAP_MS, 400, 100, 5000),
+  shortlinkBackfillPerRun: clampNum(process.env.AUTO_SYNC_SHORTLINKS, 15, 0, 100),
 };
 
 const state = {
@@ -108,6 +110,36 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
       if (i < config.batch - 1) await sleep(config.requestGapMs);
     }
 
+    // Gera shortlinks para as ofertas mais recentes sem short_link cacheado.
+    // Assim, quando um visitante clica em "Comprar", o link já está pronto.
+    let shortlinksGenerated = 0;
+    if (config.shortlinkBackfillPerRun > 0) {
+      try {
+        const missing = await listOffersMissingShortlink({ limit: config.shortlinkBackfillPerRun });
+        for (const row of Array.isArray(missing) ? missing : []) {
+          // product_link (URL cru) obrigatório — offer_link já vem encurtado.
+          const origin = row.product_link || row.offer_link;
+          if (!origin) continue;
+          try {
+            const subIds = buildProductSubIds(row.category, row.item_id, row.subcategory);
+            const shortLink = await generateShortLink(origin, subIds);
+            if (shortLink) {
+              await updateShortLink(row.item_id, shortLink);
+              shortlinksGenerated += 1;
+            }
+          } catch (linkErr) {
+            if (linkErr.rateLimited) break;
+          }
+          await sleep(config.requestGapMs);
+        }
+        if (shortlinksGenerated) {
+          console.log(`[autosync] shortlinks gerados: ${shortlinksGenerated}`);
+        }
+      } catch (e) {
+        console.warn("[autosync] backfill shortlink falhou:", e.message);
+      }
+    }
+
     if (config.pruneDays > 0) {
       const dayMs = 24 * 60 * 60 * 1000;
       const canPrune = !state.lastPruneAt || Date.now() - new Date(state.lastPruneAt).getTime() > dayMs;
@@ -125,7 +157,7 @@ async function runOnce({ manual = false, forceMode = null } = {}) {
     state.runs += 1;
     state.totalUpserts += upserts;
     state.lastRunAt = startedAt.toISOString();
-    state.lastResult = { manual, upserts, mode: mode.label, processed };
+    state.lastResult = { manual, upserts, mode: mode.label, processed, shortlinksGenerated };
     console.log(`[autosync] run #${state.runs} [${mode.label}]: ${upserts} upserts (${processed.length} keywords)`);
     return state.lastResult;
   } finally {

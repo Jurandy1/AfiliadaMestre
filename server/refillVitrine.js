@@ -60,8 +60,7 @@ async function refillVitrine({
         const nodes = offer.nodes || [];
         const rows = nodes
           .map((n) => mapOfferToRow(n, keyword, 0))
-          .filter((r) => r.item_id && r.offer_link)
-          .map((r) => ({ ...r, short_link: null }));
+          .filter((r) => r.item_id && r.offer_link);
 
         if (rows.length) {
           await upsertOfertas(rows);

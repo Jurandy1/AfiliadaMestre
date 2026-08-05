@@ -236,6 +236,19 @@ async function countBySubcategory(categoryId) {
   return counts;
 }
 
+/** Ofertas sem short_link cacheado. Prioriza mais recentes (updated_at desc). */
+async function listOffersMissingShortlink({ limit = 50 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const path = `/ofertas?select=item_id,category,subcategory,offer_link,product_link,shop_id,sub_ids&short_link=is.null&order=updated_at.desc&limit=${safeLimit}&${visibleOnlyQuery()}`;
+  return supabaseRequest(path, { method: "GET", useService: true });
+}
+
+async function countShortlinkStatus() {
+  const total = await supabaseCount(visibleOnlyQuery()).catch(() => 0);
+  const missing = await supabaseCount(`short_link=is.null&${visibleOnlyQuery()}`).catch(() => 0);
+  return { total, missing, ready: Math.max(0, total - missing) };
+}
+
 async function pruneOlderThan(days = 60) {
   const d = Number(days) || 60;
   const cutoff = new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
@@ -392,6 +405,8 @@ module.exports = {
   countByCategory,
   countBySubcategory,
   countOfertas,
+  listOffersMissingShortlink,
+  countShortlinkStatus,
   pruneOlderThan,
   clearAllOfertas,
   rowToProduct,

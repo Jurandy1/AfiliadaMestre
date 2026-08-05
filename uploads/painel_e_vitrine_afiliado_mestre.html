@@ -525,6 +525,23 @@
         <!-- VIEW: Catálogo & Sync -->
         <section id="admin-view-catalogo" class="admin-view space-y-6">
 
+                <!-- Shortlinks pré-gerados (acelera clique "Comprar") -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <h4 class="font-bold text-xs text-slate-700 uppercase tracking-wide"><i class="fas fa-bolt text-amber-500 mr-1"></i> Shortlinks pré-gerados</h4>
+                            <p class="text-[10px] text-slate-500 mt-1">Gera <strong>tudo que falta</strong> com Sub IDs oficiais. Produtos do Explorador já saem com shope.ee pronto.</p>
+                            <p id="shortlink-status-line" class="text-[11px] text-slate-700 font-semibold mt-2"><i class="fas fa-spinner fa-spin mr-1"></i> Verificando…</p>
+                            <div class="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div id="shortlink-status-bar" class="h-full bg-emerald-500 transition-all" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-shortlink-backfill" onclick="runShortlinkBackfill()" class="px-3 py-2 rounded-lg bg-shopee-orange text-white text-[11px] font-bold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i> Gerar tudo que falta
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Ofertas oficiais Shopee -->
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
@@ -1715,6 +1732,7 @@
             } else if (view === "catalogo") {
                 populateAdminCategorySelect();
                 loadAutoStatus();
+                loadShortlinkStatus();
                 applyExplorerPreset('bestsellers');
             } else if (view === "produtos") {
                 adminPage = 1;
@@ -1836,6 +1854,7 @@
                 populateAdminCategorySelect();
                 loadAdminStats();
                 loadAutoStatus();
+                loadShortlinkStatus();
                 loadConversions({ reset: true });
             }
             const health = await checkApiHealth();
@@ -2342,12 +2361,17 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                showToast(`Salvos: ${data.saved} produtos no Supabase`, "success");
-                setExplorerStatus("success", `<strong>${data.saved}</strong> produtos gravados (de ${data.unique} únicos selecionados).`);
+                const sl = data.shortlinks || {};
+                const slMsg = sl.generated
+                    ? ` · ${sl.generated} shortlinks prontos`
+                    : (sl.failed ? ` · ${sl.failed} shortlinks falharam` : "");
+                showToast(`Salvos: ${data.saved} produtos${slMsg}`, "success");
+                setExplorerStatus("success", `<strong>${data.saved}</strong> produtos gravados com Sub IDs${sl.generated ? ` e <strong>${sl.generated}</strong> shope.ee gerados` : ""}.`);
                 await loadOffersFromSupabase({ silent: true, reset: true });
                 await loadCategoriesFromApi({ silent: true });
                 populateAdminCategorySelect();
                 loadAdminStats();
+                loadShortlinkStatus();
             } catch (err) {
                 showToast(`Falha ao salvar: ${err.message}`, "error");
                 setExplorerStatus("error", escapeHtml(err.message));
@@ -3705,17 +3729,17 @@ async function loadOffersFromSupabase(opts = {}) {
             });
         }
 
-        const SITE_SUBID = 'afiliada_mestre';
+        // Alfanumérico puro — Shopee rejeita "_" e "-" ao gerar shortlink.
+        const SITE_SUBID = 'afiliadamestre';
         const TRACKING_STORAGE_KEY = 'afiliada_mestre_traffic_v1';
         const TRACKED_LINKS_KEY = 'afiliada_mestre_tracked_links';
 
+        // Sub IDs Shopee só aceitam alfanumérico — "_" e "-" quebram como "invalid sub id".
         function sanitizeSubId(value, fallback) {
             const clean = String(value || '')
                 .trim()
                 .toLowerCase()
-                .replace(/[^a-zA-Z0-9_-]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_+|_+$/g, '')
+                .replace(/[^a-z0-9]/g, '')
                 .slice(0, 40);
             return clean || fallback;
         }
@@ -3891,11 +3915,13 @@ async function loadOffersFromSupabase(opts = {}) {
         }
 
         function buildCampaignShareUrl(channel, campaign, productId = '') {
-            const url = new URL(location.origin + '/');
+            // Links com produto vão para /p/:id (SSR popup rápido).
+            // Links sem produto continuam na home com UTMs preservados.
+            const basePath = productId ? `/p/${encodeURIComponent(String(productId))}` : '/';
+            const url = new URL(location.origin + basePath);
             url.searchParams.set('utm_source', sanitizeSubId(channel, 'organico'));
             url.searchParams.set('utm_campaign', sanitizeSubId(campaign, 'vitrine'));
             url.searchParams.set('utm_medium', 'social');
-            if (productId) url.searchParams.set('produto', String(productId));
             return url.toString();
         }
 
@@ -4263,7 +4289,7 @@ async function loadOffersFromSupabase(opts = {}) {
                 return;
             }
             scrollToStoreGrid();
-            setTimeout(() => openProductModal(p.id), 400);
+            requestAnimationFrame(() => openProductModal(p.id));
         }
 
         async function resetVitrineAndRefill() {
@@ -5363,6 +5389,59 @@ async function loadOffersFromSupabase(opts = {}) {
             }
         }
 
+        async function loadShortlinkStatus() {
+            const line = document.getElementById('shortlink-status-line');
+            const bar = document.getElementById('shortlink-status-bar');
+            if (!line || !bar) return;
+            try {
+                const res = await fetch(`${API_BASE}/api/status/shortlinks`);
+                const s = await res.json();
+                if (!res.ok) throw new Error(s.error || `HTTP ${res.status}`);
+                const total = Number(s.total) || 0;
+                const ready = Number(s.ready) || 0;
+                const missing = Number(s.missing) || 0;
+                const pct = total > 0 ? Math.round((ready / total) * 100) : 0;
+                bar.style.width = `${pct}%`;
+                bar.className = `h-full transition-all ${pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`;
+                line.innerHTML = total
+                    ? `<strong>${ready.toLocaleString('pt-BR')}</strong> / ${total.toLocaleString('pt-BR')} produtos com shortlink pronto (${pct}%). Faltam <strong>${missing.toLocaleString('pt-BR')}</strong>.`
+                    : 'Nenhum produto no banco ainda. Rode um sync primeiro.';
+            } catch (err) {
+                line.innerHTML = `<span class="text-rose-500"><i class="fas fa-circle-exclamation mr-1"></i>${escapeHtml(err.message || 'Erro ao consultar status')}</span>`;
+            }
+        }
+
+        async function runShortlinkBackfill() {
+            const btn = document.getElementById('btn-shortlink-backfill');
+            const line = document.getElementById('shortlink-status-line');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Gerando tudo…'; }
+            if (line) line.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Gerando <strong>todos</strong> os shortlinks faltantes (lotes de 50). Pode levar alguns minutos…';
+            try {
+                const res = await adminFetch(`${API_BASE}/api/shortlinks/backfill`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ all: true, limit: 50 }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const missing = data.status?.missing;
+                let msg = `Shortlinks: ${data.generated} gerados, ${data.failed || 0} falhas`;
+                if (data.rateLimited) {
+                    msg += ' — rate-limit. Clique de novo em alguns segundos para continuar.';
+                } else if (data.timedOut || (typeof missing === 'number' && missing > 0)) {
+                    msg += ` — ainda faltam ${missing != null ? missing : 'alguns'}. Clique de novo para continuar.`;
+                } else {
+                    msg += ' — fila zerada.';
+                }
+                showToast(msg, data.generated || data.done ? 'success' : 'error');
+            } catch (err) {
+                showToast(err.message || 'Erro no backfill', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-1"></i> Gerar tudo que falta'; }
+                loadShortlinkStatus();
+            }
+        }
+
         async function loadAutoStatus() {
             const box = document.getElementById('auto-status-box');
             const badge = document.getElementById('auto-enabled-badge');
@@ -5551,7 +5630,8 @@ async function loadOffersFromSupabase(opts = {}) {
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                showToast(`Importadas ${data.saved || data.count || 0} ofertas oficiais`, 'success');
+                showToast(`Importadas ${data.saved || data.count || 0} ofertas oficiais${data.shortlinks?.generated ? ` · ${data.shortlinks.generated} shortlinks` : ''}`, 'success');
+                loadShortlinkStatus();
             } catch (err) {
                 showToast(`Import falhou: ${err.message}`, 'error');
             }

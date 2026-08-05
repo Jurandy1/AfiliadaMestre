@@ -13,6 +13,8 @@ const {
   fetchProductDetailsByIds,
   fetchShopeeOffers,
   generateShortLink,
+  generateBatchShortLink,
+  resolveProductOriginUrl,
   mapOfferToProduct,
   mapOfferToRow,
   mapCampaignNode,
@@ -38,11 +40,13 @@ const {
   deleteCampanhaRastreio,
   patchOferta,
   deleteOfertasByIds,
+  listOffersMissingShortlink,
+  countShortlinkStatus,
 } = require("./supabase");
 const { CATEGORIAS, categoryForKeyword, weightedKeywords, allKeywords, metaOnly } = require("./categorias");
 const { refillVitrine } = require("./refillVitrine");
 const { productMatchesSubcategory } = require("./productMeta");
-const { SITE_SUBID, buildProductSubIds } = require("./tracking");
+const { SITE_SUBID, buildProductSubIds, buildTrackedSubIds, sanitizeSubId } = require("./tracking");
 const autosync = require("./autosync");
 
 const app = express();
@@ -334,10 +338,27 @@ app.post("/api/ofertas/save-bulk", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Nenhum produto válido (itemId + offerLink)", code: "INVALID_PRODUCTS" });
     }
 
+    // Garante product_link cru + Sub IDs antes de gravar (tracking oficial Shopee)
+    for (const row of rows) {
+      if (!row.product_link) {
+        row.product_link = resolveProductOriginUrl(row) || null;
+      }
+      if (!Array.isArray(row.sub_ids) || row.sub_ids.length < 5) {
+        row.sub_ids = buildProductSubIds(row.category, row.item_id, row.subcategory);
+      }
+    }
+
     const result = await upsertOfertas(rows);
     const saved = Array.isArray(result) ? result.length : rows.length;
     categoriasCache = { at: 0, data: null };
     ofertasCache.clear();
+
+    // Já gera shope.ee com Sub IDs — produto sai pronto pro "Comprar" (sem perder comissão)
+    const withShortlinks = body.withShortlinks !== false;
+    let shortlinks = { generated: 0, failed: 0, skipped: 0 };
+    if (withShortlinks && rows.length) {
+      shortlinks = await generateShortlinksForRows(rows);
+    }
 
     res.json({
       ok: true,
@@ -345,6 +366,7 @@ app.post("/api/ofertas/save-bulk", requireAdmin, async (req, res) => {
       unique: rows.length,
       saved,
       count: saved,
+      shortlinks,
     });
   } catch (err) {
     console.error("[/api/ofertas/save-bulk]", err.message);
@@ -799,6 +821,141 @@ app.post("/api/shortlink", async (req, res) => {
 });
 
 /**
+ * Gera shortlinks shope.ee com Sub IDs oficiais para uma lista de rows.
+ * Usa generateBatchShortLink (até 50 por request).
+ */
+async function generateShortlinksForRows(rows = [], { gapMs = 400 } = {}) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let generated = 0;
+  let failed = 0;
+  let skipped = 0;
+  const list = Array.isArray(rows) ? rows : [];
+  const BATCH = 50;
+
+  for (let i = 0; i < list.length; i += BATCH) {
+    const chunk = list.slice(i, i + BATCH);
+    const links = [];
+    for (const row of chunk) {
+      const origin = resolveProductOriginUrl(row);
+      if (!origin) {
+        skipped += 1;
+        continue;
+      }
+      const subIds = Array.isArray(row.sub_ids) && row.sub_ids.length
+        ? row.sub_ids
+        : buildProductSubIds(row.category, row.item_id, row.subcategory);
+      links.push({ originUrl: origin, subIds, itemId: row.item_id });
+    }
+    if (!links.length) continue;
+
+    try {
+      const batch = await generateBatchShortLink(links);
+      for (const item of batch.links || []) {
+        if (item.success && item.shortLink && item.itemId) {
+          try {
+            await updateShortLink(item.itemId, item.shortLink);
+            generated += 1;
+          } catch (_) {
+            failed += 1;
+          }
+        } else {
+          failed += 1;
+        }
+      }
+      if (batch.rateLimited) {
+        return { generated, failed, skipped, rateLimited: true };
+      }
+    } catch (e) {
+      failed += links.length;
+      if (e.rateLimited) {
+        return { generated, failed, skipped, rateLimited: true };
+      }
+    }
+    if (i + BATCH < list.length) await sleep(gapMs);
+  }
+  return { generated, failed, skipped };
+}
+
+/**
+ * Backfill de shortlinks: gera shope.ee para ofertas sem short_link cacheado.
+ * all=true → continua até zerar a fila, rate-limit, ou teto de tempo (~45s, seguro no Vercel).
+ */
+async function backfillShortlinks({ limit = 50, gapMs = 400, all = false } = {}) {
+  const batchSize = Math.min(Math.max(Number(limit) || 50, 1), 50);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let generated = 0;
+  let failed = 0;
+  let skipped = 0;
+  let rounds = 0;
+  const maxRounds = all ? 400 : 1;
+  const started = Date.now();
+  const timeBudgetMs = all ? 45000 : 55000;
+
+  while (rounds < maxRounds) {
+    if (Date.now() - started > timeBudgetMs) {
+      return {
+        ok: true,
+        generated,
+        failed,
+        skipped,
+        rounds,
+        all,
+        timedOut: true,
+        message: "Parou no limite de tempo — clique de novo para continuar o restante.",
+      };
+    }
+    rounds += 1;
+    const rows = await listOffersMissingShortlink({ limit: batchSize });
+    if (!Array.isArray(rows) || !rows.length) break;
+
+    const result = await generateShortlinksForRows(rows, { gapMs: 0 });
+    generated += result.generated;
+    failed += result.failed;
+    skipped += result.skipped;
+
+    if (result.rateLimited) {
+      return {
+        ok: true,
+        generated,
+        failed,
+        skipped,
+        rounds,
+        all,
+        rateLimited: true,
+        message: "Rate-limit da Shopee — rode de novo em alguns segundos para continuar.",
+      };
+    }
+    if (!all) break;
+    if (rounds < maxRounds) await sleep(gapMs);
+  }
+
+  return { ok: true, generated, failed, skipped, rounds, all, done: true };
+}
+
+app.get("/api/status/shortlinks", async (_req, res) => {
+  try {
+    const status = await countShortlinkStatus();
+    res.json({ ...status, updatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error("[/api/status/shortlinks]", err.message);
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+app.post("/api/shortlinks/backfill", requireAdmin, async (req, res) => {
+  try {
+    const all = req.body?.all !== false; // padrão: gera tudo que falta
+    const limit = Number(req.body?.limit) || 50;
+    const result = await backfillShortlinks({ limit, all });
+    const status = await countShortlinkStatus().catch(() => null);
+    res.json({ ...result, status });
+  } catch (err) {
+    console.error("[/api/shortlinks/backfill]", err.message);
+    res.status(err.status || 500).json({ error: err.message, details: err.payload || null });
+  }
+});
+
+/**
  * Relatório real de conversões da Shopee para o painel admin.
  * Por padrão (siteOnly=1) só retorna vendas rastreadas por este site.
  */
@@ -821,9 +978,14 @@ app.get("/api/conversions", async (req, res) => {
     let nodes = Array.isArray(report.nodes) ? report.nodes : [];
     const totalFromShopee = nodes.length;
     if (siteOnly) {
-      nodes = nodes.filter((conversion) =>
-        String(conversion.utmContent || "").toLowerCase().includes(marker)
-      );
+      // Reconhece ambas as formas do marcador (com/sem underscore) —
+      // histórico usava "afiliada_mestre"; novo padrão é "afiliadamestre".
+      const markerCompact = marker.replace(/[^a-z0-9]/g, "");
+      const markerLegacy = "afiliada_mestre";
+      nodes = nodes.filter((conversion) => {
+        const utm = String(conversion.utmContent || "").toLowerCase();
+        return utm.includes(markerCompact) || utm.includes(markerLegacy);
+      });
     }
     const itemIds = nodes.flatMap((conversion) =>
       (conversion.orders || []).flatMap((order) =>
@@ -980,6 +1142,206 @@ app.delete("/api/ofertas", requireAdmin, async (req, res) => {
     res.status(err.status || 500).json({ error: err.message });
   }
 });
+
+/**
+ * Landing page ultra-leve do produto — abre o "popup" ANTES da vitrine carregar.
+ * Usada em links de campanha compartilhados no Facebook/Instagram/WhatsApp.
+ *   /p/:itemId?utm_campaign=...&utm_source=...&utm_medium=...
+ *
+ * Fluxo: HTML < 8KB → imagem+preço+CTA imediato → click sai para shope.ee com Sub IDs.
+ * Vitrine completa carrega em segundo plano (defer) para quem fechar o popup.
+ */
+app.get("/p/:itemId", async (req, res) => {
+  const itemId = Number(String(req.params.itemId).replace(/[^\d]/g, ""));
+  if (!Number.isSafeInteger(itemId) || itemId <= 0) {
+    return res.redirect(302, "/");
+  }
+  const q = req.query || {};
+  const attribution = {
+    channel: String(q.utm_source || q.canal || q.source || q.ref || "organico"),
+    campaign: String(q.utm_campaign || q.campanha || q.campaign || "vitrine"),
+    medium: String(q.utm_medium || q.medium || "social"),
+  };
+
+  try {
+    const rows = await getOffersByItemIds([itemId], { full: true });
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row) {
+      const back = new URLSearchParams({
+        produto: String(itemId),
+        utm_campaign: attribution.campaign,
+        utm_source: attribution.channel,
+        utm_medium: attribution.medium,
+      }).toString();
+      return res.redirect(302, `/?${back}`);
+    }
+    const product = rowToProduct(row);
+    // Para generateShortLink precisamos do URL "cru" (shopee.com.br/product/...);
+    // affiliateLink já vem encurtado (s.shopee.com.br) e o Shopee rejeita.
+    const rawOrigin = product.productLink && /shopee\.com\.br\/(product|(?:i\/)?[^\/]+\/[^\/]+)/i.test(product.productLink)
+      ? product.productLink
+      : (product.affiliateLink && product.affiliateLink !== "#" ? product.affiliateLink : "");
+    const buyFallback = product.affiliateLink && product.affiliateLink !== "#"
+      ? product.affiliateLink
+      : (product.productLink || "");
+
+    let shortLink = product.shortLink || null;
+    const isDefaultAttribution =
+      attribution.channel === "organico" &&
+      attribution.campaign === "vitrine";
+    // Gera shortlink com Sub IDs da campanha (ou usa o cacheado quando é orgânico)
+    if (rawOrigin && (!shortLink || !isDefaultAttribution)) {
+      try {
+        const subIds = buildTrackedSubIds(
+          product.category,
+          itemId,
+          product.subcategory,
+          attribution
+        );
+        const generated = await generateShortLink(rawOrigin, subIds);
+        if (generated) {
+          shortLink = generated;
+          if (isDefaultAttribution) {
+            // Só cacheia o link "orgânico" — links de campanha são efêmeros
+            updateShortLink(itemId, generated).catch(() => {});
+          }
+        }
+      } catch (linkErr) {
+        console.warn("[/p/:itemId] shortlink falhou:", linkErr.message);
+      }
+    }
+
+    const buyHref = shortLink || buyFallback || "#";
+    const priceNew = Number(product.newPrice) || 0;
+    const priceOld = Number(product.oldPrice) || 0;
+    const brl = (n) => "R$ " + n.toFixed(2).replace(".", ",");
+    const oldPriceHtml = priceOld > priceNew
+      ? `<div class="old-price">De: ${brl(priceOld)}</div>` : "";
+    const discountHtml = product.discountPct
+      ? `<span class="discount-badge">-${product.discountPct}%</span>` : "";
+    const shopHtml = product.shopName
+      ? `<div class="shop"><i>🏪</i> ${escapeHtmlSSR(product.shopName)}</div>` : "";
+    const backHref = "/?" + new URLSearchParams({
+      utm_campaign: attribution.campaign,
+      utm_source: attribution.channel,
+      utm_medium: attribution.medium,
+    }).toString();
+
+    res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+    res.send(renderFastPopup({
+      product,
+      buyHref,
+      backHref,
+      oldPriceHtml,
+      discountHtml,
+      shopHtml,
+      priceNewFmt: brl(priceNew),
+      attribution,
+    }));
+  } catch (err) {
+    console.error("[/p/:itemId]", err.message);
+    return res.redirect(302, "/");
+  }
+});
+
+function escapeHtmlSSR(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderFastPopup({ product, buyHref, backHref, oldPriceHtml, discountHtml, shopHtml, priceNewFmt, attribution }) {
+  const title = escapeHtmlSSR(product.title || "Oferta Shopee");
+  const image = escapeHtmlSSR(product.image || "");
+  const category = escapeHtmlSSR(product.category || "");
+  const desc = escapeHtmlSSR(product.desc || "");
+  const stars = Math.max(1, Math.min(5, Math.round(Number(product.stars) || 4)));
+  const salesTxt = escapeHtmlSSR(product.sales || "");
+  const ogUrl = "https://shope.ee";
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,follow">
+<title>${title} — Afiliada Mestre</title>
+<meta property="og:title" content="${title}">
+<meta property="og:image" content="${image}">
+<meta property="og:type" content="product">
+<link rel="preconnect" href="https://shope.ee">
+<link rel="preconnect" href="https://s.shopee.com.br">
+<link rel="preconnect" href="https://cf.shopee.com.br">
+<link rel="dns-prefetch" href="https://shopee.com.br">
+${image ? `<link rel="preload" as="image" href="${image}">` : ""}
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
+.card{background:#fff;border-radius:18px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(15,23,42,.25);overflow:hidden;animation:pop .18s ease-out}
+@keyframes pop{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.head{background:linear-gradient(135deg,#ee4d2d,#f97316);color:#fff;padding:10px 14px;font-size:12px;font-weight:800;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;letter-spacing:.5px}
+.close{background:rgba(255,255,255,.2);border:0;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:16px;text-decoration:none;display:flex;align-items:center;justify-content:center}
+.img-wrap{position:relative;aspect-ratio:1;background:#f8fafc;overflow:hidden}
+.img-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.discount-badge{position:absolute;top:10px;right:10px;background:#fbbf24;color:#78350f;padding:5px 10px;border-radius:8px;font-weight:800;font-size:12px}
+.body{padding:16px}
+.cat{display:inline-block;background:#fef3c7;color:#78350f;font-size:10px;font-weight:800;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-bottom:8px}
+h1{font-size:15px;line-height:1.35;margin-bottom:6px;font-weight:700}
+.stars{color:#f59e0b;font-size:12px;margin-bottom:8px}
+.stars span{color:#94a3b8;margin-left:6px}
+.price-box{background:#fef7f0;border-radius:12px;padding:10px 12px;margin-bottom:10px}
+.old-price{font-size:11px;color:#94a3b8;text-decoration:line-through}
+.new-price{font-size:26px;font-weight:800;color:#ee4d2d;line-height:1.1;margin-top:2px}
+.desc{font-size:12px;color:#475569;line-height:1.55;background:#f8fafc;padding:9px 11px;border-radius:10px;margin-bottom:10px}
+.shop{font-size:11px;color:#64748b;margin-bottom:10px}
+.shop i{font-style:normal;margin-right:4px}
+.cta{display:block;width:100%;background:#ee4d2d;color:#fff;text-align:center;padding:14px;border-radius:12px;font-weight:800;font-size:14px;text-decoration:none;text-transform:uppercase;letter-spacing:.4px;box-shadow:0 6px 16px rgba(238,77,45,.35)}
+.cta:active{transform:translateY(1px)}
+.more{display:block;text-align:center;margin-top:10px;color:#64748b;font-size:11px;text-decoration:none;padding:8px}
+.more:hover{color:#ee4d2d}
+.foot{padding:6px 14px 12px;font-size:9px;color:#94a3b8;text-align:center;line-height:1.5}
+</style>
+</head>
+<body>
+<main class="card" role="main">
+  <header class="head">
+    <span>🛍️ Oferta selecionada</span>
+    <a class="close" href="${backHref}" aria-label="Fechar">×</a>
+  </header>
+  <div class="img-wrap">
+    ${image ? `<img src="${image}" alt="${title}" fetchpriority="high">` : ""}
+    ${discountHtml}
+  </div>
+  <div class="body">
+    ${category ? `<div class="cat">${category}</div>` : ""}
+    <h1>${title}</h1>
+    <div class="stars">${"★".repeat(stars)}${"☆".repeat(5 - stars)} ${salesTxt ? `<span>(${salesTxt})</span>` : ""}</div>
+    <div class="price-box">
+      ${oldPriceHtml}
+      <div class="new-price">${priceNewFmt}</div>
+    </div>
+    ${desc ? `<div class="desc">${desc}</div>` : ""}
+    ${shopHtml}
+    <a class="cta" href="${escapeHtmlSSR(buyHref)}" target="_blank" rel="noopener noreferrer">Comprar na Shopee →</a>
+    <a class="more" href="${backHref}">Ver mais ofertas na vitrine</a>
+  </div>
+  <div class="foot">Link de afiliado. Ao comprar você apoia o site sem custo extra.</div>
+</main>
+<script>
+  // Prefetch vitrine sob demanda (idle) para acelerar quem fechar o popup
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(function(){
+      var l = document.createElement('link');
+      l.rel = 'prefetch'; l.href = ${JSON.stringify(backHref)};
+      document.head.appendChild(l);
+    }, { timeout: 3000 });
+  }
+</script>
+</body>
+</html>`;
+}
 
 // Canonical: path antigo do HTML → URL limpa (antes do static)
 app.get("/uploads/painel_e_vitrine_afiliado_mestre.html", (req, res) => {

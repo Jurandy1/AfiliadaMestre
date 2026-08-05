@@ -1,7 +1,10 @@
 "use strict";
 
-/** Marcador fixo deste site nas conversões Shopee (utmContent). */
-const SITE_SUBID = "afiliada_mestre";
+/**
+ * Marcador fixo deste site nas conversões Shopee (utmContent).
+ * Precisa ser alfanumérico puro — Shopee rejeita "_" e "-" como sub id.
+ */
+const SITE_SUBID = "afiliadamestre";
 
 /** Códigos curtos de seção da vitrine → slot 3 (campanha) no painel Shopee. */
 const SECTION_CODES = {
@@ -19,13 +22,15 @@ const SECTION_CODES = {
   oficial: "oficial",
 };
 
+/**
+ * Sub IDs Shopee: SÓ ALFANUMÉRICO. A API rejeita `_` e `-` como "invalid sub id".
+ * Convertemos separadores (espaço/underscore/hífen) removendo-os e mantendo case-insensitive.
+ */
 function sanitizeSubId(value, fallback = "geral") {
   const clean = String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
+    .replace(/[^a-z0-9]/g, "")
     .slice(0, 40);
   return clean || fallback;
 }
@@ -48,6 +53,31 @@ function buildProductSubIds(category, itemId, subcategory = null, campaign = "vi
   ].slice(0, 5);
 }
 
+/**
+ * Sub IDs a partir de atribuição de tráfego (utm_source, utm_campaign, utm_medium).
+ * Espelha o comportamento do cliente em `getTrackingSubIds`:
+ *   1 site | 2 canal[_medium] | 3 campanha | 4 categoria[_sub] | 5 produto
+ */
+function buildTrackedSubIds(category, itemId, subcategory = null, attribution = {}) {
+  const catBase = sanitizeSubId(category, "geral");
+  const catSlot = subcategory
+    ? sanitizeSubId(`${catBase}_${subcategory}`, catBase)
+    : catBase;
+  const channel = sanitizeSubId(attribution.channel || "organico", "organico");
+  const medium = sanitizeSubId(attribution.medium || "", "");
+  const channelSlot = medium && medium !== channel
+    ? sanitizeSubId(`${channel}_${medium}`, channel)
+    : channel;
+  const campaignSlot = sanitizeSubId(attribution.campaign || "vitrine", "vitrine");
+  return [
+    SITE_SUBID,
+    channelSlot,
+    campaignSlot,
+    catSlot,
+    sanitizeSubId(itemId ? `p${itemId}` : "produto", "produto"),
+  ].slice(0, 5);
+}
+
 function sectionToCampaign(section) {
   if (!section) return null;
   const key = String(section).trim();
@@ -64,6 +94,7 @@ module.exports = {
   SECTION_CODES,
   sanitizeSubId,
   buildProductSubIds,
+  buildTrackedSubIds,
   sectionToCampaign,
   subIdsToText,
 };
